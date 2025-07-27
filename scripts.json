@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "dev": "flutter run -d web-server --web-port 8080 --dart-define-from-file=.env.development",
+    "dev:mock": "flutter run -d web-server --web-port 8080 --dart-define=ENVIRONMENT=development --dart-define=USE_MOCK_SERVICES=true",
+    "dev:real": "flutter run -d web-server --web-port 8080 --dart-define=ENVIRONMENT=development --dart-define=USE_MOCK_SERVICES=false",
+    "build:dev": "flutter build web --dart-define-from-file=.env.development",
+    "build:staging": "flutter build web --dart-define-from-file=.env.staging",
+    "build:prod": "flutter build web --dart-define-from-file=.env.production",
+    "deploy:prod": "powershell -ExecutionPolicy Bypass -File ./deploy-firebase.ps1",
+    "deploy:staging": "powershell -ExecutionPolicy Bypass -File ./deploy-staging.ps1",
+    "test": "flutter test",
+    "analyze": "flutter analyze"
+  }
+}

@@ -1,0 +1,65 @@
+name: Deploy to Firebase Hosting
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.0'
+        channel: 'stable'
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Get Flutter dependencies
+      run: flutter pub get
+      
+    - name: Build for Production
+      if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production'
+      run: |
+        flutter build web --release \
+          --dart-define=ENVIRONMENT=production \
+          --dart-define=USE_MOCK_SERVICES=false \
+          --dart-define=FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID_PROD }} \
+          --dart-define=STRIPE_PUBLISHABLE_KEY_PROD=${{ secrets.STRIPE_PUBLISHABLE_KEY_PROD }}
+          
+    - name: Build for Staging
+      if: github.ref != 'refs/heads/main' && github.event.inputs.environment != 'production'
+      run: |
+        flutter build web --release \
+          --dart-define=ENVIRONMENT=staging \
+          --dart-define=USE_MOCK_SERVICES=false \
+          --dart-define=FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID_STAGING }} \
+          --dart-define=STRIPE_PUBLISHABLE_KEY_TEST=${{ secrets.STRIPE_PUBLISHABLE_KEY_TEST }}
+          
+    - name: Deploy to Firebase Hosting
+      uses: FirebaseExtended/action-hosting-deploy@v0
+      with:
+        repoToken: '${{ secrets.GITHUB_TOKEN }}'
+        firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+        projectId: '${{ secrets.FIREBASE_PROJECT_ID }}'
+        channelId: live

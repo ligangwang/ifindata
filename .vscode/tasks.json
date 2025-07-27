@@ -1,0 +1,22 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Flutter: Run Web",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"run",
+				"-d",
+				"web-server",
+				"--web-port",
+				"8080"
+			],
+			"group": "build",
+			"isBackground": true,
+			"problemMatcher": [
+				"$dart-analyzer"
+			]
+		}
+	]
+}

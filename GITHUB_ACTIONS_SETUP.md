@@ -40,6 +40,10 @@ Add each of these secrets one by one:
 - **Name**: `FIREBASE_MEASUREMENT_ID`
   - **Value**: `G-8FBVV30SY6`
 
+#### **Google Sign-In Secret:**
+- **Name**: `GOOGLE_CLIENT_ID`
+  - **Value**: `464830297405-m3fhkgnl5t5f8ld3s7e69t3cegklqmfg.apps.googleusercontent.com`
+
 #### **Firebase Service Account:**
 - **Name**: `FIREBASE_SERVICE_ACCOUNT_IFINDATA_80905`
   - **Value**: [Get this from Firebase Console - see Step 3 below]
@@ -79,6 +83,7 @@ If you want a staging environment, also add:
 - `FIREBASE_MESSAGING_SENDER_ID_STAGING`
 - `FIREBASE_APP_ID_STAGING`
 - `FIREBASE_MEASUREMENT_ID_STAGING`
+- `GOOGLE_CLIENT_ID_STAGING`
 
 ## 🔄 **How the CI/CD Works**
 

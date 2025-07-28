@@ -1,8 +1,8 @@
 // lib/screens/watchlist/watchlist_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/mock_watchlist_provider.dart';
-import '../../providers/mock_auth_provider.dart';
+import '../../providers/watchlist_provider.dart';
+import '../../providers/auth_provider.dart';
 
 class WatchlistScreen extends StatelessWidget {
   const WatchlistScreen({super.key});
@@ -13,7 +13,7 @@ class WatchlistScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Watchlist'),
         actions: [
-          Consumer<MockWatchlistProvider>(
+          Consumer<WatchlistProvider>(
             builder: (context, watchlistProvider, _) {
               return IconButton(
                 icon: const Icon(Icons.refresh),
@@ -25,7 +25,7 @@ class WatchlistScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Consumer2<MockWatchlistProvider, MockAuthProvider>(
+      body: Consumer2<WatchlistProvider, AuthProvider>(
         builder: (context, watchlistProvider, authProvider, _) {
           if (watchlistProvider.isLoading &&
               watchlistProvider.watchlistData.isEmpty) {
@@ -251,7 +251,7 @@ class WatchlistScreen extends StatelessWidget {
 
   void _removeFromWatchlist(
     BuildContext context,
-    MockWatchlistProvider watchlistProvider,
+    WatchlistProvider watchlistProvider,
     String symbol,
   ) {
     showDialog(

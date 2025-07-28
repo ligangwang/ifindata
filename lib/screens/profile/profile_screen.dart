@@ -1,7 +1,7 @@
 // lib/screens/profile/profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/mock_auth_provider.dart';
+import '../../providers/auth_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -10,7 +10,7 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
-      body: Consumer<MockAuthProvider>(
+      body: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {
           final user = authProvider.user;
 
@@ -238,7 +238,7 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
-  void _signOut(BuildContext context, MockAuthProvider authProvider) {
+  void _signOut(BuildContext context, AuthProvider authProvider) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(

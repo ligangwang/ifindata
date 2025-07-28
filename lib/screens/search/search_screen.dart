@@ -1,8 +1,8 @@
 // lib/screens/search/search_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/mock_stock_provider.dart';
-import '../../providers/mock_watchlist_provider.dart';
+import '../../providers/stock_provider.dart';
+import '../../providers/watchlist_provider.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -38,7 +38,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 if (value.isNotEmpty) {
                   _performSearch(value);
                 } else {
-                  context.read<MockStockProvider>().clearSearchResults();
+                  context.read<StockProvider>().clearSearchResults();
                 }
               },
               trailing: [
@@ -47,7 +47,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     icon: const Icon(Icons.clear),
                     onPressed: () {
                       _searchController.clear();
-                      context.read<MockStockProvider>().clearSearchResults();
+                      context.read<StockProvider>().clearSearchResults();
                     },
                   ),
               ],
@@ -55,7 +55,7 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ),
       ),
-      body: Consumer<MockStockProvider>(
+      body: Consumer<StockProvider>(
         builder: (context, stockProvider, _) {
           if (stockProvider.isSearching) {
             return const Center(child: CircularProgressIndicator());
@@ -174,7 +174,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         ],
                       ),
                       const SizedBox(width: 8),
-                      Consumer<MockWatchlistProvider>(
+                      Consumer<WatchlistProvider>(
                         builder: (context, watchlistProvider, _) {
                           return IconButton(
                             icon: Icon(
@@ -214,7 +214,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void _performSearch(String query) {
     if (!_isSearching) {
       _isSearching = true;
-      context.read<MockStockProvider>().searchStocks(query).then((_) {
+      context.read<StockProvider>().searchStocks(query).then((_) {
         _isSearching = false;
       });
     }

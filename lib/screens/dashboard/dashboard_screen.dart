@@ -1,8 +1,8 @@
 // lib/screens/dashboard/dashboard_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/mock_stock_provider.dart';
-import '../../providers/mock_auth_provider.dart';
+import '../../providers/stock_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/stock_data.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -23,13 +23,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              context.read<MockStockProvider>().refreshData();
+              context.read<StockProvider>().refreshData();
             },
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () => context.read<MockStockProvider>().refreshData(),
+        onRefresh: () => context.read<StockProvider>().refreshData(),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -57,7 +57,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildWelcomeSection() {
-    return Consumer<MockAuthProvider>(
+    return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
         final user = authProvider.user;
         return Card(
@@ -116,7 +116,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        Consumer<MockStockProvider>(
+        Consumer<StockProvider>(
           builder: (context, stockProvider, _) {
             if (stockProvider.isLoading &&
                 stockProvider.marketIndices.isEmpty) {
@@ -233,7 +233,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        Consumer<MockStockProvider>(
+        Consumer<StockProvider>(
           builder: (context, stockProvider, _) {
             if (stockProvider.isLoading &&
                 stockProvider.trendingStocks.isEmpty) {

@@ -1,7 +1,7 @@
 // lib/screens/auth/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/mock_auth_provider.dart';
+import '../../providers/auth_provider.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -81,105 +81,11 @@ class LoginScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 32),
 
-                          // Google Sign In Button
-                          Consumer<MockAuthProvider>(
-                            builder: (context, authProvider, _) {
-                              return SizedBox(
-                                width: double.infinity,
-                                height: 56,
-                                child: ElevatedButton.icon(
-                                  onPressed: authProvider.isLoading
-                                      ? null
-                                      : () => _signInWithGoogle(
-                                          context,
-                                          authProvider,
-                                        ),
-                                  icon: authProvider.isLoading
-                                      ? const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      : Image.asset(
-                                          'assets/images/google_logo.png',
-                                          width: 24,
-                                          height: 24,
-                                          errorBuilder:
-                                              (context, error, stackTrace) {
-                                                return const Icon(
-                                                  Icons.account_circle,
-                                                );
-                                              },
-                                        ),
-                                  label: Text(
-                                    authProvider.isLoading
-                                        ? 'Signing in...'
-                                        : 'Continue with Google',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: Colors.black87,
-                                    elevation: 2,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      side: BorderSide(
-                                        color: Colors.grey.shade300,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+                          // Google Sign In Button - Works with both providers
+                          _buildGoogleSignInButton(),
 
-                          // Error Message
-                          Consumer<MockAuthProvider>(
-                            builder: (context, authProvider, _) {
-                              if (authProvider.errorMessage != null) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 16),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.errorContainer,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.error_outline,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.onErrorContainer,
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            authProvider.errorMessage!,
-                                            style: TextStyle(
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.onErrorContainer,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }
-                              return const SizedBox.shrink();
-                            },
-                          ),
+                          // Error Message - Works with both providers
+                          _buildErrorMessage(),
                         ],
                       ),
                     ),
@@ -230,14 +136,93 @@ class LoginScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildGoogleSignInButton() {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, _) {
+        return SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton.icon(
+            onPressed: authProvider.isLoading
+                ? null
+                : () => _signInWithGoogle(context, authProvider),
+            icon: authProvider.isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Image.asset(
+                    'assets/images/google_logo.png',
+                    width: 24,
+                    height: 24,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Icon(Icons.account_circle);
+                    },
+                  ),
+            label: Text(
+              authProvider.isLoading ? 'Signing in...' : 'Continue with Google',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black87,
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.grey.shade300),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildErrorMessage() {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, _) {
+        if (authProvider.errorMessage != null) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      authProvider.errorMessage!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
   Future<void> _signInWithGoogle(
     BuildContext context,
-    MockAuthProvider authProvider,
+    AuthProvider authProvider,
   ) async {
     final success = await authProvider.signInWithGoogle();
-
     if (!success && context.mounted) {
-      // Error is already handled by the provider and displayed in UI
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Sign in failed. Please try again.'),

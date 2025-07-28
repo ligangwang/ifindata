@@ -1,11 +1,8 @@
 // lib/screens/main_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../config/environment.dart';
 import '../providers/stock_provider.dart';
-import '../providers/mock_stock_provider.dart';
 import '../providers/watchlist_provider.dart';
-import '../providers/mock_watchlist_provider.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'watchlist/watchlist_screen.dart';
 import 'search/search_screen.dart';
@@ -37,14 +34,9 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _initializeData() {
-    // Load initial data based on environment
-    if (EnvironmentConfig.useMockServices) {
-      context.read<MockStockProvider>().refreshData();
-      context.read<MockWatchlistProvider>().refreshWatchlistData();
-    } else {
-      context.read<StockProvider>().refreshData();
-      context.read<WatchlistProvider>().refreshWatchlistData();
-    }
+    // Load initial data - providers are automatically the correct type based on environment
+    context.read<StockProvider>().refreshData();
+    context.read<WatchlistProvider>().refreshWatchlistData();
   }
 
   @override

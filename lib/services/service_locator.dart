@@ -14,9 +14,9 @@ import 'stripe_service.dart';
 class ServiceLocator {
   static ServiceLocator? _instance;
   static ServiceLocator get instance => _instance ??= ServiceLocator._();
-  
+
   ServiceLocator._();
-  
+
   // Auth Service Factory
   static AuthServiceInterface get authService {
     if (AppConfig.useMockServices) {
@@ -25,7 +25,7 @@ class ServiceLocator {
       return AuthServiceImpl();
     }
   }
-  
+
   // Stock Service Factory
   static StockServiceInterface get stockService {
     if (AppConfig.useMockServices) {
@@ -34,7 +34,7 @@ class ServiceLocator {
       return StockServiceImpl();
     }
   }
-  
+
   // Watchlist Service Factory
   static WatchlistServiceInterface get watchlistService {
     if (AppConfig.useMockServices) {
@@ -43,7 +43,7 @@ class ServiceLocator {
       return WatchlistServiceImpl();
     }
   }
-  
+
   // Stripe Service (always real, but uses test/prod keys based on environment)
   static StripeService get stripeService {
     return StripeService();

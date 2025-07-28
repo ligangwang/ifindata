@@ -1,7 +1,7 @@
 // lib/screens/subscription/subscription_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/mock_auth_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/stripe_service.dart';
 
 class SubscriptionScreen extends StatelessWidget {
@@ -17,7 +17,7 @@ class SubscriptionScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Current subscription status
-            Consumer<MockAuthProvider>(
+            Consumer<AuthProvider>(
               builder: (context, authProvider, _) {
                 return FutureBuilder<String>(
                   future: authProvider.getUserSubscription(),
@@ -350,7 +350,7 @@ class SubscriptionScreen extends StatelessWidget {
       Navigator.pop(context); // Close loading dialog
 
       // Update subscription in provider
-      final authProvider = context.read<MockAuthProvider>();
+      final authProvider = context.read<AuthProvider>();
       final planType = plan['id'].contains('basic')
           ? 'basic'
           : plan['id'].contains('premium')

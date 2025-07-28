@@ -18,19 +18,40 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _user != null;
 
   AuthProvider() {
+    print('🔧 AuthProvider constructor called');
+    _isLoading = true;
+    // Don't call notifyListeners in constructor
     _initializeAuth();
   }
 
-  void _initializeAuth() {
-    _authService.authStateChanges.listen((User? user) {
-      _user = user;
-      if (user != null) {
-        _loadUserModel();
-      } else {
-        _userModel = null;
-      }
+  void _initializeAuth() async {
+    print('🔧 AuthProvider _initializeAuth called');
+    try {
+      // Get initial user state
+      _user = _authService.currentUser;
+      print('🔧 Initial user: ${_user?.email ?? 'null'}');
+      _isLoading = false;
+
+      // Notify listeners with initial state
       notifyListeners();
-    });
+
+      // Listen to auth state changes
+      _authService.authStateChanges.listen((User? user) {
+        print('🔧 Auth state changed: ${user?.email ?? 'null'}');
+        _user = user;
+        if (user != null) {
+          _loadUserModel();
+        } else {
+          _userModel = null;
+        }
+        notifyListeners();
+      });
+    } catch (e) {
+      print('🔧 Error in _initializeAuth: $e');
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+    }
   }
 
   Future<void> _loadUserModel() async {

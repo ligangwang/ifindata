@@ -41,6 +41,9 @@ jobs:
     - name: Get Flutter dependencies
       run: flutter pub get
       
+    - name: Create dummy .env file for build
+      run: echo "# CI/CD dummy .env file" > .env
+      
     - name: Run Tests
       run: flutter test
       

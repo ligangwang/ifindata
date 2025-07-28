@@ -2,15 +2,15 @@ name: Deploy to Firebase Hosting
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       environment:
         description: 'Environment to deploy'
         required: true
-        default: 'staging'
+        default: 'production'
         type: choice
         options:
         - staging
@@ -27,7 +27,7 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.19.0'
+        flutter-version: '3.24.0'
         channel: 'stable'
         
     - name: Setup Node.js
@@ -35,31 +35,56 @@ jobs:
       with:
         node-version: '20'
         
+    - name: Install Firebase CLI
+      run: npm install -g firebase-tools
+        
     - name: Get Flutter dependencies
       run: flutter pub get
+      
+    - name: Run Tests
+      run: flutter test
       
     - name: Build for Production
       if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production'
       run: |
         flutter build web --release \
+          --dart-define=FIREBASE_API_KEY="${{ secrets.FIREBASE_API_KEY }}" \
+          --dart-define=FIREBASE_AUTH_DOMAIN="${{ secrets.FIREBASE_AUTH_DOMAIN }}" \
+          --dart-define=FIREBASE_PROJECT_ID="${{ secrets.FIREBASE_PROJECT_ID }}" \
+          --dart-define=FIREBASE_STORAGE_BUCKET="${{ secrets.FIREBASE_STORAGE_BUCKET }}" \
+          --dart-define=FIREBASE_MESSAGING_SENDER_ID="${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}" \
+          --dart-define=FIREBASE_APP_ID="${{ secrets.FIREBASE_APP_ID }}" \
+          --dart-define=FIREBASE_MEASUREMENT_ID="${{ secrets.FIREBASE_MEASUREMENT_ID }}" \
           --dart-define=ENVIRONMENT=production \
-          --dart-define=USE_MOCK_SERVICES=false \
-          --dart-define=FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID_PROD }} \
-          --dart-define=STRIPE_PUBLISHABLE_KEY_PROD=${{ secrets.STRIPE_PUBLISHABLE_KEY_PROD }}
+          --dart-define=USE_MOCK_SERVICES=false
           
     - name: Build for Staging
       if: github.ref != 'refs/heads/main' && github.event.inputs.environment != 'production'
       run: |
         flutter build web --release \
+          --dart-define=FIREBASE_API_KEY="${{ secrets.FIREBASE_API_KEY_STAGING }}" \
+          --dart-define=FIREBASE_AUTH_DOMAIN="${{ secrets.FIREBASE_AUTH_DOMAIN_STAGING }}" \
+          --dart-define=FIREBASE_PROJECT_ID="${{ secrets.FIREBASE_PROJECT_ID_STAGING }}" \
+          --dart-define=FIREBASE_STORAGE_BUCKET="${{ secrets.FIREBASE_STORAGE_BUCKET_STAGING }}" \
+          --dart-define=FIREBASE_MESSAGING_SENDER_ID="${{ secrets.FIREBASE_MESSAGING_SENDER_ID_STAGING }}" \
+          --dart-define=FIREBASE_APP_ID="${{ secrets.FIREBASE_APP_ID_STAGING }}" \
+          --dart-define=FIREBASE_MEASUREMENT_ID="${{ secrets.FIREBASE_MEASUREMENT_ID_STAGING }}" \
           --dart-define=ENVIRONMENT=staging \
-          --dart-define=USE_MOCK_SERVICES=false \
-          --dart-define=FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID_STAGING }} \
-          --dart-define=STRIPE_PUBLISHABLE_KEY_TEST=${{ secrets.STRIPE_PUBLISHABLE_KEY_TEST }}
+          --dart-define=USE_MOCK_SERVICES=false
           
-    - name: Deploy to Firebase Hosting
+    - name: Deploy to Firebase Hosting (Production)
+      if: github.ref == 'refs/heads/main'
       uses: FirebaseExtended/action-hosting-deploy@v0
       with:
         repoToken: '${{ secrets.GITHUB_TOKEN }}'
-        firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-        projectId: '${{ secrets.FIREBASE_PROJECT_ID }}'
+        firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_IFINDATA_80905 }}'
+        projectId: ifindata-80905
         channelId: live
+        
+    - name: Deploy Preview (for PRs)
+      if: github.event_name == 'pull_request'
+      uses: FirebaseExtended/action-hosting-deploy@v0
+      with:
+        repoToken: '${{ secrets.GITHUB_TOKEN }}'
+        firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_IFINDATA_80905 }}'
+        projectId: ifindata-80905

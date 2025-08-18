@@ -10,6 +10,7 @@ class UserModel {
   final DateTime createdAt;
   final DateTime lastLogin;
   final List<String> watchlist;
+  final bool isAdmin;
 
   UserModel({
     required this.uid,
@@ -20,6 +21,7 @@ class UserModel {
     required this.createdAt,
     required this.lastLogin,
     this.watchlist = const [],
+    this.isAdmin = false,
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
@@ -33,6 +35,7 @@ class UserModel {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       lastLogin: (data['lastLogin'] as Timestamp?)?.toDate() ?? DateTime.now(),
       watchlist: List<String>.from(data['watchlist'] ?? []),
+      isAdmin: data['isAdmin'] ?? false,
     );
   }
 
@@ -45,6 +48,7 @@ class UserModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'lastLogin': Timestamp.fromDate(lastLogin),
       'watchlist': watchlist,
+      'isAdmin': isAdmin,
     };
   }
 
@@ -57,6 +61,7 @@ class UserModel {
     DateTime? createdAt,
     DateTime? lastLogin,
     List<String>? watchlist,
+    bool? isAdmin,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -67,6 +72,7 @@ class UserModel {
       createdAt: createdAt ?? this.createdAt,
       lastLogin: lastLogin ?? this.lastLogin,
       watchlist: watchlist ?? this.watchlist,
+      isAdmin: isAdmin ?? this.isAdmin,
     );
   }
 

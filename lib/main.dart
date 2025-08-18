@@ -6,6 +6,9 @@ import 'config/firebase_config.dart';
 import 'providers/auth_provider.dart';
 import 'providers/stock_provider.dart';
 import 'providers/watchlist_provider.dart';
+import 'providers/company_analysis_provider.dart';
+import 'providers/business_model_provider.dart';
+import 'providers/admin_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/main_screen.dart';
 
@@ -27,7 +30,7 @@ void main() async {
   print('API Key: ${FirebaseConfig.apiKey}');
   print('Auth Domain: ${FirebaseConfig.authDomain}');
   print('Project ID: ${FirebaseConfig.projectId}');
-  
+
   await Firebase.initializeApp(
     options: FirebaseOptions(
       apiKey: FirebaseConfig.apiKey,
@@ -39,7 +42,7 @@ void main() async {
       measurementId: FirebaseConfig.measurementId,
     ),
   );
-  
+
   print('✅ Firebase initialized successfully');
 
   runApp(const MyApp());
@@ -55,9 +58,12 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => StockProvider()),
         ChangeNotifierProvider(create: (_) => WatchlistProvider()),
+        ChangeNotifierProvider(create: (_) => CompanyAnalysisProvider()),
+        ChangeNotifierProvider(create: (_) => BusinessModelProvider()),
+        ChangeNotifierProvider(create: (_) => AdminProvider()),
       ],
       child: MaterialApp(
-        title: 'IFinData - Stock Analysis',
+        title: 'IFinData - Business Model Explorer',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
             seedColor: const Color(0xFF1976D2),

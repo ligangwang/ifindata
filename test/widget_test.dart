@@ -5,15 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('IFinData App Tests', () {
-    testWidgets('Basic app components should initialize', (WidgetTester tester) async {
+    testWidgets('Basic app components should initialize', (
+      WidgetTester tester,
+    ) async {
       // Test that basic MaterialApp can be created
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(
-            body: Center(
-              child: Text('IFinData Test'),
-            ),
-          ),
+          home: Scaffold(body: Center(child: Text('IFinData Test'))),
         ),
       );
 
@@ -34,7 +32,7 @@ void main() {
       // Test basic Dart functionality
       final testMap = {'key': 'value'};
       expect(testMap['key'], equals('value'));
-      
+
       final testList = [1, 2, 3];
       expect(testList.length, equals(3));
       expect(testList.first, equals(1));
@@ -44,7 +42,7 @@ void main() {
       // Test date operations that might be used in stock app
       final now = DateTime.now();
       final yesterday = now.subtract(Duration(days: 1));
-      
+
       expect(yesterday.isBefore(now), isTrue);
       expect(now.isAfter(yesterday), isTrue);
     });
@@ -55,7 +53,7 @@ void main() {
         Duration(milliseconds: 10),
         () => 'completed',
       );
-      
+
       expect(result, equals('completed'));
     });
   });

@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/admin_provider.dart';
+import '../admin/admin_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -10,9 +12,16 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
-      body: Consumer<AuthProvider>(
-        builder: (context, authProvider, _) {
+      body: Consumer2<AuthProvider, AdminProvider>(
+        builder: (context, authProvider, adminProvider, _) {
           final user = authProvider.user;
+
+          // Check admin status when user is available
+          if (user != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              adminProvider.checkAdminStatus(user.uid);
+            });
+          }
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -103,6 +112,20 @@ class ProfileScreen extends StatelessWidget {
                 Card(
                   child: Column(
                     children: [
+                      if (adminProvider.isAdmin) ...[
+                        ListTile(
+                          leading: const Icon(Icons.admin_panel_settings),
+                          title: const Text('Admin Panel'),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const AdminScreen()),
+                            );
+                          },
+                        ),
+                        const Divider(height: 1),
+                      ],
                       ListTile(
                         leading: const Icon(Icons.notifications),
                         title: const Text('Notifications'),

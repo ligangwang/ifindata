@@ -1,138 +1,99 @@
-# Firebase Deployment Guide
+# Deployment
+
+The goal is a fast, safe loop:
+
+1. Build locally.
+2. Publish to a staging Cloud Run service.
+3. Smoke-test `/api/health`.
+4. Promote to production when the feature is ready.
+
+## Recommended Agile Flow
+
+For day-to-day iteration:
+
+```bash
+npm run smoke:install
+npm run verify
+npm run deploy:staging
+```
+
+That staging deploy command will:
+
+1. Run lint, typecheck, and production build.
+2. Build and push the container with Cloud Build.
+3. Deploy to the staging Cloud Run service.
+4. Fetch the deployed service URL.
+5. Call `/api/health` and fail if the app is not healthy.
+
+If you want local browser smoke coverage too:
+
+```bash
+PLAYWRIGHT_RUN_SMOKE=1 npm run deploy:staging
+```
+
+That will run the Playwright smoke suite against the deployed Cloud Run URL after the health check succeeds.
+
+When the feature is confirmed in staging:
+
+```bash
+npm run deploy:production
+```
 
 ## Prerequisites
 
-### 1. Node.js Version Update Required
-⚠️ **IMPORTANT**: Firebase CLI requires Node.js v20+ (you currently have v16.13.0)
+- Google Cloud project with billing enabled
+- Cloud Run, Cloud Build, and Artifact Registry APIs enabled
+- `gcloud` installed and authenticated
+- Artifact Registry repository created once
 
-**Update Node.js:**
-1. Visit [nodejs.org](https://nodejs.org/) and download Node.js LTS (v20+)
-2. Install the new version
-3. Restart your terminal/PowerShell
-4. Verify: `node --version` should show v20+
+Create the repository once:
 
-### 2. Install Firebase CLI
 ```bash
-npm install -g firebase-tools
+gcloud artifacts repositories create ifindata \
+  --repository-format=docker \
+  --location=us-central1
 ```
 
-### 3. Login to Firebase
+## Local Environment Variables
+
+Before using the deploy scripts, export:
+
 ```bash
-firebase login
+export GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+export GOOGLE_CLOUD_REGION=us-central1
+export CLOUD_RUN_SERVICE_STAGING=ifindata-web-staging
+export CLOUD_RUN_SERVICE_PRODUCTION=ifindata-web
 ```
 
-### 4. Initialize Firebase Project (if not already done)
+Optional:
+
 ```bash
-firebase init
-```
-- Select "Hosting" and "Firestore"
-- Choose your existing Firebase project
-- Set public directory to `build/web`
-- Configure as single-page app: Yes
-- Don't overwrite index.html
-
-## Quick Deployment Commands
-
-### Production Deployment
-```bash
-# Using PowerShell script
-.\deploy-firebase.ps1
-
-# Or manually
-flutter build web --release --dart-define=ENVIRONMENT=production --dart-define=USE_MOCK_SERVICES=false
-firebase deploy --only hosting
+export APP_ENVIRONMENT=staging
 ```
 
-### Staging Deployment
-```bash
-# Using PowerShell script
-.\deploy-staging.ps1
+## CI/CD Recommendation
 
-# Or manually
-flutter build web --release --dart-define=ENVIRONMENT=staging --dart-define=USE_MOCK_SERVICES=false
-firebase deploy --only hosting:staging
-```
+- Push to `dev`: auto-deploy to staging.
+- Push to `main`: auto-deploy to production only when you are comfortable with that cadence.
+- For stricter control, keep production on manual workflow dispatch.
 
-## Environment Configuration
+This repository is set up for:
 
-The app automatically uses the correct environment based on build parameters:
+- fast local staging deploys
+- GitHub Actions staging deployment on `dev`
+- GitHub Actions production deployment on `main` or manual dispatch
+- post-deploy Playwright smoke checks in CI
 
-- **Production**: Real Firebase services, Stripe live keys
-- **Staging**: Real Firebase services, Stripe test keys
-- **Development**: Mock services (local testing)
+## Health Check
 
-## Firebase Project Setup
+The app exposes `/api/health` and returns environment, revision, and commit metadata when available. Use it as the first smoke test after every deployment.
 
-### 1. Web App Configuration
-In Firebase Console > Project Settings > General:
-- Add a web app if not already added
-- Copy the Firebase config object
+## Runtime Variables
 
-### 2. Authentication Setup
-In Firebase Console > Authentication:
-- Enable Google Sign-in provider
-- Add authorized domains for your hosting URL
+Set Cloud Run environment variables for:
 
-### 3. Firestore Setup
-In Firebase Console > Firestore Database:
-- Create database in production mode
-- Deploy security rules: `firebase deploy --only firestore:rules`
-
-### 4. Hosting Configuration
-The app is configured for Single Page Application (SPA) routing with proper cache headers for static assets.
-
-## Deployment Workflow
-
-1. **Test Locally**: Use mock services for development
-   ```bash
-   .\run-dev-mock.ps1
-   ```
-
-2. **Test with Real Services**: Test with actual Firebase
-   ```bash
-   .\run-dev-real.ps1
-   ```
-
-3. **Deploy to Staging**: Test deployment
-   ```bash
-   .\deploy-staging.ps1
-   ```
-
-4. **Deploy to Production**: Final deployment
-   ```bash
-   .\deploy-firebase.ps1
-   ```
-
-## Troubleshooting
-
-### Build Issues
-- Ensure all environment variables are set correctly
-- Check that Firebase config is properly initialized
-- Verify Stripe keys are configured for the target environment
-
-### Deployment Issues
-- Ensure Firebase CLI is logged in: `firebase login`
-- Check that the correct project is selected: `firebase use --list`
-- Verify hosting configuration in `firebase.json`
-
-### Runtime Issues
-- Check browser console for errors
-- Verify Firebase project configuration
-- Ensure authentication domains are whitelisted
-- Check Firestore security rules
-
-## Security Checklist
-
-✅ Firestore security rules configured  
-✅ Authentication domains whitelisted  
-✅ Environment-specific API keys  
-✅ No sensitive data in client code  
-✅ HTTPS enforced for production  
-
-## Post-Deployment
-
-After successful deployment:
-1. Test all major features (auth, data, payments)
-2. Verify analytics and monitoring
-3. Check performance metrics
-4. Update DNS if using custom domain
+- `NEXT_PUBLIC_*` Firebase client configuration
+- Stripe secrets
+- Neo4j credentials
+- `APP_ENVIRONMENT`
+- `GIT_SHA` if you want deploy metadata in the health endpoint

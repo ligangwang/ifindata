@@ -38,6 +38,23 @@ if [[ -n "${CLOUD_BUILD_SOURCE_STAGING_DIR:-}" ]]; then
   build_submit_args+=(--gcs-source-staging-dir "$CLOUD_BUILD_SOURCE_STAGING_DIR")
 fi
 
+if [[ "${DEBUG_GCLOUD_DEPLOY:-0}" == "1" ]]; then
+  echo "Deploy debug context:"
+  echo "  target=$target"
+  echo "  project_id=$project_id"
+  echo "  region=$region"
+  echo "  service_name=$service_name"
+  echo "  app_environment=$app_environment"
+  echo "  cloud_build_source_staging_dir=${CLOUD_BUILD_SOURCE_STAGING_DIR:-<unset>}"
+  printf '  gcloud builds submit args:'
+  printf ' %q' "${build_submit_args[@]}"
+  printf ' %q\n' .
+  echo "Authenticated accounts:"
+  gcloud auth list
+  echo "Active gcloud config:"
+  gcloud config list
+fi
+
 gcloud builds submit "${build_submit_args[@]}" .
 
 echo "[3/4] Resolving deployed service URL"

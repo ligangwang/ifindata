@@ -94,12 +94,40 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
+      - name: Debug staging deploy context
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ env.GCP_PROJECT_ID }}
+          GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
+          CLOUD_RUN_SERVICE_STAGING: ${{ env.CLOUD_RUN_SERVICE_STAGING }}
+          CLOUD_BUILD_SOURCE_STAGING_DIR: ${{ env.CLOUD_BUILD_SOURCE_STAGING_DIR }}
+        run: |
+          set -euxo pipefail
+          echo "GitHub environment: staging"
+          echo "Project: ${GOOGLE_CLOUD_PROJECT}"
+          echo "Region: ${GOOGLE_CLOUD_REGION}"
+          echo "Service: ${CLOUD_RUN_SERVICE_STAGING}"
+          echo "Source staging dir: ${CLOUD_BUILD_SOURCE_STAGING_DIR}"
+          echo "Authenticated accounts:"
+          gcloud auth list
+          echo "Application default credentials:"
+          gcloud auth application-default print-access-token >/dev/null && echo "ADC available"
+          echo "Active gcloud config:"
+          gcloud config list
+          echo "Bucket metadata:"
+          bucket_root="$(echo "${CLOUD_BUILD_SOURCE_STAGING_DIR}" | sed -E 's#^(gs://[^/]+).*$#\1#')"
+          gcloud storage buckets describe "${bucket_root}"
+          echo "Bucket IAM policy:"
+          gcloud storage buckets get-iam-policy "${bucket_root}"
+          echo "Bucket access smoke test:"
+          gcloud storage ls "${bucket_root}"
+
       - name: Deploy staging
         env:
           GOOGLE_CLOUD_PROJECT: ${{ env.GCP_PROJECT_ID }}
           GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
           CLOUD_RUN_SERVICE_STAGING: ${{ env.CLOUD_RUN_SERVICE_STAGING }}
           CLOUD_BUILD_SOURCE_STAGING_DIR: ${{ env.CLOUD_BUILD_SOURCE_STAGING_DIR }}
+          DEBUG_GCLOUD_DEPLOY: "1"
           GIT_SHA: ${{ github.sha }}
           APP_ENVIRONMENT: staging
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ env.NEXT_PUBLIC_FIREBASE_API_KEY }}

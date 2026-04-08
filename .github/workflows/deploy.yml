@@ -1,6 +1,16 @@
 name: Deploy to Cloud Run
 
 on:
+  pull_request:
+    branches:
+      - dev
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
   push:
     branches:
       - dev
@@ -22,8 +32,13 @@ env:
   CLOUD_RUN_SERVICE_STAGING: ${{ vars.CLOUD_RUN_SERVICE_STAGING || 'ifindata-web-staging' }}
   CLOUD_RUN_SERVICE_PRODUCTION: ${{ vars.CLOUD_RUN_SERVICE_PRODUCTION || 'ifindata-web' }}
 
+concurrency:
+  group: deploy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -42,7 +57,7 @@ jobs:
         run: npm run verify
 
   deploy-staging:
-    if: github.ref == 'refs/heads/dev' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/dev') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
     needs: verify
     runs-on: ubuntu-latest
     environment: staging
@@ -111,7 +126,7 @@ jobs:
         run: npm run smoke:test
 
   deploy-production:
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
     needs: verify
     runs-on: ubuntu-latest
     environment: production

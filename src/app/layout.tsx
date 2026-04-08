@@ -16,8 +16,8 @@ const ibmPlexSans = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "IFinData Web",
-  description: "Web-first financial knowledge graph for public company and business model research.",
+  title: "IFinData - Company Intelligence Graph",
+  description: "Explore company ecosystems through a guided graph starting with the TSMC customer network.",
 };
 
 export default function RootLayout({

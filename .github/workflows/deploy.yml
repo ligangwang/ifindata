@@ -113,13 +113,9 @@ jobs:
           gcloud auth application-default print-access-token >/dev/null && echo "ADC available"
           echo "Active gcloud config:"
           gcloud config list
-          echo "Bucket metadata:"
-          bucket_root="$(echo "${CLOUD_BUILD_SOURCE_STAGING_DIR}" | sed -E 's#^(gs://[^/]+).*$#\1#')"
-          gcloud storage buckets describe "${bucket_root}"
-          echo "Bucket IAM policy:"
-          gcloud storage buckets get-iam-policy "${bucket_root}"
           echo "Bucket access smoke test:"
-          gcloud storage ls "${bucket_root}"
+          bucket_root="$(echo "${CLOUD_BUILD_SOURCE_STAGING_DIR}" | sed -E 's#^(gs://[^/]+).*$#\1#')"
+          gcloud storage ls "${bucket_root}" || echo "WARN: could not list bucket (SA may lack storage.objects.list; bucket describe/IAM skipped — SA needs storage.buckets.get for that)"
 
       - name: Deploy staging
         env:

@@ -2,21 +2,54 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Flutter: Run Web",
+			"label": "Next.js: Dev Server",
 			"type": "shell",
-			"command": "flutter",
+			"command": "npm",
 			"args": [
 				"run",
-				"-d",
-				"web-server",
-				"--web-port",
-				"8080"
+				"dev"
 			],
 			"group": "build",
 			"isBackground": true,
 			"problemMatcher": [
-				"$dart-analyzer"
+				"$tsc-watch"
 			]
+		},
+		{
+			"label": "Next.js: Build",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"group": "build",
+			"problemMatcher": [
+				"$tsc"
+			]
+		},
+		{
+			"label": "Next.js: Verify",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"verify"
+			],
+			"group": "build",
+			"problemMatcher": [
+				"$tsc"
+			]
+		},
+		{
+			"label": "Cloud Run: Deploy Staging",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"deploy:staging"
+			],
+			"group": "build"
 		}
 	]
 }

@@ -108,9 +108,46 @@ if [[ -z "$service_url" ]]; then
   exit 1
 fi
 
-echo "[4/4] Smoke testing $service_url/api/health"
-curl --fail --show-error --silent "$service_url/api/health"
-echo
+health_url="$service_url/api/health"
+echo "[4/4] Smoke testing $health_url"
+
+health_tmp_file="$(mktemp)"
+health_status="$(curl --silent --show-error --output "$health_tmp_file" --write-out '%{http_code}' "$health_url" || true)"
+
+if [[ "$health_status" == "200" ]]; then
+  cat "$health_tmp_file"
+  echo
+elif [[ "$health_status" == "401" || "$health_status" == "403" ]]; then
+  echo "Health endpoint returned $health_status without authentication; retrying with identity token"
+  identity_token="$(gcloud auth print-identity-token --audiences="$service_url" 2>/dev/null || true)"
+
+  if [[ -z "$identity_token" ]]; then
+    echo "ERROR: could not obtain identity token for authenticated health check"
+    rm -f "$health_tmp_file"
+    exit 1
+  fi
+
+  auth_health_status="$(curl --silent --show-error --output "$health_tmp_file" --write-out '%{http_code}' \
+    -H "Authorization: Bearer $identity_token" \
+    "$health_url" || true)"
+
+  if [[ "$auth_health_status" == "200" ]]; then
+    cat "$health_tmp_file"
+    echo
+  else
+    echo "ERROR: authenticated health check failed with status $auth_health_status"
+    cat "$health_tmp_file" || true
+    rm -f "$health_tmp_file"
+    exit 1
+  fi
+else
+  echo "ERROR: health check failed with status $health_status"
+  cat "$health_tmp_file" || true
+  rm -f "$health_tmp_file"
+  exit 1
+fi
+
+rm -f "$health_tmp_file"
 
 if [[ "${PLAYWRIGHT_RUN_SMOKE:-0}" == "1" ]]; then
   echo "Running Playwright smoke checks against $service_url"

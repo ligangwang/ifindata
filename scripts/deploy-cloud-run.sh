@@ -68,7 +68,25 @@ if [[ "${DEBUG_GCLOUD_DEPLOY:-0}" == "1" ]]; then
   gcloud config list
 fi
 
-build_id="$(gcloud builds submit "${build_submit_args[@]}" --async --format='value(id)' .)"
+submit_stderr_file="$(mktemp)"
+
+if build_id="$(gcloud builds submit "${build_submit_args[@]}" --async --format='value(id)' . 2>"$submit_stderr_file")"; then
+  :
+else
+  cat "$submit_stderr_file" >&2
+
+  if [[ "${CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING:-0}" != "1" ]] && [[ -n "${CLOUD_BUILD_SOURCE_STAGING_DIR:-}" ]] && grep -E -q "forbidden from accessing the bucket \[${project_id}_cloudbuild\]" "$submit_stderr_file"; then
+    echo "Retrying Cloud Build submit with custom source staging dir: $CLOUD_BUILD_SOURCE_STAGING_DIR"
+    retry_build_submit_args=("${build_submit_args[@]}" --gcs-source-staging-dir "$CLOUD_BUILD_SOURCE_STAGING_DIR")
+    build_id="$(gcloud builds submit "${retry_build_submit_args[@]}" --async --format='value(id)' .)"
+  else
+    rm -f "$submit_stderr_file"
+    exit 1
+  fi
+fi
+
+rm -f "$submit_stderr_file"
+
 echo "Cloud Build submitted: $build_id"
 echo "Logs: https://console.cloud.google.com/cloud-build/builds/$build_id?project=$project_id"
 

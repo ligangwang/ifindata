@@ -82,6 +82,13 @@ while true; do
     SUCCESS) echo "Build succeeded."; break ;;
     FAILURE|CANCELLED|TIMEOUT|EXPIRED|INTERNAL_ERROR)
       echo "ERROR: build ended with status: $build_status"
+      echo "--- Failed step details ---"
+      gcloud builds describe "$build_id" \
+        --project "$project_id" \
+        --format='table[box](steps.name,steps.status,steps.timing.startTime,steps.timing.endTime)' || true
+      gcloud builds describe "$build_id" \
+        --project "$project_id" \
+        --format='value(steps[].status,steps[].args)' || true
       exit 1
       ;;
     *)

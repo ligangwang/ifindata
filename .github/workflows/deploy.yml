@@ -150,10 +150,18 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Generate staging smoke auth token
+        id: staging-smoke-token
+        run: |
+          token="$(gcloud auth print-identity-token --audiences='${{ steps.staging-url.outputs.url }}')"
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
       - name: Run staging smoke tests
         env:
           PLAYWRIGHT_BASE_URL: ${{ steps.staging-url.outputs.url }}
           PLAYWRIGHT_EXPECT_STAGING_BANNER: "1"
+          PLAYWRIGHT_AUTH_BEARER_TOKEN: ${{ steps.staging-smoke-token.outputs.token }}
         run: npm run smoke:test
 
   deploy-production:
@@ -222,8 +230,16 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Generate production smoke auth token
+        id: production-smoke-token
+        run: |
+          token="$(gcloud auth print-identity-token --audiences='${{ steps.production-url.outputs.url }}')"
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
       - name: Run production smoke tests
         env:
           PLAYWRIGHT_BASE_URL: ${{ steps.production-url.outputs.url }}
           PLAYWRIGHT_EXPECT_STAGING_BANNER: "0"
+          PLAYWRIGHT_AUTH_BEARER_TOKEN: ${{ steps.production-smoke-token.outputs.token }}
         run: npm run smoke:test

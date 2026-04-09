@@ -205,12 +205,43 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
+      - name: Debug production deploy context
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ env.GCP_PROJECT_ID }}
+          GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
+          CLOUD_RUN_SERVICE_PRODUCTION: ${{ env.CLOUD_RUN_SERVICE_PRODUCTION }}
+          CLOUD_BUILD_SOURCE_STAGING_DIR: ${{ env.CLOUD_BUILD_SOURCE_STAGING_DIR }}
+          CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING: ${{ vars.CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING }}
+        run: |
+          set -euxo pipefail
+          echo "GitHub environment: production"
+          echo "Project: ${GOOGLE_CLOUD_PROJECT}"
+          echo "Region: ${GOOGLE_CLOUD_REGION}"
+          echo "Service: ${CLOUD_RUN_SERVICE_PRODUCTION}"
+          echo "Source staging dir: ${CLOUD_BUILD_SOURCE_STAGING_DIR}"
+          echo "Use custom source staging: ${CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING:-0}"
+          echo "Authenticated accounts:"
+          gcloud auth list
+          echo "Application default credentials:"
+          gcloud auth application-default print-access-token >/dev/null && echo "ADC available"
+          echo "Active gcloud config:"
+          gcloud config list
+          if [[ "${CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING:-0}" == "1" ]] && [[ -n "${CLOUD_BUILD_SOURCE_STAGING_DIR}" ]]; then
+            echo "Bucket access smoke test (custom source staging enabled):"
+            bucket_root="$(echo "${CLOUD_BUILD_SOURCE_STAGING_DIR}" | sed -E 's#^(gs://[^/]+).*$#\1#')"
+            gcloud storage ls "${bucket_root}" || echo "WARN: could not list bucket; custom source staging likely to fail"
+          else
+            echo "Skipping bucket smoke test; custom source staging is disabled"
+          fi
+
       - name: Deploy production
         env:
           GOOGLE_CLOUD_PROJECT: ${{ env.GCP_PROJECT_ID }}
           GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
           CLOUD_RUN_SERVICE_PRODUCTION: ${{ env.CLOUD_RUN_SERVICE_PRODUCTION }}
           CLOUD_BUILD_SOURCE_STAGING_DIR: ${{ env.CLOUD_BUILD_SOURCE_STAGING_DIR }}
+          CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING: ${{ vars.CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING }}
+          DEBUG_GCLOUD_DEPLOY: "1"
           GIT_SHA: ${{ github.sha }}
           APP_ENVIRONMENT: production
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ env.NEXT_PUBLIC_FIREBASE_API_KEY }}

@@ -9,23 +9,13 @@ test("health endpoint reports ok", async ({ request, baseURL }) => {
   expect(health.service).toBe("ifindata-web");
 });
 
-test("homepage exposes the loved-company MVP flow", async ({ page }) => {
+test("homepage exposes the graph exploration experience", async ({ page }) => {
   await page.goto("/");
 
-  await expect(
-    page.getByRole("heading", {
-      name: /See the market as a graph of business models, sectors, and company relationships/i,
-    }),
-  ).toBeVisible();
-
-  const loveButton = page.getByRole("button", { name: /Love Microsoft/i });
-  await expect(loveButton).toBeVisible();
-  await loveButton.click();
-
-  await expect(page.getByTestId("auth-prompt")).toBeVisible();
-  await expect(
-    page.getByText("Sign in to save loved companies", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: /TSMC Customer Ecosystem/i })).toBeVisible();
+  await expect(page.getByLabel(/Search company/i)).toBeVisible();
+  await expect(page.getByText(/1-hop graph/i)).toBeVisible();
+  await expect(page.getByText(/Selected Company/i)).toBeVisible();
 });
 
 test("staging banner is present only when expected", async ({ page }) => {

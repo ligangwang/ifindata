@@ -68,7 +68,27 @@ if [[ "${DEBUG_GCLOUD_DEPLOY:-0}" == "1" ]]; then
   gcloud config list
 fi
 
-gcloud builds submit "${build_submit_args[@]}" .
+build_id="$(gcloud builds submit "${build_submit_args[@]}" --async --format='value(id)' .)"
+echo "Cloud Build submitted: $build_id"
+echo "Logs: https://console.cloud.google.com/cloud-build/builds/$build_id?project=$project_id"
+
+echo "Waiting for build $build_id to complete..."
+while true; do
+  build_status="$(gcloud builds describe "$build_id" \
+    --project "$project_id" \
+    --format='value(status)')"
+  echo "  status: $build_status"
+  case "$build_status" in
+    SUCCESS) echo "Build succeeded."; break ;;
+    FAILURE|CANCELLED|TIMEOUT|EXPIRED|INTERNAL_ERROR)
+      echo "ERROR: build ended with status: $build_status"
+      exit 1
+      ;;
+    *)
+      sleep 15
+      ;;
+  esac
+done
 
 echo "[3/4] Resolving deployed service URL"
 service_url="$(gcloud run services describe "$service_name" \

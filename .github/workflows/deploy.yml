@@ -100,6 +100,7 @@ jobs:
           GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
           CLOUD_RUN_SERVICE_STAGING: ${{ env.CLOUD_RUN_SERVICE_STAGING }}
           CLOUD_BUILD_SOURCE_STAGING_DIR: ${{ env.CLOUD_BUILD_SOURCE_STAGING_DIR }}
+          CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING: ${{ vars.CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING }}
         run: |
           set -euxo pipefail
           echo "GitHub environment: staging"
@@ -107,15 +108,20 @@ jobs:
           echo "Region: ${GOOGLE_CLOUD_REGION}"
           echo "Service: ${CLOUD_RUN_SERVICE_STAGING}"
           echo "Source staging dir: ${CLOUD_BUILD_SOURCE_STAGING_DIR}"
+          echo "Use custom source staging: ${CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING:-0}"
           echo "Authenticated accounts:"
           gcloud auth list
           echo "Application default credentials:"
           gcloud auth application-default print-access-token >/dev/null && echo "ADC available"
           echo "Active gcloud config:"
           gcloud config list
-          echo "Bucket access smoke test:"
-          bucket_root="$(echo "${CLOUD_BUILD_SOURCE_STAGING_DIR}" | sed -E 's#^(gs://[^/]+).*$#\1#')"
-          gcloud storage ls "${bucket_root}" || echo "WARN: could not list bucket (SA may lack storage.objects.list; bucket describe/IAM skipped — SA needs storage.buckets.get for that)"
+          if [[ "${CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING:-0}" == "1" ]] && [[ -n "${CLOUD_BUILD_SOURCE_STAGING_DIR}" ]]; then
+            echo "Bucket access smoke test (custom source staging enabled):"
+            bucket_root="$(echo "${CLOUD_BUILD_SOURCE_STAGING_DIR}" | sed -E 's#^(gs://[^/]+).*$#\1#')"
+            gcloud storage ls "${bucket_root}" || echo "WARN: could not list bucket; custom source staging likely to fail"
+          else
+            echo "Skipping bucket smoke test; custom source staging is disabled"
+          fi
 
       - name: Deploy staging
         env:
@@ -123,6 +129,7 @@ jobs:
           GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
           CLOUD_RUN_SERVICE_STAGING: ${{ env.CLOUD_RUN_SERVICE_STAGING }}
           CLOUD_BUILD_SOURCE_STAGING_DIR: ${{ env.CLOUD_BUILD_SOURCE_STAGING_DIR }}
+          CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING: ${{ vars.CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING }}
           DEBUG_GCLOUD_DEPLOY: "1"
           GIT_SHA: ${{ github.sha }}
           APP_ENVIRONMENT: staging

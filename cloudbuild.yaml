@@ -58,7 +58,7 @@ substitutions:
   _NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ""
   _NEXT_PUBLIC_FIREBASE_APP_ID: ""
   _NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ""
-  _IMAGE: ${_REGION}-docker.pkg.dev/$PROJECT_ID/ifindata/ifindata-web:$COMMIT_SHA
+  _IMAGE: us-central1-docker.pkg.dev/PROJECT_ID/ifindata/ifindata-web:latest
 
 images:
   - ${_IMAGE}

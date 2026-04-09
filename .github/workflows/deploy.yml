@@ -27,10 +27,7 @@ on:
           - production
 
 env:
-  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-  GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
-  CLOUD_RUN_SERVICE_STAGING: ${{ vars.CLOUD_RUN_SERVICE_STAGING || 'ifindata-web-staging' }}
-  CLOUD_RUN_SERVICE_PRODUCTION: ${{ vars.CLOUD_RUN_SERVICE_PRODUCTION || 'ifindata-web' }}
+  GCP_REGION: us-central1
 
 concurrency:
   group: deploy-${{ github.workflow }}-${{ github.ref }}
@@ -62,9 +59,11 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     env:
+      # All these are set in GitHub Environment: Settings → Environments → staging
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-      GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
-      CLOUD_RUN_SERVICE_STAGING: ${{ vars.CLOUD_RUN_SERVICE_STAGING || 'ifindata-web-staging' }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      CLOUD_RUN_SERVICE_STAGING: ${{ vars.CLOUD_RUN_SERVICE_STAGING }}
+      CLOUD_BUILD_SOURCE_STAGING_DIR: ${{ vars.CLOUD_BUILD_SOURCE_STAGING_DIR }}
       NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
       NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
       NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
@@ -95,11 +94,43 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
+      - name: Debug staging deploy context
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ env.GCP_PROJECT_ID }}
+          GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
+          CLOUD_RUN_SERVICE_STAGING: ${{ env.CLOUD_RUN_SERVICE_STAGING }}
+          CLOUD_BUILD_SOURCE_STAGING_DIR: ${{ env.CLOUD_BUILD_SOURCE_STAGING_DIR }}
+          CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING: ${{ vars.CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING }}
+        run: |
+          set -euxo pipefail
+          echo "GitHub environment: staging"
+          echo "Project: ${GOOGLE_CLOUD_PROJECT}"
+          echo "Region: ${GOOGLE_CLOUD_REGION}"
+          echo "Service: ${CLOUD_RUN_SERVICE_STAGING}"
+          echo "Source staging dir: ${CLOUD_BUILD_SOURCE_STAGING_DIR}"
+          echo "Use custom source staging: ${CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING:-0}"
+          echo "Authenticated accounts:"
+          gcloud auth list
+          echo "Application default credentials:"
+          gcloud auth application-default print-access-token >/dev/null && echo "ADC available"
+          echo "Active gcloud config:"
+          gcloud config list
+          if [[ "${CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING:-0}" == "1" ]] && [[ -n "${CLOUD_BUILD_SOURCE_STAGING_DIR}" ]]; then
+            echo "Bucket access smoke test (custom source staging enabled):"
+            bucket_root="$(echo "${CLOUD_BUILD_SOURCE_STAGING_DIR}" | sed -E 's#^(gs://[^/]+).*$#\1#')"
+            gcloud storage ls "${bucket_root}" || echo "WARN: could not list bucket; custom source staging likely to fail"
+          else
+            echo "Skipping bucket smoke test; custom source staging is disabled"
+          fi
+
       - name: Deploy staging
         env:
           GOOGLE_CLOUD_PROJECT: ${{ env.GCP_PROJECT_ID }}
           GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
           CLOUD_RUN_SERVICE_STAGING: ${{ env.CLOUD_RUN_SERVICE_STAGING }}
+          CLOUD_BUILD_SOURCE_STAGING_DIR: ${{ env.CLOUD_BUILD_SOURCE_STAGING_DIR }}
+          CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING: ${{ vars.CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING }}
+          DEBUG_GCLOUD_DEPLOY: "1"
           GIT_SHA: ${{ github.sha }}
           APP_ENVIRONMENT: staging
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ env.NEXT_PUBLIC_FIREBASE_API_KEY }}
@@ -119,10 +150,18 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Generate staging smoke auth token
+        id: staging-smoke-token
+        run: |
+          token="$(gcloud auth print-identity-token --audiences='${{ steps.staging-url.outputs.url }}')"
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
       - name: Run staging smoke tests
         env:
           PLAYWRIGHT_BASE_URL: ${{ steps.staging-url.outputs.url }}
           PLAYWRIGHT_EXPECT_STAGING_BANNER: "1"
+          PLAYWRIGHT_AUTH_BEARER_TOKEN: ${{ steps.staging-smoke-token.outputs.token }}
         run: npm run smoke:test
 
   deploy-production:
@@ -131,9 +170,11 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
+      # All these are set in GitHub Environment: Settings → Environments → production
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-      GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
-      CLOUD_RUN_SERVICE_PRODUCTION: ${{ vars.CLOUD_RUN_SERVICE_PRODUCTION || 'ifindata-web' }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      CLOUD_RUN_SERVICE_PRODUCTION: ${{ vars.CLOUD_RUN_SERVICE_PRODUCTION }}
+      CLOUD_BUILD_SOURCE_STAGING_DIR: ${{ vars.CLOUD_BUILD_SOURCE_STAGING_DIR }}
       NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
       NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
       NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
@@ -169,6 +210,7 @@ jobs:
           GOOGLE_CLOUD_PROJECT: ${{ env.GCP_PROJECT_ID }}
           GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
           CLOUD_RUN_SERVICE_PRODUCTION: ${{ env.CLOUD_RUN_SERVICE_PRODUCTION }}
+          CLOUD_BUILD_SOURCE_STAGING_DIR: ${{ env.CLOUD_BUILD_SOURCE_STAGING_DIR }}
           GIT_SHA: ${{ github.sha }}
           APP_ENVIRONMENT: production
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ env.NEXT_PUBLIC_FIREBASE_API_KEY }}
@@ -188,8 +230,16 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Generate production smoke auth token
+        id: production-smoke-token
+        run: |
+          token="$(gcloud auth print-identity-token --audiences='${{ steps.production-url.outputs.url }}')"
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
       - name: Run production smoke tests
         env:
           PLAYWRIGHT_BASE_URL: ${{ steps.production-url.outputs.url }}
           PLAYWRIGHT_EXPECT_STAGING_BANNER: "0"
+          PLAYWRIGHT_AUTH_BEARER_TOKEN: ${{ steps.production-smoke-token.outputs.token }}
         run: npm run smoke:test

@@ -22,6 +22,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /companies/{companyId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /relationships/{relationshipId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
     match /saved_graph_views/{viewId} {
       allow read: if isSignedIn();
       allow write: if false;

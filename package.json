@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "verify": "npm run lint && npm run typecheck && npm run build",
     "graph:seed": "tsx scripts/graph/seed-firestore.ts",
+    "graph:migrate": "tsx scripts/graph/migrate-firestore.ts",
     "smoke:test": "playwright test",
     "smoke:install": "playwright install chromium",
     "deploy:staging": "./scripts/deploy-cloud-run.sh staging",

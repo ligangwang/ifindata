@@ -30,6 +30,12 @@ cp .env.example .env.local
 npm run dev
 ```
 
+4. Run Firestore graph migrations (idempotent).
+
+```bash
+npm run graph:migrate
+```
+
 4. Open http://localhost:3000.
 
 ## Required Environment Variables
@@ -55,6 +61,11 @@ See .env.example for full details.
 - /api/graph/[id]
 - /api/health
 - /api/loved-entities
+
+## Graph Data Migrations
+
+- `npm run graph:migrate`: runs all ordered Firestore graph migrations in `scripts/graph/migrations`.
+- `npm run graph:seed`: runs only the initial graph seed migration.
 
 ## Firestore Model (MVP)
 

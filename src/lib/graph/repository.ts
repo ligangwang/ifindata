@@ -1,4 +1,4 @@
-import { seededCompanies, seededRelationships } from "@/lib/graph/seed";
+import { getAdminFirestore } from "@/lib/firebase/admin";
 import type {
   Company,
   CompanyResponse,
@@ -11,6 +11,50 @@ import type {
 
 const typeSet = new Set<RelationshipType>(["supplier", "customer", "competitor"]);
 
+type CompanyDoc = {
+  id: number;
+  name: string;
+  nameLower?: string;
+  ticker: string;
+  tickerLower?: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+};
+
+type RelationshipDoc = {
+  id: number;
+  sourceCompanyId: number;
+  targetCompanyId: number;
+  type: RelationshipType;
+  weight?: number | null;
+  confidence: number;
+  source?: string;
+  createdAt?: string;
+};
+
+function mapCompanyDoc(doc: CompanyDoc): Company {
+  return {
+    id: Number(doc.id),
+    name: doc.name,
+    ticker: doc.ticker,
+    description: doc.description ?? "",
+    metadata: doc.metadata ?? {},
+  };
+}
+
+function mapRelationshipDoc(doc: RelationshipDoc): Relationship {
+  return {
+    id: Number(doc.id),
+    sourceCompanyId: Number(doc.sourceCompanyId),
+    targetCompanyId: Number(doc.targetCompanyId),
+    type: doc.type,
+    weight: doc.weight == null ? null : Number(doc.weight),
+    confidence: Number(doc.confidence),
+    source: doc.source ?? "firestore",
+    createdAt: doc.createdAt ?? new Date().toISOString(),
+  };
+}
+
 function isRelationshipType(value: string): value is RelationshipType {
   return typeSet.has(value as RelationshipType);
 }
@@ -18,14 +62,6 @@ function isRelationshipType(value: string): value is RelationshipType {
 function normalizeTypes(types?: string[]): RelationshipType[] {
   const next = (types ?? []).filter(isRelationshipType);
   return next.length > 0 ? next : ["supplier", "customer", "competitor"];
-}
-
-function filterSeedRelationships(companyId: number, types: RelationshipType[]): Relationship[] {
-  return seededRelationships.filter(
-    (relationship) =>
-      (relationship.sourceCompanyId === companyId || relationship.targetCompanyId === companyId) &&
-      types.includes(relationship.type),
-  );
 }
 
 function mapEdge(relationship: Relationship): GraphEdge {
@@ -48,67 +84,153 @@ function mapNode(company: Company): GraphNode {
   };
 }
 
-function findCompanyInSeed(idOrSlug: string): Company | null {
+async function findCompanyInFirestore(idOrSlug: string): Promise<Company | null> {
+  const db = getAdminFirestore();
   const asNumber = Number(idOrSlug);
+
   if (Number.isInteger(asNumber)) {
-    return seededCompanies.find((company) => company.id === asNumber) ?? null;
+    const snap = await db.collection("companies").doc(String(asNumber)).get();
+    if (snap.exists) {
+      return mapCompanyDoc(snap.data() as CompanyDoc);
+    }
+    return null;
   }
 
   const slug = idOrSlug.toLowerCase();
-  return (
-    seededCompanies.find(
-      (company) => company.name.toLowerCase() === slug || company.ticker.toLowerCase() === slug,
-    ) ?? null
-  );
+  const byTicker = await db
+    .collection("companies")
+    .where("tickerLower", "==", slug)
+    .limit(1)
+    .get();
+  if (!byTicker.empty) {
+    return mapCompanyDoc(byTicker.docs[0].data() as CompanyDoc);
+  }
+
+  const byName = await db
+    .collection("companies")
+    .where("nameLower", "==", slug)
+    .limit(1)
+    .get();
+  if (!byName.empty) {
+    return mapCompanyDoc(byName.docs[0].data() as CompanyDoc);
+  }
+
+  return null;
 }
 
-export function getCompanyByIdOrSlug(idOrSlug: string): Company | null {
-  return findCompanyInSeed(idOrSlug);
+export async function getCompanyByIdOrSlug(idOrSlug: string): Promise<Company | null> {
+  return findCompanyInFirestore(idOrSlug);
 }
 
-function getRelationshipsForCompany(
+async function getRelationshipsForCompany(
   companyId: number,
   relationshipTypes: RelationshipType[],
-): Relationship[] {
-  return filterSeedRelationships(companyId, relationshipTypes);
+): Promise<Relationship[]> {
+  const db = getAdminFirestore();
+  const [fromSource, fromTarget] = await Promise.all([
+    db
+      .collection("relationships")
+      .where("sourceCompanyId", "==", companyId)
+      .where("type", "in", relationshipTypes)
+      .orderBy("confidence", "desc")
+      .get(),
+    db
+      .collection("relationships")
+      .where("targetCompanyId", "==", companyId)
+      .where("type", "in", relationshipTypes)
+      .orderBy("confidence", "desc")
+      .get(),
+  ]);
+
+  const dedup = new Map<string, Relationship>();
+  for (const snap of [...fromSource.docs, ...fromTarget.docs]) {
+    const relationship = mapRelationshipDoc(snap.data() as RelationshipDoc);
+    dedup.set(String(relationship.id), relationship);
+  }
+
+  return Array.from(dedup.values()).sort((a, b) => b.confidence - a.confidence);
 }
 
-function getCompaniesByIds(companyIds: number[]): Company[] {
-  const companySet = new Set(companyIds);
-  return seededCompanies.filter((company) => companySet.has(company.id));
+async function getCompaniesByIds(companyIds: number[]): Promise<Company[]> {
+  if (companyIds.length === 0) {
+    return [];
+  }
+
+  const db = getAdminFirestore();
+  const docs = await Promise.all(
+    companyIds.map((id) => db.collection("companies").doc(String(id)).get()),
+  );
+  return docs.filter((doc) => doc.exists).map((doc) => mapCompanyDoc(doc.data() as CompanyDoc));
 }
 
-export function searchCompanies(query: string, limit = 10): Company[] {
+async function searchCompaniesInFirestore(query: string, limit: number): Promise<Company[]> {
+  const db = getAdminFirestore();
+  const q = query.toLowerCase();
+  const end = `${q}\uf8ff`;
+
+  const [nameMatches, tickerMatches] = await Promise.all([
+    db
+      .collection("companies")
+      .where("nameLower", ">=", q)
+      .where("nameLower", "<=", end)
+      .orderBy("nameLower")
+      .limit(limit)
+      .get(),
+    db
+      .collection("companies")
+      .where("tickerLower", ">=", q)
+      .where("tickerLower", "<=", end)
+      .orderBy("tickerLower")
+      .limit(limit)
+      .get(),
+  ]);
+
+  const dedup = new Map<number, Company>();
+  for (const snap of [...nameMatches.docs, ...tickerMatches.docs]) {
+    const company = mapCompanyDoc(snap.data() as CompanyDoc);
+    dedup.set(company.id, company);
+  }
+
+  return Array.from(dedup.values()).slice(0, limit);
+}
+
+export async function searchCompanies(query: string, limit = 10): Promise<Company[]> {
   const trimmed = query.trim();
-  if (!trimmed) return [];
-  const q = trimmed.toLowerCase();
-  return seededCompanies
-    .filter((c) => c.name.toLowerCase().includes(q) || c.ticker.toLowerCase().includes(q))
-    .slice(0, limit);
+  if (!trimmed) {
+    return [];
+  }
+
+  return searchCompaniesInFirestore(trimmed, limit);
 }
 
-export function getCompanyWithRelationships(
+export async function getCompanyWithRelationships(
   idOrSlug: string,
   relationshipTypes?: string[],
-): CompanyResponse | null {
-  const company = getCompanyByIdOrSlug(idOrSlug);
-  if (!company) return null;
+): Promise<CompanyResponse | null> {
+  const company = await getCompanyByIdOrSlug(idOrSlug);
+  if (!company) {
+    return null;
+  }
 
   const normalizedTypes = normalizeTypes(relationshipTypes);
-  const relationships = getRelationshipsForCompany(company.id, normalizedTypes);
+  const relationships = await getRelationshipsForCompany(company.id, normalizedTypes);
+
   return { company, relationships };
 }
 
-export function getGraph(
+export async function getGraph(
   idOrSlug: string,
   relationshipTypes?: string[],
   maxNodes = 50,
-): GraphResponse | null {
-  const company = getCompanyByIdOrSlug(idOrSlug);
-  if (!company) return null;
+): Promise<GraphResponse | null> {
+  const company = await getCompanyByIdOrSlug(idOrSlug);
+  if (!company) {
+    return null;
+  }
 
   const normalizedTypes = normalizeTypes(relationshipTypes);
-  const relationships = getRelationshipsForCompany(company.id, normalizedTypes);
+  const relationships = await getRelationshipsForCompany(company.id, normalizedTypes);
+
   const slicedRelationships = relationships.slice(0, Math.max(1, maxNodes));
 
   const nodeIds = new Set<number>([company.id]);
@@ -117,10 +239,12 @@ export function getGraph(
     nodeIds.add(rel.targetCompanyId);
   }
 
+  const companies = await getCompaniesByIds(Array.from(nodeIds));
+
   return {
     centerCompanyId: company.id,
     relationshipTypes: normalizedTypes,
-    nodes: getCompaniesByIds(Array.from(nodeIds)).map(mapNode),
+    nodes: companies.map(mapNode),
     edges: slicedRelationships.map(mapEdge),
   };
 }

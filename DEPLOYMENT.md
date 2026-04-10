@@ -71,6 +71,8 @@ Optional deploy behavior:
 - `FIRESTORE_PROJECT_ID` can be set when Firestore lives in a different project than Cloud Run.
 - Set `APPLY_FIRESTORE_INDEXES=0` to skip automatic index deployment.
 
+Index deployment is applied via `gcloud firestore indexes composite create` from `scripts/firestore/apply-indexes.ts` to avoid requiring Firebaserules API permissions in CI.
+
 Firestore project resolution order:
 
 1. `FIRESTORE_PROJECT_ID`

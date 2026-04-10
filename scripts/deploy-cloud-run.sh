@@ -42,14 +42,11 @@ if [[ -n "${CLOUD_BUILD_DEFAULT_BUCKETS_BEHAVIOR:-}" ]]; then
   build_submit_args+=(--default-buckets-behavior "$CLOUD_BUILD_DEFAULT_BUCKETS_BEHAVIOR")
 fi
 
-if [[ "${CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING:-0}" == "1" ]]; then
-  if [[ -n "${CLOUD_BUILD_SOURCE_STAGING_DIR:-}" ]]; then
-    build_submit_args+=(--gcs-source-staging-dir "$CLOUD_BUILD_SOURCE_STAGING_DIR")
-  else
-    echo "WARN: CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING=1 but CLOUD_BUILD_SOURCE_STAGING_DIR is unset; using default source staging behavior"
-  fi
-elif [[ -n "${CLOUD_BUILD_SOURCE_STAGING_DIR:-}" ]]; then
-  echo "INFO: CLOUD_BUILD_SOURCE_STAGING_DIR is set but ignored (set CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING=1 to enable custom staging dir)"
+if [[ -n "${CLOUD_BUILD_SOURCE_STAGING_DIR:-}" ]]; then
+  build_submit_args+=(--gcs-source-staging-dir "$CLOUD_BUILD_SOURCE_STAGING_DIR")
+  echo "INFO: Using custom Cloud Build source staging dir: $CLOUD_BUILD_SOURCE_STAGING_DIR"
+elif [[ "${CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING:-0}" == "1" ]]; then
+  echo "WARN: CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING=1 but CLOUD_BUILD_SOURCE_STAGING_DIR is unset; using default source staging behavior"
 fi
 
 if [[ "${DEBUG_GCLOUD_DEPLOY:-0}" == "1" ]]; then

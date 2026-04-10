@@ -7,6 +7,60 @@ target="${1:-staging}"
 project_id="${GOOGLE_CLOUD_PROJECT:?GOOGLE_CLOUD_PROJECT is required}"
 region="${GOOGLE_CLOUD_REGION:-us-central1}"
 
+ensure_firestore_api_enabled() {
+  local api_name="firestore.googleapis.com"
+  local enabled
+
+  enabled="$(gcloud services list \
+    --project "$project_id" \
+    --enabled \
+    --filter="name:$api_name" \
+    --format='value(name)')"
+
+  if [[ "$enabled" == "$api_name" ]]; then
+    return 0
+  fi
+
+  if [[ "${FIRESTORE_AUTO_ENABLE_API:-0}" == "1" ]]; then
+    echo "Firestore API is disabled. Attempting to enable $api_name in project $project_id"
+    gcloud services enable "$api_name" --project "$project_id"
+    echo "Firestore API enable requested. Waiting briefly for propagation..."
+    sleep 10
+    enabled="$(gcloud services list \
+      --project "$project_id" \
+      --enabled \
+      --filter="name:$api_name" \
+      --format='value(name)')"
+
+    if [[ "$enabled" == "$api_name" ]]; then
+      echo "Firestore API is now enabled."
+      return 0
+    fi
+  fi
+
+  echo "ERROR: Firestore API is disabled for project $project_id"
+  echo "Enable it with: gcloud services enable firestore.googleapis.com --project $project_id"
+  echo "Or set FIRESTORE_AUTO_ENABLE_API=1 if deploy credentials can enable services."
+  exit 1
+}
+
+ensure_firestore_database_exists() {
+  local db_name="(default)"
+
+  if gcloud firestore databases describe \
+    --project "$project_id" \
+    --database "$db_name" \
+    >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "ERROR: Firestore database $db_name was not found in project $project_id"
+  echo "Create it once with one of the following options:"
+  echo "  1) Console: https://console.cloud.google.com/firestore/databases?project=$project_id"
+  echo "  2) CLI: gcloud firestore databases create --project $project_id --database=$db_name --location=us-central1 --type=firestore-native"
+  exit 1
+}
+
 case "$target" in
   staging)
     service_name="${CLOUD_RUN_SERVICE_STAGING:-ifindata-web-staging}"
@@ -23,13 +77,26 @@ case "$target" in
     ;;
 esac
 
-echo "[1/5] Running Firestore graph migrations"
-npm run graph:migrate
+echo "[1/6] Checking Firestore API"
+ensure_firestore_api_enabled
 
-echo "[2/5] Verifying application"
+echo "[2/6] Checking Firestore database"
+ensure_firestore_database_exists
+
+echo "[3/6] Running Firestore graph migrations"
+if ! npm run graph:migrate; then
+  echo "ERROR: Firestore graph migrations failed."
+  echo "If you see PERMISSION_DENIED, grant the deploy service account Firestore data access:"
+  echo "  gcloud projects add-iam-policy-binding $project_id --member=serviceAccount:<DEPLOY_SA_EMAIL> --role=roles/datastore.user"
+  echo "Active account in this environment:"
+  gcloud auth list --filter=status:ACTIVE --format='value(account)' || true
+  exit 1
+fi
+
+echo "[4/6] Verifying application"
 npm run verify
 
-echo "[3/5] Deploying $service_name to Cloud Run via Cloud Build"
+echo "[5/6] Deploying $service_name to Cloud Run via Cloud Build"
 image_tag="${region}-docker.pkg.dev/${project_id}/ifindata/ifindata-web:${GIT_SHA:-local}"
 
 build_submit_args=(
@@ -118,7 +185,7 @@ while true; do
   esac
 done
 
-echo "[4/5] Resolving deployed service URL"
+echo "[6/6] Resolving deployed service URL"
 service_url="$(gcloud run services describe "$service_name" \
   --project "$project_id" \
   --region "$region" \
@@ -130,7 +197,7 @@ if [[ -z "$service_url" ]]; then
 fi
 
 health_url="$service_url/api/health"
-echo "[5/5] Smoke testing $health_url"
+echo "[7/7] Smoke testing $health_url"
 
 health_tmp_file="$(mktemp)"
 health_status="$(curl --silent --show-error --output "$health_tmp_file" --write-out '%{http_code}' "$health_url" || true)"

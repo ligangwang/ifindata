@@ -23,10 +23,13 @@ case "$target" in
     ;;
 esac
 
-echo "[1/4] Verifying application"
+echo "[1/5] Running Firestore graph migrations"
+npm run graph:migrate
+
+echo "[2/5] Verifying application"
 npm run verify
 
-echo "[2/4] Deploying $service_name to Cloud Run via Cloud Build"
+echo "[3/5] Deploying $service_name to Cloud Run via Cloud Build"
 image_tag="${region}-docker.pkg.dev/${project_id}/ifindata/ifindata-web:${GIT_SHA:-local}"
 
 build_submit_args=(
@@ -39,14 +42,11 @@ if [[ -n "${CLOUD_BUILD_DEFAULT_BUCKETS_BEHAVIOR:-}" ]]; then
   build_submit_args+=(--default-buckets-behavior "$CLOUD_BUILD_DEFAULT_BUCKETS_BEHAVIOR")
 fi
 
-if [[ "${CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING:-0}" == "1" ]]; then
-  if [[ -n "${CLOUD_BUILD_SOURCE_STAGING_DIR:-}" ]]; then
-    build_submit_args+=(--gcs-source-staging-dir "$CLOUD_BUILD_SOURCE_STAGING_DIR")
-  else
-    echo "WARN: CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING=1 but CLOUD_BUILD_SOURCE_STAGING_DIR is unset; using default source staging behavior"
-  fi
-elif [[ -n "${CLOUD_BUILD_SOURCE_STAGING_DIR:-}" ]]; then
-  echo "INFO: CLOUD_BUILD_SOURCE_STAGING_DIR is set but ignored (set CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING=1 to enable custom staging dir)"
+if [[ -n "${CLOUD_BUILD_SOURCE_STAGING_DIR:-}" ]]; then
+  build_submit_args+=(--gcs-source-staging-dir "$CLOUD_BUILD_SOURCE_STAGING_DIR")
+  echo "INFO: Using custom Cloud Build source staging dir: $CLOUD_BUILD_SOURCE_STAGING_DIR"
+elif [[ "${CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING:-0}" == "1" ]]; then
+  echo "WARN: CLOUD_BUILD_USE_CUSTOM_SOURCE_STAGING=1 but CLOUD_BUILD_SOURCE_STAGING_DIR is unset; using default source staging behavior"
 fi
 
 if [[ "${DEBUG_GCLOUD_DEPLOY:-0}" == "1" ]]; then
@@ -115,7 +115,7 @@ while true; do
   esac
 done
 
-echo "[3/4] Resolving deployed service URL"
+echo "[4/5] Resolving deployed service URL"
 service_url="$(gcloud run services describe "$service_name" \
   --project "$project_id" \
   --region "$region" \
@@ -127,7 +127,7 @@ if [[ -z "$service_url" ]]; then
 fi
 
 health_url="$service_url/api/health"
-echo "[4/4] Smoke testing $health_url"
+echo "[5/5] Smoke testing $health_url"
 
 health_tmp_file="$(mktemp)"
 health_status="$(curl --silent --show-error --output "$health_tmp_file" --write-out '%{http_code}' "$health_url" || true)"

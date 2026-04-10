@@ -45,8 +45,31 @@ npm run deploy:production
 
 - Google Cloud project with billing enabled
 - Cloud Run, Cloud Build, and Artifact Registry APIs enabled
+- Cloud Firestore API enabled (`firestore.googleapis.com`)
+- Default Firestore database created (`(default)`, Native mode)
 - `gcloud` installed and authenticated
 - Artifact Registry repository created once
+
+Enable Firestore API once per project:
+
+```bash
+gcloud services enable firestore.googleapis.com --project "$GOOGLE_CLOUD_PROJECT"
+```
+
+Create Firestore database once per project (if not already created):
+
+```bash
+gcloud firestore databases create \
+  --project "$GOOGLE_CLOUD_PROJECT" \
+  --database="(default)" \
+  --location=us-central1 \
+  --type=firestore-native
+```
+
+Optional deploy behavior:
+
+- Set `FIRESTORE_AUTO_ENABLE_API=1` to let deploy attempt enabling Firestore API automatically.
+- If service enable permissions are missing, deploy will fail with a clear message before migrations run.
 
 Create the repository once:
 
@@ -99,3 +122,17 @@ Set Cloud Run environment variables for:
 - Neo4j credentials
 - `APP_ENVIRONMENT`
 - `GIT_SHA` if you want deploy metadata in the health endpoint
+
+## IAM For Migrations
+
+The identity used by deploy (for example the service account in `GCP_SA_KEY`) must be able to read/write Firestore documents for graph migrations.
+
+Minimum recommended role on the target project:
+
+```bash
+gcloud projects add-iam-policy-binding "$GOOGLE_CLOUD_PROJECT" \
+  --member="serviceAccount:YOUR_DEPLOY_SA@YOUR_PROJECT.iam.gserviceaccount.com" \
+  --role="roles/datastore.user"
+```
+
+To confirm which principal CI is using, inspect the `gcloud auth list` output in the deploy workflow logs.

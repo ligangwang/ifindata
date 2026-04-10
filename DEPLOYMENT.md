@@ -13,19 +13,19 @@ For day-to-day iteration:
 
 ```bash
 npm run smoke:install
-npm run graph:migrate
 npm run verify
 npm run deploy:staging
 ```
 
 That staging deploy command will:
 
-1. Run Firestore graph migrations.
-2. Run lint, typecheck, and production build.
-3. Build and push the container with Cloud Build.
-4. Deploy to the staging Cloud Run service.
-5. Fetch the deployed service URL.
-6. Call `/api/health` and fail if the app is not healthy.
+1. Deploy Firestore indexes from `firestore.indexes.json`.
+2. Run Firestore graph migrations.
+3. Run lint, typecheck, and production build.
+4. Build and push the container with Cloud Build.
+5. Deploy to the staging Cloud Run service.
+6. Fetch the deployed service URL.
+7. Call `/api/health` and fail if the app is not healthy.
 
 If you want local browser smoke coverage too:
 
@@ -68,11 +68,12 @@ gcloud firestore databases create \
 
 Optional deploy behavior:
 
-- Set `FIRESTORE_AUTO_ENABLE_API=1` to let deploy attempt enabling Firestore API automatically.
-- If service enable permissions are missing, deploy will fail with a clear message before migrations run.
 - `FIRESTORE_PROJECT_ID` can be set when Firestore lives in a different project than Cloud Run.
+- Set `APPLY_FIRESTORE_INDEXES=0` to skip automatic index deployment.
 
-Firestore preflight project resolution order:
+Index deployment is applied via `gcloud firestore indexes composite create` from `scripts/firestore/apply-indexes.ts` to avoid requiring Firebaserules API permissions in CI.
+
+Firestore project resolution order:
 
 1. `FIRESTORE_PROJECT_ID`
 2. `NEXT_PUBLIC_FIREBASE_PROJECT_ID`

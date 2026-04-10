@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@/components/providers/auth-provider";
 
 type AuthModalProps = {
@@ -57,6 +58,7 @@ function GoogleIcon() {
 
 export function AuthModal({ onClose }: AuthModalProps) {
   const { signInWithGoogle, signInWithEmail, createAccountWithEmail } = useAuth();
+  const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -76,6 +78,11 @@ export function AuthModal({ onClose }: AuthModalProps) {
   // Auto-focus email input when modal opens
   useEffect(() => {
     emailRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
   }, []);
 
   function switchMode(next: Mode) {
@@ -115,9 +122,35 @@ export function AuthModal({ onClose }: AuthModalProps) {
     }
   }
 
-  return (
+  const overlayStyle: React.CSSProperties = {
+    position: "fixed",
+    inset: 0,
+    zIndex: 1000,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "1rem",
+    background: "rgba(0, 0, 0, 0.6)",
+    backdropFilter: "blur(2px)",
+  };
+
+  const dialogStyle: React.CSSProperties = {
+    width: "100%",
+    maxWidth: "24rem",
+    borderRadius: "1rem",
+    border: "1px solid rgb(51 65 85)",
+    background: "rgb(2 6 23)",
+    color: "rgb(248 250 252)",
+    padding: "1.5rem",
+    boxShadow: "0 20px 40px rgba(0, 0, 0, 0.45)",
+  };
+
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      style={overlayStyle}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -127,6 +160,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
         aria-modal="true"
         aria-label={mode === "signin" ? "Sign in" : "Create account"}
         className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-950 p-6 shadow-2xl"
+        style={dialogStyle}
       >
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
@@ -225,6 +259,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
           )}
         </p>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

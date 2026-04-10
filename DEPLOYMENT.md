@@ -70,6 +70,13 @@ Optional deploy behavior:
 
 - Set `FIRESTORE_AUTO_ENABLE_API=1` to let deploy attempt enabling Firestore API automatically.
 - If service enable permissions are missing, deploy will fail with a clear message before migrations run.
+- `FIRESTORE_PROJECT_ID` can be set when Firestore lives in a different project than Cloud Run.
+
+Firestore preflight project resolution order:
+
+1. `FIRESTORE_PROJECT_ID`
+2. `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+3. `GOOGLE_CLOUD_PROJECT`
 
 Create the repository once:
 

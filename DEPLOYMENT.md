@@ -13,17 +13,19 @@ For day-to-day iteration:
 
 ```bash
 npm run smoke:install
+npm run graph:migrate
 npm run verify
 npm run deploy:staging
 ```
 
 That staging deploy command will:
 
-1. Run lint, typecheck, and production build.
-2. Build and push the container with Cloud Build.
-3. Deploy to the staging Cloud Run service.
-4. Fetch the deployed service URL.
-5. Call `/api/health` and fail if the app is not healthy.
+1. Run Firestore graph migrations.
+2. Run lint, typecheck, and production build.
+3. Build and push the container with Cloud Build.
+4. Deploy to the staging Cloud Run service.
+5. Fetch the deployed service URL.
+6. Call `/api/health` and fail if the app is not healthy.
 
 If you want local browser smoke coverage too:
 

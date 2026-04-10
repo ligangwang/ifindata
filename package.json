@@ -12,6 +12,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "verify": "npm run lint && npm run typecheck && npm run build",
+    "firestore:indexes:apply": "tsx scripts/firestore/apply-indexes.ts",
     "graph:seed": "tsx scripts/graph/seed-firestore.ts",
     "graph:migrate": "tsx scripts/graph/migrate-firestore.ts",
     "smoke:test": "playwright test",

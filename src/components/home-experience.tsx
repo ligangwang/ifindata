@@ -4,9 +4,6 @@ import type cytoscape from "cytoscape";
 import type { ElementDefinition, EventObject, EventObjectNode } from "cytoscape";
 import CytoscapeComponent from "react-cytoscapejs";
 import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "@/components/providers/auth-provider";
-import { AuthModal } from "@/components/auth/auth-modal";
-import { UserMenu } from "@/components/auth/user-menu";
 
 type RelationshipType = "supplier" | "customer" | "competitor";
 
@@ -141,8 +138,6 @@ function summarizeRelationships(relationships: CompanyRelationship[]) {
 }
 
 export function HomeExperience() {
-  const { user } = useAuth();
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const [centerCompanyId, setCenterCompanyId] = useState<number>(DEFAULT_CENTER_ID);
   const [selectedCompanyId, setSelectedCompanyId] = useState<number>(DEFAULT_CENTER_ID);
   const [graphData, setGraphData] = useState<GraphResponse | null>(null);
@@ -390,19 +385,6 @@ export function HomeExperience() {
               ) : null}
               </div>
 
-              <div className="shrink-0">
-                {user ? (
-                  <UserMenu />
-                ) : (
-                  <button
-                    className="rounded-2xl border border-sky-400/50 bg-sky-500/10 px-4 py-2 text-sm text-sky-100 transition-colors hover:bg-sky-500/20"
-                    onClick={() => setShowAuthModal(true)}
-                    type="button"
-                  >
-                    Sign In
-                  </button>
-                )}
-              </div>
             </div>
 
             <div>
@@ -532,7 +514,6 @@ export function HomeExperience() {
         </section>
       </div>
 
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
     </main>
   );
 }

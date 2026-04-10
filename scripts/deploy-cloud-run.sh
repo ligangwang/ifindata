@@ -6,6 +6,7 @@ target="${1:-staging}"
 
 project_id="${GOOGLE_CLOUD_PROJECT:?GOOGLE_CLOUD_PROJECT is required}"
 region="${GOOGLE_CLOUD_REGION:-us-central1}"
+firestore_project_id="${FIRESTORE_PROJECT_ID:-${NEXT_PUBLIC_FIREBASE_PROJECT_ID:-$project_id}}"
 
 case "$target" in
   staging)
@@ -23,13 +24,23 @@ case "$target" in
     ;;
 esac
 
-echo "[1/5] Running Firestore graph migrations"
+echo "[1/6] Deploying Firestore indexes"
+if [[ "${APPLY_FIRESTORE_INDEXES:-1}" == "1" ]]; then
+  npx --yes firebase-tools deploy \
+    --only firestore:indexes \
+    --project "$firestore_project_id" \
+    --non-interactive
+else
+  echo "Skipping Firestore index deployment (APPLY_FIRESTORE_INDEXES=${APPLY_FIRESTORE_INDEXES:-0})"
+fi
+
+echo "[2/6] Running Firestore graph migrations"
 npm run graph:migrate
 
-echo "[2/5] Verifying application"
+echo "[3/6] Verifying application"
 npm run verify
 
-echo "[3/5] Deploying $service_name to Cloud Run via Cloud Build"
+echo "[4/6] Deploying $service_name to Cloud Run via Cloud Build"
 image_tag="${region}-docker.pkg.dev/${project_id}/ifindata/ifindata-web:${GIT_SHA:-local}"
 
 build_submit_args=(
@@ -53,6 +64,7 @@ if [[ "${DEBUG_GCLOUD_DEPLOY:-0}" == "1" ]]; then
   echo "Deploy debug context:"
   echo "  target=$target"
   echo "  project_id=$project_id"
+  echo "  firestore_project_id=$firestore_project_id"
   echo "  region=$region"
   echo "  service_name=$service_name"
   echo "  app_environment=$app_environment"
@@ -115,7 +127,7 @@ while true; do
   esac
 done
 
-echo "[4/5] Resolving deployed service URL"
+echo "[5/6] Resolving deployed service URL"
 service_url="$(gcloud run services describe "$service_name" \
   --project "$project_id" \
   --region "$region" \
@@ -127,7 +139,7 @@ if [[ -z "$service_url" ]]; then
 fi
 
 health_url="$service_url/api/health"
-echo "[5/5] Smoke testing $health_url"
+echo "[6/6] Smoke testing $health_url"
 
 health_tmp_file="$(mktemp)"
 health_status="$(curl --silent --show-error --output "$health_tmp_file" --write-out '%{http_code}' "$health_url" || true)"

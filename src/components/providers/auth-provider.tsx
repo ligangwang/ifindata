@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  browserLocalPersistence,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  setPersistence,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut as firebaseSignOut,
@@ -18,6 +20,7 @@ import {
   type ReactNode,
 } from "react";
 import { getFirebaseServices, isFirebaseConfigured } from "@/lib/firebase/client";
+import { ensureUserProfileDocument } from "@/lib/firebase/users";
 
 type AuthContextValue = {
   user: User | null;
@@ -59,6 +62,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
       setLoading(false);
+
+      if (!nextUser) {
+        return;
+      }
+
+      const { db } = getFirebaseServices();
+      void ensureUserProfileDocument(db, nextUser).catch((nextError) => {
+        setError(toMessage(nextError, "Unable to create user profile."));
+      });
+    });
+
+    void setPersistence(auth, browserLocalPersistence).catch((nextError) => {
+      setError(toMessage(nextError, "Unable to persist authentication state."));
     });
 
     return unsubscribe;

@@ -20,7 +20,6 @@ import {
   type ReactNode,
 } from "react";
 import { getFirebaseServices, isFirebaseConfigured } from "@/lib/firebase/client";
-import { ensureUserProfileDocument } from "@/lib/firebase/users";
 
 type AuthContextValue = {
   user: User | null;
@@ -53,6 +52,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState<boolean>(() => configured);
   const [error, setError] = useState<string | null>(null);
 
+  const bootstrapUserProfile = useCallback(async (nextUser: User) => {
+    const token = await nextUser.getIdToken();
+    const response = await fetch("/api/users/bootstrap", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        displayName: nextUser.displayName,
+        email: nextUser.email,
+        photoURL: nextUser.photoURL,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Unable to create user profile.");
+    }
+  }, []);
+
   useEffect(() => {
     if (!configured) {
       return;
@@ -67,8 +86,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return;
       }
 
-      const { db } = getFirebaseServices();
-      void ensureUserProfileDocument(db, nextUser).catch((nextError) => {
+      void bootstrapUserProfile(nextUser).catch((nextError) => {
         setError(toMessage(nextError, "Unable to create user profile."));
       });
     });
@@ -78,7 +96,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
 
     return unsubscribe;
-  }, [configured]);
+  }, [bootstrapUserProfile, configured]);
 
   const signInWithGoogle = useCallback(async () => {
     if (!configured) {

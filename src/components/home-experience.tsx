@@ -3,7 +3,8 @@
 import type cytoscape from "cytoscape";
 import type { ElementDefinition, EventObject, EventObjectNode } from "cytoscape";
 import CytoscapeComponent from "react-cytoscapejs";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/components/providers/auth-provider";
 
 type RelationshipType = "supplier" | "customer" | "competitor";
 
@@ -138,6 +139,16 @@ function summarizeRelationships(relationships: CompanyRelationship[]) {
 }
 
 export function HomeExperience() {
+  const {
+    user,
+    loading: authLoading,
+    configured: authConfigured,
+    error: authError,
+    signInWithGoogle,
+    signInWithEmail,
+    createAccountWithEmail,
+    signOut,
+  } = useAuth();
   const [centerCompanyId, setCenterCompanyId] = useState<number>(DEFAULT_CENTER_ID);
   const [selectedCompanyId, setSelectedCompanyId] = useState<number>(DEFAULT_CENTER_ID);
   const [graphData, setGraphData] = useState<GraphResponse | null>(null);
@@ -148,11 +159,18 @@ export function HomeExperience() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Company[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [createMode, setCreateMode] = useState(false);
+  const [emailSubmitting, setEmailSubmitting] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMenuOpen, setAuthMenuOpen] = useState(false);
   const [relationshipFilter, setRelationshipFilter] = useState<Record<RelationshipType, boolean>>({
     customer: true,
     supplier: false,
     competitor: false,
   });
+  const avatarMenuRef = useRef<HTMLDivElement | null>(null);
 
   const activeTypes = useMemo(
     () =>
@@ -326,8 +344,60 @@ export function HomeExperience() {
     }
   }, [graphData, selectedCompanyId, centerCompanyId]);
 
+  useEffect(() => {
+    if (!authModalOpen) {
+      return;
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setAuthModalOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [authModalOpen]);
+
+  useEffect(() => {
+    if (!authMenuOpen) {
+      return;
+    }
+
+    function handleOutsideClick(event: MouseEvent) {
+      if (avatarMenuRef.current && !avatarMenuRef.current.contains(event.target as Node)) {
+        setAuthMenuOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setAuthMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [authMenuOpen]);
+
+  useEffect(() => {
+    if (user && authModalOpen) {
+      setAuthModalOpen(false);
+      setPassword("");
+    }
+  }, [user, authModalOpen]);
+
   const summary = selectedCompany ? summarizeRelationships(selectedCompany.relationships) : null;
   const selectedNode = nodeById.get(selectedCompanyId);
+  const userInitial = user?.displayName?.trim()?.charAt(0)?.toUpperCase() ??
+    user?.email?.trim()?.charAt(0)?.toUpperCase() ??
+    "U";
 
   function handleFilterToggle(type: RelationshipType) {
     setRelationshipFilter((previous) => {
@@ -341,6 +411,46 @@ export function HomeExperience() {
         [type]: !previous[type],
       };
     });
+  }
+
+  async function handleSignIn() {
+    try {
+      await signInWithGoogle();
+    } catch {
+      // Error state is handled by the auth provider.
+    }
+  }
+
+  async function handleSignOut() {
+    try {
+      setAuthMenuOpen(false);
+      await signOut();
+    } catch {
+      // Error state is handled by the auth provider.
+    }
+  }
+
+  async function handleEmailAuth(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail || !password) {
+      return;
+    }
+
+    setEmailSubmitting(true);
+    try {
+      if (createMode) {
+        await createAccountWithEmail(normalizedEmail, password);
+      } else {
+        await signInWithEmail(normalizedEmail, password);
+      }
+      setPassword("");
+    } catch {
+      // Error state is handled by the auth provider.
+    } finally {
+      setEmailSubmitting(false);
+    }
   }
 
   return (
@@ -385,7 +495,80 @@ export function HomeExperience() {
               ) : null}
               </div>
 
+              <div className="flex items-center gap-2">
+                {authConfigured ? (
+                  user ? (
+                    <div className="relative" ref={avatarMenuRef}>
+                      <button
+                        aria-expanded={authMenuOpen}
+                        aria-haspopup="menu"
+                        className="flex items-center gap-2 rounded-full border border-slate-600 bg-slate-900/70 px-1 py-1 text-slate-100 transition-colors hover:border-slate-400"
+                        onClick={() => {
+                          setAuthMenuOpen((previous) => !previous);
+                        }}
+                        type="button"
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-slate-600 bg-slate-900 text-xs font-semibold text-sky-100">
+                          {user.photoURL ? (
+                            <img
+                              alt={user.displayName || user.email || "User avatar"}
+                              className="h-full w-full object-cover"
+                              referrerPolicy="no-referrer"
+                              src={user.photoURL}
+                            />
+                          ) : (
+                            <span>{userInitial}</span>
+                          )}
+                        </div>
+                      </button>
+
+                      {authMenuOpen ? (
+                        <div
+                          className="absolute right-0 z-30 mt-2 min-w-44 rounded-xl border border-slate-700 bg-slate-950/95 p-1 shadow-2xl"
+                          role="menu"
+                        >
+                          <p className="truncate px-3 py-2 text-xs text-slate-400">
+                            {user.displayName || user.email || "Signed in"}
+                          </p>
+                          <button
+                            className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-slate-100 transition-colors hover:bg-slate-800"
+                            onClick={() => {
+                              void handleSignOut();
+                            }}
+                            role="menuitem"
+                            type="button"
+                          >
+                            Sign out
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <button
+                      className="rounded-xl border border-sky-300/40 bg-sky-500/15 px-3 py-2 text-xs text-sky-100 transition-colors hover:border-sky-200"
+                      disabled={authLoading}
+                      onClick={() => {
+                        setAuthModalOpen(true);
+                      }}
+                      type="button"
+                    >
+                      {authLoading ? "Checking auth..." : "Sign in"}
+                    </button>
+                  )
+                ) : (
+                  <span className="rounded-xl border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                    Firebase Auth not configured
+                  </span>
+                )}
+              </div>
+
             </div>
+
+            {authError ? (
+              <p className="text-sm text-rose-200" role="status">
+                {authError}
+              </p>
+            ) : null}
 
             <div>
               <h1 className="font-[family:var(--font-sora)] text-3xl font-semibold text-amber-100 sm:text-4xl">
@@ -513,6 +696,94 @@ export function HomeExperience() {
           </aside>
         </section>
       </div>
+
+      {authConfigured && !user && authModalOpen ? (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setAuthModalOpen(false);
+            }
+          }}
+          role="dialog"
+        >
+          <div className="w-full max-w-md rounded-3xl border border-sky-300/30 bg-slate-950 p-5 shadow-2xl sm:p-6">
+            <div className="flex items-center justify-between">
+              <h2 className="font-[family:var(--font-sora)] text-2xl text-amber-100">Sign in to IFinData</h2>
+              <button
+                aria-label="Close sign-in modal"
+                className="rounded-lg border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:border-slate-500"
+                onClick={() => {
+                  setAuthModalOpen(false);
+                }}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+
+            <p className="mt-2 text-sm text-slate-300">Use Google or email/password to continue.</p>
+
+            <button
+              className="mt-4 w-full rounded-xl border border-sky-300/40 bg-sky-500/15 px-4 py-2 text-sm text-sky-100 transition-colors hover:border-sky-200"
+              disabled={authLoading || emailSubmitting}
+              onClick={() => {
+                void handleSignIn();
+              }}
+              type="button"
+            >
+              {authLoading ? "Checking auth..." : "Continue with Google"}
+            </button>
+
+            <div className="my-4 flex items-center gap-2 text-xs text-slate-500">
+              <span className="h-px flex-1 bg-slate-700" />
+              <span>or with email</span>
+              <span className="h-px flex-1 bg-slate-700" />
+            </div>
+
+            <form className="grid gap-2" onSubmit={handleEmailAuth}>
+              <input
+                aria-label="Email"
+                autoComplete="email"
+                className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-amber-50 outline-none placeholder:text-slate-400 focus:border-sky-300"
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="Email"
+                type="email"
+                value={email}
+              />
+              <input
+                aria-label="Password"
+                autoComplete={createMode ? "new-password" : "current-password"}
+                className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-amber-50 outline-none placeholder:text-slate-400 focus:border-sky-300"
+                minLength={6}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Password"
+                type="password"
+                value={password}
+              />
+              <div className="mt-1 flex items-center gap-2">
+                <button
+                  className="rounded-xl border border-slate-500 bg-slate-800 px-3 py-2 text-xs text-slate-100 transition-colors hover:border-slate-300"
+                  disabled={emailSubmitting || authLoading}
+                  type="submit"
+                >
+                  {emailSubmitting ? "Working..." : createMode ? "Create account" : "Sign in"}
+                </button>
+                <button
+                  className="rounded-xl border border-sky-300/40 bg-sky-500/15 px-3 py-2 text-xs text-sky-100 transition-colors hover:border-sky-200"
+                  onClick={() => {
+                    setCreateMode((previous) => !previous);
+                  }}
+                  type="button"
+                >
+                  {createMode ? "Use sign in" : "Create account mode"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
     </main>
   );

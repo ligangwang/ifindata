@@ -6,6 +6,12 @@ import { useAuth } from "@/components/providers/auth-provider";
 
 type ExpiryUnit = "DAYS" | "MONTHS" | "YEARS";
 
+const MAX_EXPIRY_BY_UNIT: Record<ExpiryUnit, number> = {
+  DAYS: 365,
+  MONTHS: 12,
+  YEARS: 1,
+};
+
 function addMonthsClamped(date: Date, monthsToAdd: number): Date {
   const next = new Date(date);
   const targetDay = next.getDate();
@@ -49,6 +55,12 @@ function calculateExpiryDate(amount: number, unit: ExpiryUnit): Date {
   return addMonthsClamped(now, amount * 12);
 }
 
+function isWithinOneYear(expiryDate: Date): boolean {
+  const now = new Date();
+  const oneYearFromNow = addMonthsClamped(now, 12);
+  return expiryDate.getTime() <= oneYearFromNow.getTime();
+}
+
 export function CreatePredictionPage() {
   const router = useRouter();
   const { user, getIdToken } = useAuth();
@@ -61,15 +73,18 @@ export function CreatePredictionPage() {
   const [error, setError] = useState<string | null>(null);
 
   const parsedExpiryAmount = Number(expiryAmount);
-  const hasValidExpiryAmount = Number.isInteger(parsedExpiryAmount) && parsedExpiryAmount > 0;
+  const maxExpiryAmount = MAX_EXPIRY_BY_UNIT[expiryUnit];
+  const hasValidExpiryAmount =
+    Number.isInteger(parsedExpiryAmount) && parsedExpiryAmount > 0 && parsedExpiryAmount <= maxExpiryAmount;
   const calculatedExpiryDate = hasValidExpiryAmount ? calculateExpiryDate(parsedExpiryAmount, expiryUnit) : null;
-  const calculatedExpiryAt = calculatedExpiryDate ? toEndOfDay(calculatedExpiryDate) : null;
+  const expiryWithinOneYear = calculatedExpiryDate ? isWithinOneYear(calculatedExpiryDate) : false;
+  const calculatedExpiryAt = calculatedExpiryDate && expiryWithinOneYear ? toEndOfDay(calculatedExpiryDate) : null;
 
   async function submit() {
     setError(null);
 
     if (!hasValidExpiryAmount || !calculatedExpiryAt) {
-      setError("Enter a valid expiry duration.");
+      setError("Expiry must be within one year.");
       return;
     }
 
@@ -154,6 +169,7 @@ export function CreatePredictionPage() {
               <input
                 type="number"
                 min="1"
+                max={String(maxExpiryAmount)}
                 step="1"
                 inputMode="numeric"
                 value={expiryAmount}
@@ -166,7 +182,14 @@ export function CreatePredictionPage() {
                   <button
                     key={option}
                     type="button"
-                    onClick={() => setExpiryUnit(option)}
+                    onClick={() => {
+                      setExpiryUnit(option);
+                      const nextMax = MAX_EXPIRY_BY_UNIT[option];
+                      const current = Number(expiryAmount);
+                      if (Number.isInteger(current) && current > nextMax) {
+                        setExpiryAmount(String(nextMax));
+                      }
+                    }}
                     className={`flex-1 rounded-full px-3 py-1.5 text-sm sm:flex-none ${expiryUnit === option ? "bg-cyan-400 text-slate-900" : "text-slate-200"}`}
                   >
                     {option.toLowerCase()}
@@ -175,9 +198,9 @@ export function CreatePredictionPage() {
               </div>
             </div>
             <p className="text-xs text-slate-400">
-              {calculatedExpiryDate
+              {calculatedExpiryDate && expiryWithinOneYear
                 ? `This prediction will expire at the end of ${formatExpiryDate(calculatedExpiryDate)}.`
-                : "Enter a positive whole number for the expiry horizon."}
+                : `Enter a positive whole number. Maximum: ${MAX_EXPIRY_BY_UNIT[expiryUnit]} ${expiryUnit.toLowerCase()}.`}
             </p>
           </div>
 

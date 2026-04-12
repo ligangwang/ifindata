@@ -125,7 +125,7 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
 export async function createPrediction(input: CreatePredictionInput, user: AuthedUser) {
   const db = getAdminFirestore();
   const nowIso = new Date().toISOString();
-  const quote = await getLatestPrice(input.ticker);
+  const quote = await getLatestPrice(input.ticker, input.direction === "UP" ? "ASK" : "BID");
   const predictionRef = db.collection("predictions").doc();
   const userRef = db.collection("users").doc(user.uid);
 

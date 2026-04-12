@@ -9,13 +9,16 @@ test("health endpoint reports ok", async ({ request, baseURL }) => {
   expect(health.service).toBe("ifindata-web");
 });
 
-test("homepage exposes the graph exploration experience", async ({ page }) => {
+test("homepage renders predictions feed", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: /TSMC Customer Ecosystem/i })).toBeVisible();
-  await expect(page.getByLabel(/Search company/i)).toBeVisible();
-  await expect(page.getByText(/1-hop graph/i)).toBeVisible();
-  await expect(page.getByText(/Selected Company/i)).toBeVisible();
+  // Verify navigation is present
+  await expect(page.getByRole("link", { name: /Feed/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Create/i })).toBeVisible();
+  
+  // Verify predictions feed is on the page
+  const feedTitle = page.locator("h1, h2, h3").filter({ hasText: /Home feed|Feed/i }).first();
+  await expect(feedTitle).toBeVisible();
 });
 
 test("staging banner is present only when expected", async ({ page }) => {

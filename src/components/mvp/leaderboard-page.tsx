@@ -27,7 +27,7 @@ export function LeaderboardPage() {
   useEffect(() => {
     let cancelled = false;
 
-    void fetch("/api/leaderboard?limit=100&minSettled=5")
+    void fetch("/api/leaderboard?limit=100&minSettled=1")
       .then(async (response) => {
         if (!response.ok) {
           throw new Error("Unable to load leaderboard.");

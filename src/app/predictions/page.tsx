@@ -1,5 +1,5 @@
 import { PredictionsFeed } from "@/components/mvp/predictions-feed";
 
-export default function Home() {
+export default function PredictionsRoutePage() {
   return <PredictionsFeed title="Home feed" />;
 }

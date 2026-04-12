@@ -1,5 +1,6 @@
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { sanitizePredictionThesis } from "@/lib/predictions/types";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
@@ -29,6 +30,7 @@ export async function GET(
     return NextResponse.json({
       id: snapshot.id,
       ...prediction,
+      thesis: sanitizePredictionThesis(typeof prediction.thesis === "string" ? prediction.thesis : ""),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch prediction";

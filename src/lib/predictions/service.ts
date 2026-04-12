@@ -8,6 +8,7 @@ import {
   isPredictionDirection,
   isPredictionVisibility,
   normalizeTicker,
+  sanitizePredictionThesis,
   type CreatePredictionInput,
   type Prediction,
   type PredictionComment,
@@ -69,7 +70,15 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
   const docs = snapshot.docs;
   const hasMore = docs.length > clampedLimit;
   const selected = hasMore ? docs.slice(0, clampedLimit) : docs;
-  const items = selected.map((doc) => ({ id: doc.id, ...(doc.data() as Prediction) }));
+  const items = selected.map((doc) => {
+    const prediction = doc.data() as Prediction;
+
+    return {
+      id: doc.id,
+      ...prediction,
+      thesis: sanitizePredictionThesis(prediction.thesis),
+    };
+  });
   const nextCursor = hasMore && selected.length > 0 ? selected[selected.length - 1].get("createdAt") : null;
 
   return {
@@ -87,7 +96,7 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
   const ticker = typeof input.ticker === "string" ? normalizeTicker(input.ticker) : "";
   const direction = input.direction;
   const expiryAt = typeof input.expiryAt === "string" ? input.expiryAt : "";
-  const thesis = typeof input.thesis === "string" ? input.thesis.trim() : "";
+  const thesis = typeof input.thesis === "string" ? sanitizePredictionThesis(input.thesis) : "";
   const visibility = input.visibility;
 
   if (!ticker || ticker.length > 12) {
@@ -147,7 +156,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       entryPriceSource: quote.source,
       entryCapturedAt: quote.capturedAt,
       expiryAt: input.expiryAt,
-      thesis: input.thesis ?? "",
+      thesis: sanitizePredictionThesis(input.thesis),
       status: "ACTIVE",
       visibility: input.visibility ?? "PUBLIC",
       commentCount: 0,

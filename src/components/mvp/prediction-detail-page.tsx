@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
+import { sanitizePredictionThesis } from "@/lib/predictions/types";
 
 type PredictionDetail = {
   id: string;
@@ -111,6 +112,8 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
     return <main className="mx-auto w-full max-w-4xl px-4 py-8 text-sm text-rose-300">{error ?? "Prediction not found."}</main>;
   }
 
+  const thesis = sanitizePredictionThesis(prediction.thesis);
+
   return (
     <main className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
@@ -121,7 +124,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           <p className="text-sm text-slate-300">{prediction.status}</p>
         </div>
 
-        <p className="text-sm text-slate-200">{prediction.thesis || "No thesis provided."}</p>
+        <p className="text-sm text-slate-200">{thesis || "No thesis provided."}</p>
 
         <div className="mt-4 grid gap-1 text-sm text-slate-300 md:grid-cols-2">
           <p>Author: {prediction.authorDisplayName ?? "Anonymous"}</p>

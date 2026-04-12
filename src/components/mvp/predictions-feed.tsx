@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { sanitizePredictionThesis } from "@/lib/predictions/types";
 
 type Prediction = {
   id: string;
@@ -125,29 +126,33 @@ export function PredictionsFeed({ title }: { title: string }) {
         {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 
         <div className="grid gap-3">
-          {items.map((item) => (
-            <Link
-              key={item.id}
-              href={`/predictions/${item.id}`}
-              className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition hover:border-cyan-300/60"
-            >
-              <div className="mb-2 flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
-                <p className="font-semibold text-cyan-200">
-                  {item.ticker} · {item.direction}
-                </p>
-                <p className="text-xs text-slate-400 sm:text-sm">{new Date(item.createdAt).toLocaleString()}</p>
-              </div>
-              <p className="line-clamp-2 text-sm text-slate-100">{item.thesis || "No thesis provided."}</p>
-              <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-                <p>by {item.authorDisplayName ?? "Anonymous"}</p>
-                <p>
-                  {item.status}
-                  {item.result ? ` · ${formatScore(item.result.score)}` : ""}
-                </p>
-              </div>
-              <p className="mt-1 text-xs text-slate-400">Expires {new Date(item.expiryAt).toLocaleString()}</p>
-            </Link>
-          ))}
+          {items.map((item) => {
+            const thesis = sanitizePredictionThesis(item.thesis);
+
+            return (
+              <Link
+                key={item.id}
+                href={`/predictions/${item.id}`}
+                className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition hover:border-cyan-300/60"
+              >
+                <div className="mb-2 flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <p className="font-semibold text-cyan-200">
+                    {item.ticker} · {item.direction}
+                  </p>
+                  <p className="text-xs text-slate-400 sm:text-sm">{new Date(item.createdAt).toLocaleString()}</p>
+                </div>
+                <p className="line-clamp-2 text-sm text-slate-100">{thesis || "No thesis provided."}</p>
+                <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+                  <p>by {item.authorDisplayName ?? "Anonymous"}</p>
+                  <p>
+                    {item.status}
+                    {item.result ? ` · ${formatScore(item.result.score)}` : ""}
+                  </p>
+                </div>
+                <p className="mt-1 text-xs text-slate-400">Expires {new Date(item.expiryAt).toLocaleString()}</p>
+              </Link>
+            );
+          })}
 
           {!loading && items.length === 0 ? (
             <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">

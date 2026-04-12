@@ -34,12 +34,18 @@ export async function POST(request: NextRequest) {
       displayName: payload.displayName ?? decoded.name ?? null,
       email: payload.email ?? decoded.email ?? null,
       photoURL: payload.photoURL ?? decoded.picture ?? null,
-      provider: resolveProvider(decoded.firebase.sign_in_provider),
+      authProviders: [resolveProvider(decoded.firebase.sign_in_provider)],
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      bio: "",
       stats: {
         totalPredictions: 0,
+        activePredictions: 0,
         settledPredictions: 0,
         totalScore: 0,
+      },
+      settings: {
+        isPublic: true,
       },
     });
 

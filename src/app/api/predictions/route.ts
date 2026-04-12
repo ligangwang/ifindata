@@ -1,0 +1,80 @@
+import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
+import { createPrediction, listPredictions, validateCreatePredictionInput } from "@/lib/predictions/service";
+import { NextRequest, NextResponse } from "next/server";
+
+function parseLimit(raw: string | null): number {
+  const parsed = Number(raw ?? "20");
+  if (!Number.isFinite(parsed)) {
+    return 20;
+  }
+
+  return Math.max(1, Math.min(50, Math.trunc(parsed)));
+}
+
+export async function GET(request: NextRequest) {
+  const statusParam = request.nextUrl.searchParams.get("status");
+  const userId = request.nextUrl.searchParams.get("userId")?.trim() ?? "";
+  const includePrivateParam = request.nextUrl.searchParams.get("includePrivate");
+  const cursorCreatedAt = request.nextUrl.searchParams.get("cursorCreatedAt")?.trim() ?? "";
+  const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
+
+  if (statusParam && statusParam !== "ACTIVE" && statusParam !== "SETTLED") {
+    return NextResponse.json({ error: "status must be ACTIVE or SETTLED" }, { status: 400 });
+  }
+
+  const includePrivate = includePrivateParam === "true";
+  let includePrivateForQuery = false;
+
+  if (includePrivate) {
+    const decoded = await getDecodedUserFromRequest(request);
+    includePrivateForQuery = Boolean(decoded && userId && decoded.uid === userId);
+  }
+
+  try {
+    const result = await listPredictions({
+      status: statusParam === "ACTIVE" || statusParam === "SETTLED" ? statusParam : undefined,
+      userId: userId || undefined,
+      includePrivate: includePrivateForQuery,
+      cursorCreatedAt: cursorCreatedAt || undefined,
+      limit,
+    });
+
+    return NextResponse.json({
+      items: result.items,
+      nextCursor: result.nextCursor,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to fetch predictions";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const decoded = await getDecodedUserFromRequest(request);
+  if (!decoded) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const payload = await request.json();
+    const input = validateCreatePredictionInput(payload);
+    const created = await createPrediction(input, {
+      uid: decoded.uid,
+      displayName: decoded.name,
+      photoURL: decoded.picture,
+    });
+
+    return NextResponse.json({ id: created.id }, { status: 201 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to create prediction";
+    const status =
+      message.includes("required") ||
+      message.includes("must") ||
+      message.includes("Invalid") ||
+      message.includes("future")
+        ? 400
+        : 500;
+
+    return NextResponse.json({ error: message }, { status });
+  }
+}

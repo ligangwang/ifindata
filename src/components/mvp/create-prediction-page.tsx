@@ -51,7 +51,7 @@ function calculateExpiryDate(amount: number, unit: ExpiryUnit): Date {
 
 export function CreatePredictionPage() {
   const router = useRouter();
-  const { user, getIdToken } = useAuth();
+  const { user, loading, getIdToken } = useAuth();
   const [ticker, setTicker] = useState("");
   const [direction, setDirection] = useState<"UP" | "DOWN">("UP");
   const [expiryAmount, setExpiryAmount] = useState("30");
@@ -65,16 +65,33 @@ export function CreatePredictionPage() {
   const calculatedExpiryDate = hasValidExpiryAmount ? calculateExpiryDate(parsedExpiryAmount, expiryUnit) : null;
   const calculatedExpiryAt = calculatedExpiryDate ? toEndOfDay(calculatedExpiryDate) : null;
 
+  if (loading) {
+    return <main className="mx-auto w-full max-w-3xl px-4 py-8 text-sm text-slate-300">Loading...</main>;
+  }
+
+  if (!user) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-4 py-8">
+        <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-6 text-center shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
+          <h1 className="mb-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">Sign in to create a prediction</h1>
+          <p className="mb-6 text-sm text-slate-300">You need to be signed in to publish predictions and build your score.</p>
+          <button
+            type="button"
+            onClick={() => router.push("/auth")}
+            className="rounded-full bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-slate-900"
+          >
+            Sign in
+          </button>
+        </section>
+      </main>
+    );
+  }
+
   async function submit() {
     setError(null);
 
     if (!hasValidExpiryAmount || !calculatedExpiryAt) {
       setError("Enter a valid expiry duration.");
-      return;
-    }
-
-    if (!user) {
-      router.push("/auth");
       return;
     }
 

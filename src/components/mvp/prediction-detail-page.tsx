@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 
@@ -171,7 +172,12 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             </button>
           </div>
         ) : (
-          <p className="text-sm text-slate-300">Sign in to join the discussion.</p>
+          <Link
+            href="/auth"
+            className="inline-block rounded-full border border-cyan-400/35 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-500/15"
+          >
+            Sign in to join the discussion
+          </Link>
         )}
 
         {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}

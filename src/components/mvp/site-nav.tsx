@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 
 function initials(name: string | null | undefined, email: string | null | undefined): string {
@@ -20,7 +20,35 @@ function initials(name: string | null | undefined, email: string | null | undefi
 
 export function SiteNav() {
   const { user, loading, signOut } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const profileHref = useMemo(() => (user ? `/analysts/${user.uid}` : "/auth"), [user]);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+
+    function onPointerDown(event: MouseEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    function onEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onEscape);
+    };
+  }, [menuOpen]);
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/85 backdrop-blur">
@@ -41,21 +69,58 @@ export function SiteNav() {
             {loading ? (
               <span className="text-sm text-slate-400">Loading auth...</span>
             ) : user ? (
-              <>
-                <Link
-                  href={profileHref}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-600/25 text-sm font-semibold text-cyan-100 ring-1 ring-cyan-400/40"
-                >
-                  {initials(user.displayName, user.email)}
-                </Link>
+              <div className="relative" ref={menuRef}>
                 <button
                   type="button"
-                  onClick={() => void signOut()}
-                  className="rounded-full border border-cyan-400/35 px-3 py-1.5 text-sm text-cyan-100 hover:bg-cyan-500/15"
+                  onClick={() => setMenuOpen((prev) => !prev)}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  aria-label="Open user menu"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-cyan-600/25 text-sm font-semibold text-cyan-100 ring-1 ring-cyan-400/40 transition hover:bg-cyan-500/30"
                 >
-                  Sign out
+                  {user.photoURL ? (
+                    <span
+                      aria-hidden="true"
+                      className="h-full w-full bg-cover bg-center"
+                      style={{ backgroundImage: `url(${user.photoURL})` }}
+                    />
+                  ) : (
+                    initials(user.displayName, user.email)
+                  )}
                 </button>
-              </>
+
+                {menuOpen ? (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-56 rounded-xl border border-white/10 bg-slate-950/95 p-2 shadow-[0_20px_50px_rgba(0,0,0,0.45)] backdrop-blur"
+                  >
+                    <div className="px-3 pb-2 pt-1">
+                      <p className="truncate text-sm font-medium text-cyan-100">{user.displayName ?? "Analyst"}</p>
+                      <p className="truncate text-xs text-slate-400">{user.email}</p>
+                    </div>
+
+                    <Link
+                      href={profileHref}
+                      role="menuitem"
+                      onClick={() => setMenuOpen(false)}
+                      className="block rounded-lg px-3 py-2 text-sm text-slate-100 hover:bg-white/10"
+                    >
+                      Profile
+                    </Link>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        void signOut();
+                      }}
+                      className="mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm text-rose-200 hover:bg-rose-500/10"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <Link
                 href="/auth"

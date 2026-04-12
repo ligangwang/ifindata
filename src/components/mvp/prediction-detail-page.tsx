@@ -24,6 +24,7 @@ type PredictionDetail = {
 
 type PredictionComment = {
   id: string;
+  predictionId: string;
   authorDisplayName: string | null;
   content: string;
   createdAt: string;

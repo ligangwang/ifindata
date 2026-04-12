@@ -208,6 +208,7 @@ export async function addComment(predictionId: string, content: string, user: Au
 
     const userData = userSnapshot.data() ?? {};
     const comment: PredictionComment = {
+      predictionId,
       userId: user.uid,
       authorDisplayName:
         (userData.displayName as string | null | undefined) ?? user.displayName ?? null,

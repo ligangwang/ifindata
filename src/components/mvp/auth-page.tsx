@@ -52,7 +52,7 @@ export function AuthPage() {
   return (
     <main className="mx-auto w-full max-w-xl px-4 py-16">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-6 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
-        <h1 className="mb-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">Sign in to iFinData</h1>
+        <h1 className="mb-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">Sign in to Younalyst</h1>
         <p className="mb-6 text-sm text-slate-300">Use Google or email/password to create predictions and build a score.</p>
 
         <button

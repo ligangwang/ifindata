@@ -99,7 +99,7 @@ export function SiteNav() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-5">
             <Link href="/" className="font-[var(--font-sora)] text-lg font-semibold tracking-tight text-cyan-200">
-              iFinData
+              Younalyst
             </Link>
             <nav className="hidden items-center gap-4 text-sm text-slate-200 md:flex">
               <Link href="/predictions" className="hover:text-cyan-200">Feed</Link>

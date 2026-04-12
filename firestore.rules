@@ -9,11 +9,68 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function canReadUser(userId) {
+      return isOwner(userId) || resource.data.settings.isPublic == true;
+    }
+
+    function canReadPrediction(predictionId) {
+      let prediction = get(/databases/$(database)/documents/predictions/$(predictionId));
+      return prediction.data.visibility == 'PUBLIC' || (isSignedIn() && prediction.data.userId == request.auth.uid);
+    }
+
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if canReadUser(userId);
+
+      allow create: if isOwner(userId)
+        && request.resource.data.stats.totalPredictions == 0
+        && request.resource.data.stats.activePredictions == 0
+        && request.resource.data.stats.settledPredictions == 0
+        && request.resource.data.stats.totalScore == 0;
+
+      allow update: if isOwner(userId)
+        && request.resource.data.stats == resource.data.stats
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.authProviders == resource.data.authProviders;
+
+      allow delete: if false;
 
       match /loved_entities/{entityId} {
         allow read, write: if isOwner(userId);
+      }
+    }
+
+    match /predictions/{predictionId} {
+      allow read: if resource.data.visibility == 'PUBLIC' || isOwner(resource.data.userId);
+
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'ACTIVE'
+        && request.resource.data.settledAt == null
+        && request.resource.data.result == null;
+
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.ticker == resource.data.ticker
+        && request.resource.data.direction == resource.data.direction
+        && request.resource.data.entryPrice == resource.data.entryPrice
+        && request.resource.data.entryPriceSource == resource.data.entryPriceSource
+        && request.resource.data.entryCapturedAt == resource.data.entryCapturedAt
+        && request.resource.data.expiryAt == resource.data.expiryAt
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.settledAt == resource.data.settledAt
+        && request.resource.data.result == resource.data.result;
+
+      allow delete: if false;
+
+      match /comments/{commentId} {
+        allow read: if canReadPrediction(predictionId);
+
+        allow create: if isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.isDeleted == false;
+
+        allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       }
     }
 
@@ -39,6 +96,11 @@ service cloud.firestore {
 
     match /subscriptions/{subscriptionId} {
       allow read: if isSignedIn() && request.auth.uid == resource.data.scopeId;
+      allow write: if false;
+    }
+
+    match /leaderboardSnapshots/{snapshotId} {
+      allow read: if isSignedIn();
       allow write: if false;
     }
   }

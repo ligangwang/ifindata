@@ -37,7 +37,7 @@ export default function RootLayout({
           <SiteNav />
           <div className="flex-1">{children}</div>
           <footer className="border-t border-white/10 bg-slate-950/80">
-            <div className="mx-auto w-full max-w-6xl px-4 py-4 text-xs leading-6 text-slate-400">
+            <div className="mx-auto w-full max-w-6xl px-4 py-4 text-center text-xs leading-6 text-slate-400">
               Predictions, rankings, and commentary on iFinData are provided for informational purposes only and do
               not constitute financial, investment, legal, or tax advice. Always do your own research before making
               investment decisions.

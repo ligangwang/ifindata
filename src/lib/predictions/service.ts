@@ -138,7 +138,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
   const quote = await getLatestPrice(input.ticker);
   const { entryDate, entryTime } = splitIsoDateTime(quote.capturedAt);
   const { entryDate: expiryDate } = splitIsoDateTime(input.expiryAt);
-  const duplicateKey = [user.uid, input.ticker, input.direction, entryDate, expiryDate].join("__");
+  const duplicateKey = [user.uid, input.ticker, entryDate].join("__");
   const predictionRef = db.collection("predictions").doc();
   const userRef = db.collection("users").doc(user.uid);
   const uniqueRef = db.collection("prediction_uniques").doc(duplicateKey);
@@ -150,9 +150,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
     }
 
     if (uniqueSnapshot.exists) {
-      throw new Error(
-        "Duplicate prediction exists for the same user, ticker, direction, entryDate, and expiryDate.",
-      );
+      throw new Error("Duplicate prediction exists for the same user, ticker, and entryDate.");
     }
 
     const userData = userSnapshot.data() ?? {};

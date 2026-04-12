@@ -56,6 +56,7 @@ export type Prediction = {
 };
 
 export type PredictionComment = {
+  predictionId: string;
   userId: string;
   authorDisplayName: string | null;
   authorPhotoURL: string | null;

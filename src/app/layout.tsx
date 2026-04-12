@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { IBM_Plex_Sans, Sora } from "next/font/google";
 import { AppProviders } from "@/components/providers/app-providers";
 import { EnvironmentBanner } from "@/components/environment-banner";
+import { SiteNav } from "@/components/mvp/site-nav";
 import "./globals.css";
 
 const sora = Sora({
@@ -16,8 +17,8 @@ const ibmPlexSans = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "IFinData - Company Intelligence Graph",
-  description: "Explore company ecosystems through a guided graph starting with the TSMC customer network.",
+  title: "IFinData - Prediction Market MVP",
+  description: "Publish stock predictions, settle outcomes, and climb the analyst leaderboard.",
 };
 
 export default function RootLayout({
@@ -33,6 +34,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <AppProviders>
           <EnvironmentBanner />
+          <SiteNav />
           {children}
         </AppProviders>
       </body>

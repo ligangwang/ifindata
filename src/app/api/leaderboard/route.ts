@@ -23,9 +23,9 @@ function parseLimit(raw: string | null): number {
 }
 
 function parseMinSettled(raw: string | null): number {
-  const parsed = Number(raw ?? "5");
+  const parsed = Number(raw ?? "1");
   if (!Number.isFinite(parsed)) {
-    return 5;
+    return 1;
   }
 
   return Math.max(0, Math.trunc(parsed));

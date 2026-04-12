@@ -85,16 +85,6 @@
         {
           "fieldPath": "stats.totalScore",
           "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "users",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "stats.totalScore",
-          "order": "DESCENDING"
         },
         {
           "fieldPath": "stats.settledPredictions",

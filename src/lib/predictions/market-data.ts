@@ -5,8 +5,6 @@ export type MarketQuote = {
   capturedAt: string;
 };
 
-export type QuoteSide = "BID" | "ASK" | "MID";
-
 type FinnhubQuoteResponse = {
   c?: number;
   t?: number;
@@ -75,8 +73,7 @@ async function fetchFinnhubLatestQuote(ticker: string): Promise<MarketQuote | nu
   }
 }
 
-export async function getLatestPrice(ticker: string, _side: QuoteSide = "MID"): Promise<MarketQuote> {
-  void _side;
+export async function getLatestPrice(ticker: string): Promise<MarketQuote> {
   const normalizedTicker = ticker.trim().toUpperCase();
   const finnhubQuote = await fetchFinnhubLatestQuote(normalizedTicker);
   if (finnhubQuote) {

@@ -21,6 +21,8 @@ export type UserProfile = {
   createdAt: string;
   updatedAt: string;
   bio: string;
+  nickname: string | null;
+  interests: string[];
   stats: UserStats;
   settings: {
     isPublic: boolean;

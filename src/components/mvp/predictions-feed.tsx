@@ -130,18 +130,25 @@ export function PredictionsFeed({ title }: { title: string }) {
             const thesis = sanitizePredictionThesis(item.thesis);
 
             return (
-              <Link
+              <div
                 key={item.id}
-                href={`/predictions/${item.id}`}
-                className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition hover:border-cyan-300/60"
+                className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition"
               >
                 <div className="mb-2 flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
-                  <p className="font-semibold text-cyan-200">
+                  <Link
+                    href={`/ticker/${item.ticker}`}
+                    className="w-fit font-semibold text-cyan-200 hover:text-cyan-100"
+                  >
                     {item.ticker} · {item.direction}
-                  </p>
+                  </Link>
                   <p className="text-xs text-slate-400 sm:text-sm">{new Date(item.createdAt).toLocaleString()}</p>
                 </div>
-                <p className="line-clamp-2 text-sm text-slate-100">{thesis || "No thesis provided."}</p>
+                <Link
+                  href={`/predictions/${item.id}`}
+                  className="line-clamp-2 text-sm text-slate-100 hover:text-slate-50"
+                >
+                  {thesis || "No thesis provided."}
+                </Link>
                 <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
                   <p>by {item.authorDisplayName ?? "Anonymous"}</p>
                   <p>
@@ -150,7 +157,7 @@ export function PredictionsFeed({ title }: { title: string }) {
                   </p>
                 </div>
                 <p className="mt-1 text-xs text-slate-400">Expires {new Date(item.expiryAt).toLocaleString()}</p>
-              </Link>
+              </div>
             );
           })}
 

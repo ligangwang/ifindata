@@ -87,6 +87,19 @@ export function normalizeTicker(raw: string): string {
   return raw.trim().toUpperCase();
 }
 
+export function sanitizePredictionThesis(raw: string | null | undefined): string {
+  const trimmed = raw?.trim() ?? "";
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed.startsWith("Market data provider not configured.")) {
+    return "";
+  }
+
+  return trimmed;
+}
+
 export function computeReturnValue(
   direction: PredictionDirection,
   entryPrice: number,

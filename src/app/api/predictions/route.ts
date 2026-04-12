@@ -67,11 +67,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ id: created.id }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create prediction";
-    const status =
-      message.includes("required") ||
-      message.includes("must") ||
-      message.includes("Invalid") ||
-      message.includes("future")
+    const status = message.includes("Duplicate prediction")
+      ? 409
+      :
+        message.includes("required") ||
+          message.includes("must") ||
+          message.includes("Invalid") ||
+          message.includes("future")
         ? 400
         : 500;
 

@@ -17,7 +17,7 @@ const ibmPlexSans = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "IFinData - Prediction Market MVP",
+  title: "Be the analyst. Prove it.",
   description: "Publish stock predictions, settle outcomes, and climb the analyst leaderboard.",
 };
 

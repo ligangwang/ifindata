@@ -9,6 +9,7 @@ import {
   isPredictionVisibility,
   normalizeTicker,
   sanitizePredictionThesis,
+  splitIsoDateTime,
   type CreatePredictionInput,
   type Prediction,
   type PredictionComment,
@@ -135,13 +136,23 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
   const db = getAdminFirestore();
   const nowIso = new Date().toISOString();
   const quote = await getLatestPrice(input.ticker);
+  const { entryDate, entryTime } = splitIsoDateTime(quote.capturedAt);
+  const { entryDate: expiryDate } = splitIsoDateTime(input.expiryAt);
+  const duplicateKey = [user.uid, input.ticker, input.direction, entryDate, expiryDate].join("__");
   const predictionRef = db.collection("predictions").doc();
   const userRef = db.collection("users").doc(user.uid);
+  const uniqueRef = db.collection("prediction_uniques").doc(duplicateKey);
 
   await db.runTransaction(async (tx) => {
-    const userSnapshot = await tx.get(userRef);
+    const [userSnapshot, uniqueSnapshot] = await Promise.all([tx.get(userRef), tx.get(uniqueRef)]);
     if (!userSnapshot.exists) {
       throw new Error("User profile not found. Complete bootstrap first.");
+    }
+
+    if (uniqueSnapshot.exists) {
+      throw new Error(
+        "Duplicate prediction exists for the same user, ticker, direction, entryDate, and expiryDate.",
+      );
     }
 
     const userData = userSnapshot.data() ?? {};
@@ -154,7 +165,10 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       direction: input.direction,
       entryPrice: quote.price,
       entryPriceSource: quote.source,
+      entryDate,
+      entryTime,
       entryCapturedAt: quote.capturedAt,
+      expiryDate,
       expiryAt: input.expiryAt,
       thesis: sanitizePredictionThesis(input.thesis),
       status: "ACTIVE",
@@ -167,6 +181,15 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
     };
 
     tx.set(predictionRef, prediction);
+    tx.set(uniqueRef, {
+      predictionId: predictionRef.id,
+      userId: user.uid,
+      ticker: input.ticker,
+      direction: input.direction,
+      entryDate,
+      expiryDate,
+      createdAt: nowIso,
+    });
     tx.update(userRef, {
       updatedAt: nowIso,
       "stats.totalPredictions": FieldValue.increment(1),

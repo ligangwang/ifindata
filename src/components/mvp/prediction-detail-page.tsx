@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
+import { sanitizePredictionThesis } from "@/lib/predictions/types";
 
 type PredictionDetail = {
   id: string;
@@ -22,6 +24,7 @@ type PredictionDetail = {
 
 type PredictionComment = {
   id: string;
+  predictionId: string;
   authorDisplayName: string | null;
   content: string;
   createdAt: string;
@@ -111,17 +114,19 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
     return <main className="mx-auto w-full max-w-4xl px-4 py-8 text-sm text-rose-300">{error ?? "Prediction not found."}</main>;
   }
 
+  const thesis = sanitizePredictionThesis(prediction.thesis);
+
   return (
     <main className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
             {prediction.ticker} · {prediction.direction}
           </h1>
           <p className="text-sm text-slate-300">{prediction.status}</p>
         </div>
 
-        <p className="text-sm text-slate-200">{prediction.thesis || "No thesis provided."}</p>
+        <p className="text-sm text-slate-200">{thesis || "No thesis provided."}</p>
 
         <div className="mt-4 grid gap-1 text-sm text-slate-300 md:grid-cols-2">
           <p>Author: {prediction.authorDisplayName ?? "Anonymous"}</p>
@@ -165,13 +170,18 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             <button
               type="button"
               onClick={() => void submitComment()}
-              className="w-fit rounded-full border border-cyan-400/35 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-500/15"
+              className="w-full rounded-full border border-cyan-400/35 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-500/15 sm:w-fit"
             >
               Post comment
             </button>
           </div>
         ) : (
-          <p className="text-sm text-slate-300">Sign in to join the discussion.</p>
+          <Link
+            href="/auth"
+            className="inline-block rounded-full border border-cyan-400/35 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-500/15"
+          >
+            Sign in to join the discussion
+          </Link>
         )}
 
         {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}

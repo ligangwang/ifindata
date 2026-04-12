@@ -1,21 +1,92 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 
 function initials(name: string | null | undefined, email: string | null | undefined): string {
   const source = (name || email || "U").trim();
-  if (!source) {
-    return "U";
-  }
-
+  if (!source) return "U";
   const parts = source.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) {
-    return parts[0].slice(0, 1).toUpperCase();
-  }
-
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+}
+
+function AvatarButton({ photoURL, displayName, email }: { photoURL: string | null; displayName: string | null; email: string | null }) {
+  if (photoURL) {
+    return (
+      <Image
+        src={photoURL}
+        alt={displayName ?? email ?? "User avatar"}
+        width={36}
+        height={36}
+        className="h-9 w-9 rounded-full object-cover ring-1 ring-cyan-400/40"
+        referrerPolicy="no-referrer"
+      />
+    );
+  }
+  return (
+    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-cyan-600/25 text-sm font-semibold text-cyan-100 ring-1 ring-cyan-400/40">
+      {initials(displayName, email)}
+    </span>
+  );
+}
+
+function UserMenu({ profileHref, onSignOut }: { profileHref: string; onSignOut: () => void }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={menuRef} className="relative">
+      <button
+        type="button"
+        aria-label="User menu"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className="shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+      >
+        <AvatarButton
+          photoURL={user?.photoURL ?? null}
+          displayName={user?.displayName ?? null}
+          email={user?.email ?? null}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-48 rounded-2xl border border-white/10 bg-slate-900 py-1 shadow-xl">
+          <div className="border-b border-white/10 px-4 py-2">
+            <p className="truncate text-sm font-medium text-cyan-100">{user?.displayName ?? user?.email ?? "Account"}</p>
+          </div>
+          <Link
+            href={profileHref}
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center px-4 py-2 text-sm text-slate-200 hover:bg-white/5"
+          >
+            My profile
+          </Link>
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onSignOut(); }}
+            className="flex w-full items-center px-4 py-2 text-sm text-rose-300 hover:bg-white/5"
+          >
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function SiteNav() {
@@ -24,46 +95,46 @@ export function SiteNav() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/85 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-5">
-          <Link href="/" className="font-[var(--font-sora)] text-lg font-semibold tracking-tight text-cyan-200">
-            iFinData
-          </Link>
-          <nav className="hidden items-center gap-4 text-sm text-slate-200 md:flex">
-            <Link href="/predictions" className="hover:text-cyan-200">Feed</Link>
-            <Link href="/predictions/new" className="hover:text-cyan-200">Create</Link>
-            <Link href="/leaderboard" className="hover:text-cyan-200">Leaderboard</Link>
-          </nav>
-        </div>
+      <div className="mx-auto w-full max-w-6xl px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-5">
+            <Link href="/" className="font-[var(--font-sora)] text-lg font-semibold tracking-tight text-cyan-200">
+              iFinData
+            </Link>
+            <nav className="hidden items-center gap-4 text-sm text-slate-200 md:flex">
+              <Link href="/predictions" className="hover:text-cyan-200">Feed</Link>
+              <Link href="/predictions/new" className="hover:text-cyan-200">Create</Link>
+              <Link href="/leaderboard" className="hover:text-cyan-200">Leaderboard</Link>
+            </nav>
+          </div>
 
-        <div className="flex items-center gap-3">
-          {loading ? (
-            <span className="text-sm text-slate-400">Loading auth...</span>
-          ) : user ? (
-            <>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {loading ? (
+              <span className="h-9 w-9 animate-pulse rounded-full bg-slate-700" />
+            ) : user ? (
+              <UserMenu profileHref={profileHref} onSignOut={() => void signOut()} />
+            ) : (
               <Link
-                href={profileHref}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-cyan-600/25 text-sm font-semibold text-cyan-100 ring-1 ring-cyan-400/40"
-              >
-                {initials(user.displayName, user.email)}
-              </Link>
-              <button
-                type="button"
-                onClick={() => void signOut()}
+                href="/auth"
                 className="rounded-full border border-cyan-400/35 px-3 py-1.5 text-sm text-cyan-100 hover:bg-cyan-500/15"
               >
-                Sign out
-              </button>
-            </>
-          ) : (
-            <Link
-              href="/auth"
-              className="rounded-full border border-cyan-400/35 px-3 py-1.5 text-sm text-cyan-100 hover:bg-cyan-500/15"
-            >
-              Sign in
-            </Link>
-          )}
+                Sign in
+              </Link>
+            )}
+          </div>
         </div>
+
+        <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 text-sm text-slate-200 md:hidden">
+          <Link href="/predictions" className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 hover:border-cyan-300/60 hover:text-cyan-200">
+            Feed
+          </Link>
+          <Link href="/predictions/new" className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 hover:border-cyan-300/60 hover:text-cyan-200">
+            Create
+          </Link>
+          <Link href="/leaderboard" className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 hover:border-cyan-300/60 hover:text-cyan-200">
+            Leaderboard
+          </Link>
+        </nav>
       </div>
     </header>
   );

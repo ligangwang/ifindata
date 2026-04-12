@@ -100,8 +100,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signInWithGoogle = useCallback(async () => {
     if (!configured) {
-      setError("Firebase is not configured.");
-      return;
+      const nextError = new Error("Firebase is not configured.");
+      setError(nextError.message);
+      throw nextError;
     }
 
     setError(null);
@@ -117,8 +118,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
       if (!configured) {
-        setError("Firebase is not configured.");
-        return;
+        const nextError = new Error("Firebase is not configured.");
+        setError(nextError.message);
+        throw nextError;
       }
 
       setError(null);
@@ -136,8 +138,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const createAccountWithEmail = useCallback(
     async (email: string, password: string) => {
       if (!configured) {
-        setError("Firebase is not configured.");
-        return;
+        const nextError = new Error("Firebase is not configured.");
+        setError(nextError.message);
+        throw nextError;
       }
 
       setError(null);

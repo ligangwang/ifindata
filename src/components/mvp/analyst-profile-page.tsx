@@ -110,7 +110,7 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
               <p className="text-sm text-slate-100">
                 {prediction.ticker} · {prediction.direction} · {prediction.status}
               </p>
-              <p className="mt-1 text-xs text-slate-400">{new Date(prediction.createdAt).toLocaleString()}</p>
+              <p className="mt-1 break-words text-xs text-slate-400">{new Date(prediction.createdAt).toLocaleString()}</p>
               {prediction.result ? (
                 <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>
               ) : null}

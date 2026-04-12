@@ -43,7 +43,10 @@ export type Prediction = {
   direction: PredictionDirection;
   entryPrice: number;
   entryPriceSource: string;
+  entryDate: string;
+  entryTime: string;
   entryCapturedAt: string;
+  expiryDate: string;
   expiryAt: string;
   thesis: string;
   status: PredictionStatus;
@@ -56,6 +59,7 @@ export type Prediction = {
 };
 
 export type PredictionComment = {
+  predictionId: string;
   userId: string;
   authorDisplayName: string | null;
   authorPhotoURL: string | null;
@@ -85,6 +89,31 @@ export function isPredictionVisibility(value: unknown): value is PredictionVisib
 
 export function normalizeTicker(raw: string): string {
   return raw.trim().toUpperCase();
+}
+
+export function sanitizePredictionThesis(raw: string | null | undefined): string {
+  const trimmed = raw?.trim() ?? "";
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed.startsWith("Market data provider not configured.")) {
+    return "";
+  }
+
+  return trimmed;
+}
+
+export function splitIsoDateTime(isoTimestamp: string): { entryDate: string; entryTime: string } {
+  const date = new Date(isoTimestamp);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Invalid timestamp for entry date/time");
+  }
+
+  const [entryDate, timeWithMs] = date.toISOString().split("T");
+  const entryTime = (timeWithMs ?? "00:00:00.000Z").slice(0, 8);
+
+  return { entryDate, entryTime };
 }
 
 export function computeReturnValue(

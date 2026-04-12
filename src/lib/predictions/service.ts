@@ -8,6 +8,8 @@ import {
   isPredictionDirection,
   isPredictionVisibility,
   normalizeTicker,
+  sanitizePredictionThesis,
+  splitIsoDateTime,
   type CreatePredictionInput,
   type Prediction,
   type PredictionComment,
@@ -69,7 +71,15 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
   const docs = snapshot.docs;
   const hasMore = docs.length > clampedLimit;
   const selected = hasMore ? docs.slice(0, clampedLimit) : docs;
-  const items = selected.map((doc) => ({ id: doc.id, ...(doc.data() as Prediction) }));
+  const items = selected.map((doc) => {
+    const prediction = doc.data() as Prediction;
+
+    return {
+      id: doc.id,
+      ...prediction,
+      thesis: sanitizePredictionThesis(prediction.thesis),
+    };
+  });
   const nextCursor = hasMore && selected.length > 0 ? selected[selected.length - 1].get("createdAt") : null;
 
   return {
@@ -87,7 +97,7 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
   const ticker = typeof input.ticker === "string" ? normalizeTicker(input.ticker) : "";
   const direction = input.direction;
   const expiryAt = typeof input.expiryAt === "string" ? input.expiryAt : "";
-  const thesis = typeof input.thesis === "string" ? input.thesis.trim() : "";
+  const thesis = typeof input.thesis === "string" ? sanitizePredictionThesis(input.thesis) : "";
   const visibility = input.visibility;
 
   if (!ticker || ticker.length > 12) {
@@ -126,13 +136,21 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
   const db = getAdminFirestore();
   const nowIso = new Date().toISOString();
   const quote = await getLatestPrice(input.ticker);
+  const { entryDate, entryTime } = splitIsoDateTime(quote.capturedAt);
+  const { entryDate: expiryDate } = splitIsoDateTime(input.expiryAt);
+  const duplicateKey = [user.uid, input.ticker, entryDate].join("__");
   const predictionRef = db.collection("predictions").doc();
   const userRef = db.collection("users").doc(user.uid);
+  const uniqueRef = db.collection("prediction_uniques").doc(duplicateKey);
 
   await db.runTransaction(async (tx) => {
-    const userSnapshot = await tx.get(userRef);
+    const [userSnapshot, uniqueSnapshot] = await Promise.all([tx.get(userRef), tx.get(uniqueRef)]);
     if (!userSnapshot.exists) {
       throw new Error("User profile not found. Complete bootstrap first.");
+    }
+
+    if (uniqueSnapshot.exists) {
+      throw new Error("Duplicate prediction exists for the same user, ticker, and entryDate.");
     }
 
     const userData = userSnapshot.data() ?? {};
@@ -145,9 +163,12 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       direction: input.direction,
       entryPrice: quote.price,
       entryPriceSource: quote.source,
+      entryDate,
+      entryTime,
       entryCapturedAt: quote.capturedAt,
+      expiryDate,
       expiryAt: input.expiryAt,
-      thesis: input.thesis ?? "",
+      thesis: sanitizePredictionThesis(input.thesis),
       status: "ACTIVE",
       visibility: input.visibility ?? "PUBLIC",
       commentCount: 0,
@@ -158,6 +179,15 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
     };
 
     tx.set(predictionRef, prediction);
+    tx.set(uniqueRef, {
+      predictionId: predictionRef.id,
+      userId: user.uid,
+      ticker: input.ticker,
+      direction: input.direction,
+      entryDate,
+      expiryDate,
+      createdAt: nowIso,
+    });
     tx.update(userRef, {
       updatedAt: nowIso,
       "stats.totalPredictions": FieldValue.increment(1),
@@ -199,6 +229,7 @@ export async function addComment(predictionId: string, content: string, user: Au
 
     const userData = userSnapshot.data() ?? {};
     const comment: PredictionComment = {
+      predictionId,
       userId: user.uid,
       authorDisplayName:
         (userData.displayName as string | null | undefined) ?? user.displayName ?? null,

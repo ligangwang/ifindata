@@ -5,59 +5,82 @@ export type MarketQuote = {
   capturedAt: string;
 };
 
-function parseStaticPriceMap(): Record<string, number> {
-  const raw = process.env.MARKET_DATA_STATIC_PRICES;
-  if (!raw) return {};
+type FinnhubQuoteResponse = {
+  c?: number;
+  t?: number;
+};
 
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const output: Record<string, number> = {};
+function getFinnhubConfig(): {
+  apiKey: string;
+  apiUrl: string;
+} | null {
+  const apiKey = process.env.FINNHUB_API_KEY?.trim() ?? "";
 
-    for (const [ticker, value] of Object.entries(parsed)) {
-      if (typeof value === "number" && Number.isFinite(value) && value > 0) {
-        output[ticker.toUpperCase()] = value;
-      }
-    }
-
-    return output;
-  } catch {
-    return {};
+  if (!apiKey) {
+    return null;
   }
+
+  return {
+    apiKey,
+    apiUrl: (process.env.FINNHUB_API_URL?.trim() || "https://finnhub.io").replace(/\/$/, ""),
+  };
 }
 
-function fallbackPrice(): number | null {
-  const raw = process.env.MARKET_DATA_FALLBACK_PRICE;
-  if (!raw) return null;
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return parsed;
+function resolveQuotePrice(currentPrice: number | undefined): number | null {
+  const hasCurrent = typeof currentPrice === "number" && Number.isFinite(currentPrice) && currentPrice > 0;
+
+  if (hasCurrent) {
+    return currentPrice ?? null;
+  }
+
+  return null;
+}
+
+async function fetchFinnhubLatestQuote(ticker: string): Promise<MarketQuote | null> {
+  const config = getFinnhubConfig();
+  if (!config) return null;
+
+  const url = `${config.apiUrl}/api/v1/quote?symbol=${encodeURIComponent(ticker)}&token=${encodeURIComponent(config.apiKey)}`;
+
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as FinnhubQuoteResponse;
+    const price = resolveQuotePrice(payload.c);
+    if (!price) {
+      return null;
+    }
+
+    const quoteEpochSeconds = payload.t;
+    const capturedAt = typeof quoteEpochSeconds === "number" && Number.isFinite(quoteEpochSeconds) && quoteEpochSeconds > 0
+      ? new Date(quoteEpochSeconds * 1000).toISOString()
+      : new Date().toISOString();
+
+    return {
+      ticker,
+      price,
+      source: "finnhub-quote",
+      capturedAt,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function getLatestPrice(ticker: string): Promise<MarketQuote> {
   const normalizedTicker = ticker.trim().toUpperCase();
-  const staticMap = parseStaticPriceMap();
-  const now = new Date().toISOString();
-
-  if (staticMap[normalizedTicker]) {
-    return {
-      ticker: normalizedTicker,
-      price: staticMap[normalizedTicker],
-      source: "static-env",
-      capturedAt: now,
-    };
-  }
-
-  const fallback = fallbackPrice();
-  if (fallback) {
-    return {
-      ticker: normalizedTicker,
-      price: fallback,
-      source: "fallback-env",
-      capturedAt: now,
-    };
+  const finnhubQuote = await fetchFinnhubLatestQuote(normalizedTicker);
+  if (finnhubQuote) {
+    return finnhubQuote;
   }
 
   throw new Error(
-    "Market data provider not configured. Set MARKET_DATA_STATIC_PRICES or MARKET_DATA_FALLBACK_PRICE.",
+    "Market data provider not configured. Set FINNHUB_API_KEY.",
   );
 }

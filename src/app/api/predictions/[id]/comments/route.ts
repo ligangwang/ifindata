@@ -7,6 +7,23 @@ type CommentRequestBody = {
   content?: string;
 };
 
+function mapCommentDoc(
+  predictionId: string,
+  doc: FirebaseFirestore.QueryDocumentSnapshot,
+): { id: string; predictionId: string } & Record<string, unknown> {
+  const data = doc.data();
+  const resolvedPredictionId =
+    typeof data.predictionId === "string" && data.predictionId.trim()
+      ? data.predictionId
+      : predictionId;
+
+  return {
+    id: doc.id,
+    ...data,
+    predictionId: resolvedPredictionId,
+  };
+}
+
 function parseLimit(raw: string | null): number {
   const parsed = Number(raw ?? "30");
   if (!Number.isFinite(parsed)) {
@@ -14,6 +31,77 @@ function parseLimit(raw: string | null): number {
   }
 
   return Math.max(1, Math.min(100, Math.trunc(parsed)));
+}
+
+function isMissingIndexError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const code =
+    typeof error === "object" && error && "code" in error
+      ? (error as { code?: unknown }).code
+      : undefined;
+
+  return (
+    code === 9 ||
+    /requires an index|failed precondition|query requires an index/i.test(error.message)
+  );
+}
+
+async function listCommentsWithFallback(
+  predictionRef: FirebaseFirestore.DocumentReference,
+  limit: number,
+) {
+  const predictionId = predictionRef.id;
+
+  try {
+    const snapshot = await predictionRef
+      .collection("comments")
+      .where("isDeleted", "==", false)
+      .orderBy("createdAt", "asc")
+      .limit(limit)
+      .get();
+
+    return snapshot.docs.map((doc) => mapCommentDoc(predictionId, doc));
+  } catch (error) {
+    if (!isMissingIndexError(error)) {
+      throw error;
+    }
+
+    const items: Array<Record<string, unknown> & { id: string }> = [];
+    const batchSize = Math.max(limit, 25);
+    let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+
+    while (items.length < limit) {
+      let query = predictionRef.collection("comments").orderBy("createdAt", "asc").limit(batchSize);
+      if (cursor) {
+        query = query.startAfter(cursor);
+      }
+
+      const snapshot = await query.get();
+      if (snapshot.empty) {
+        break;
+      }
+
+      for (const doc of snapshot.docs) {
+        if (doc.get("isDeleted") === false) {
+          items.push(mapCommentDoc(predictionId, doc));
+        }
+
+        if (items.length >= limit) {
+          break;
+        }
+      }
+
+      cursor = snapshot.docs[snapshot.docs.length - 1];
+      if (snapshot.docs.length < batchSize) {
+        break;
+      }
+    }
+
+    return items;
+  }
 }
 
 export async function GET(
@@ -38,16 +126,9 @@ export async function GET(
     }
 
     const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
-    const snapshot = await predictionSnapshot.ref
-      .collection("comments")
-      .where("isDeleted", "==", false)
-      .orderBy("createdAt", "asc")
-      .limit(limit)
-      .get();
+    const items = await listCommentsWithFallback(predictionSnapshot.ref, limit);
 
-    return NextResponse.json({
-      items: snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-    });
+    return NextResponse.json({ items });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch comments";
     return NextResponse.json({ error: message }, { status: 500 });

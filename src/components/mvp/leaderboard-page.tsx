@@ -68,12 +68,12 @@ export function LeaderboardPage() {
             <Link
               key={entry.userId}
               href={`/analysts/${entry.userId}`}
-              className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 rounded-xl border border-white/10 p-3 hover:border-cyan-300/60"
+              className="flex flex-col gap-2 rounded-xl border border-white/10 p-3 hover:border-cyan-300/60 sm:grid sm:grid-cols-[auto_1fr_auto_auto] sm:items-center"
             >
               <p className="text-sm font-semibold text-cyan-200">#{index + 1}</p>
               <p className="text-sm text-slate-100">{entry.displayName ?? "Anonymous"}</p>
-              <p className="text-sm text-emerald-200">{scoreText(entry.totalScore)}</p>
-              <p className="text-xs text-slate-400">{entry.settledPredictions} settled</p>
+              <p className="text-sm text-emerald-200 sm:text-right">{scoreText(entry.totalScore)}</p>
+              <p className="text-xs text-slate-400 sm:text-right">{entry.settledPredictions} settled</p>
             </Link>
           ))}
 

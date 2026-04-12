@@ -114,7 +114,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   return (
     <main className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
             {prediction.ticker} · {prediction.direction}
           </h1>
@@ -165,7 +165,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             <button
               type="button"
               onClick={() => void submitComment()}
-              className="w-fit rounded-full border border-cyan-400/35 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-500/15"
+              className="w-full rounded-full border border-cyan-400/35 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-500/15 sm:w-fit"
             >
               Post comment
             </button>

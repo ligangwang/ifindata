@@ -4,18 +4,74 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 
+type ExpiryUnit = "DAYS" | "MONTHS" | "YEARS";
+
+function addMonthsClamped(date: Date, monthsToAdd: number): Date {
+  const next = new Date(date);
+  const targetDay = next.getDate();
+
+  next.setDate(1);
+  next.setMonth(next.getMonth() + monthsToAdd);
+
+  const lastDayOfMonth = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+  next.setDate(Math.min(targetDay, lastDayOfMonth));
+
+  return next;
+}
+
+function toEndOfDay(date: Date): Date {
+  const next = new Date(date);
+  next.setHours(23, 59, 59, 999);
+  return next;
+}
+
+function formatExpiryDate(date: Date): string {
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function calculateExpiryDate(amount: number, unit: ExpiryUnit): Date {
+  const now = new Date();
+
+  if (unit === "DAYS") {
+    const next = new Date(now);
+    next.setDate(next.getDate() + amount);
+    return next;
+  }
+
+  if (unit === "MONTHS") {
+    return addMonthsClamped(now, amount);
+  }
+
+  return addMonthsClamped(now, amount * 12);
+}
+
 export function CreatePredictionPage() {
   const router = useRouter();
   const { user, getIdToken } = useAuth();
   const [ticker, setTicker] = useState("");
   const [direction, setDirection] = useState<"UP" | "DOWN">("UP");
-  const [expiryAt, setExpiryAt] = useState("");
+  const [expiryAmount, setExpiryAmount] = useState("30");
+  const [expiryUnit, setExpiryUnit] = useState<ExpiryUnit>("DAYS");
   const [thesis, setThesis] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const parsedExpiryAmount = Number(expiryAmount);
+  const hasValidExpiryAmount = Number.isInteger(parsedExpiryAmount) && parsedExpiryAmount > 0;
+  const calculatedExpiryDate = hasValidExpiryAmount ? calculateExpiryDate(parsedExpiryAmount, expiryUnit) : null;
+  const calculatedExpiryAt = calculatedExpiryDate ? toEndOfDay(calculatedExpiryDate) : null;
+
   async function submit() {
     setError(null);
+
+    if (!hasValidExpiryAmount || !calculatedExpiryAt) {
+      setError("Enter a valid expiry duration.");
+      return;
+    }
 
     if (!user) {
       router.push("/auth");
@@ -40,7 +96,7 @@ export function CreatePredictionPage() {
         body: JSON.stringify({
           ticker,
           direction,
-          expiryAt: new Date(expiryAt).toISOString(),
+          expiryAt: calculatedExpiryAt.toISOString(),
           thesis,
           visibility: "PUBLIC",
         }),
@@ -78,13 +134,13 @@ export function CreatePredictionPage() {
 
           <div className="grid gap-2">
             <label className="text-sm text-slate-200">Direction</label>
-            <div className="inline-flex w-fit rounded-full border border-white/15 p-1">
+            <div className="inline-flex w-full rounded-full border border-white/15 p-1 sm:w-fit">
               {(["UP", "DOWN"] as const).map((option) => (
                 <button
                   key={option}
                   type="button"
                   onClick={() => setDirection(option)}
-                  className={`rounded-full px-3 py-1.5 text-sm ${direction === option ? "bg-cyan-400 text-slate-900" : "text-slate-200"}`}
+                  className={`flex-1 rounded-full px-3 py-1.5 text-sm sm:flex-none ${direction === option ? "bg-cyan-400 text-slate-900" : "text-slate-200"}`}
                 >
                   {option}
                 </button>
@@ -93,13 +149,36 @@ export function CreatePredictionPage() {
           </div>
 
           <div className="grid gap-2">
-            <label className="text-sm text-slate-200">Expiry</label>
-            <input
-              type="datetime-local"
-              value={expiryAt}
-              onChange={(event) => setExpiryAt(event.target.value)}
-              className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
-            />
+            <label className="text-sm text-slate-200">Expiry horizon</label>
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <input
+                type="number"
+                min="1"
+                step="1"
+                inputMode="numeric"
+                value={expiryAmount}
+                onChange={(event) => setExpiryAmount(event.target.value)}
+                className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+                placeholder="30"
+              />
+              <div className="inline-flex w-full rounded-full border border-white/15 p-1 sm:w-fit">
+                {(["DAYS", "MONTHS", "YEARS"] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setExpiryUnit(option)}
+                    className={`flex-1 rounded-full px-3 py-1.5 text-sm sm:flex-none ${expiryUnit === option ? "bg-cyan-400 text-slate-900" : "text-slate-200"}`}
+                  >
+                    {option.toLowerCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-slate-400">
+              {calculatedExpiryDate
+                ? `This prediction will expire at the end of ${formatExpiryDate(calculatedExpiryDate)}.`
+                : "Enter a positive whole number for the expiry horizon."}
+            </p>
           </div>
 
           <div className="grid gap-2">
@@ -116,8 +195,8 @@ export function CreatePredictionPage() {
           <button
             type="button"
             onClick={() => void submit()}
-            disabled={submitting || !ticker || !expiryAt}
-            className="w-fit rounded-full bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-slate-900 disabled:opacity-60"
+            disabled={submitting || !ticker || !calculatedExpiryAt}
+            className="w-full rounded-full bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-slate-900 disabled:opacity-60 sm:w-fit"
           >
             {submitting ? "Publishing..." : "Publish prediction"}
           </button>

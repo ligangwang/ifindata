@@ -91,42 +91,6 @@
           "order": "DESCENDING"
         }
       ]
-    },
-    {
-      "collectionGroup": "relationships",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "sourceCompanyId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "type",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "confidence",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "relationships",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "targetCompanyId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "type",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "confidence",
-          "order": "DESCENDING"
-        }
-      ]
     }
   ],
   "fieldOverrides": []

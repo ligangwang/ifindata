@@ -13,20 +13,16 @@
     "typecheck": "tsc --noEmit",
     "verify": "npm run lint && npm run typecheck && npm run build",
     "firestore:indexes:apply": "tsx scripts/firestore/apply-indexes.ts",
-    "graph:seed": "tsx scripts/graph/seed-firestore.ts",
-    "graph:migrate": "tsx scripts/graph/migrate-firestore.ts",
     "smoke:test": "playwright test",
     "smoke:install": "playwright install chromium",
     "deploy:staging": "./scripts/deploy-cloud-run.sh staging",
     "deploy:production": "./scripts/deploy-cloud-run.sh production"
   },
   "dependencies": {
-    "cytoscape": "^3.33.2",
     "firebase": "^12.11.0",
     "firebase-admin": "^13.7.0",
     "next": "16.2.1",
     "react": "19.2.4",
-    "react-cytoscapejs": "^2.0.0",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
@@ -34,7 +30,6 @@
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
-    "@types/react-cytoscapejs": "^1.2.6",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",

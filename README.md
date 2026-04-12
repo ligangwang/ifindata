@@ -1,6 +1,6 @@
 # IFinData Web
 
-IFinData is a Next.js web app for exploring company relationship graphs.
+IFinData is a Next.js web app for analyst-driven stock predictions and leaderboard tracking.
 
 Current stack:
 - Next.js 16 (App Router)
@@ -30,12 +30,6 @@ cp .env.example .env.local
 npm run dev
 ```
 
-4. Run Firestore graph migrations (idempotent).
-
-```bash
-npm run graph:migrate
-```
-
 4. Open http://localhost:3000.
 
 ## Required Environment Variables
@@ -56,16 +50,11 @@ See .env.example for full details.
 
 ## APIs
 
-- /api/company/[id]
-- /api/company/search
-- /api/graph/[id]
 - /api/health
+- /api/leaderboard
 - /api/loved-entities
-
-## Graph Data Migrations
-
-- `npm run graph:migrate`: runs all ordered Firestore graph migrations in `scripts/graph/migrations`.
-- `npm run graph:seed`: runs only the initial graph seed migration.
+- /api/predictions
+- /api/users/[id]
 
 ## Firestore Model (MVP)
 

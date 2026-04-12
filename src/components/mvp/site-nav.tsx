@@ -24,46 +24,60 @@ export function SiteNav() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/85 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-5">
-          <Link href="/" className="font-[var(--font-sora)] text-lg font-semibold tracking-tight text-cyan-200">
-            iFinData
-          </Link>
-          <nav className="hidden items-center gap-4 text-sm text-slate-200 md:flex">
-            <Link href="/predictions" className="hover:text-cyan-200">Feed</Link>
-            <Link href="/predictions/new" className="hover:text-cyan-200">Create</Link>
-            <Link href="/leaderboard" className="hover:text-cyan-200">Leaderboard</Link>
-          </nav>
-        </div>
+      <div className="mx-auto w-full max-w-6xl px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-5">
+            <Link href="/" className="font-[var(--font-sora)] text-lg font-semibold tracking-tight text-cyan-200">
+              iFinData
+            </Link>
+            <nav className="hidden items-center gap-4 text-sm text-slate-200 md:flex">
+              <Link href="/predictions" className="hover:text-cyan-200">Feed</Link>
+              <Link href="/predictions/new" className="hover:text-cyan-200">Create</Link>
+              <Link href="/leaderboard" className="hover:text-cyan-200">Leaderboard</Link>
+            </nav>
+          </div>
 
-        <div className="flex items-center gap-3">
-          {loading ? (
-            <span className="text-sm text-slate-400">Loading auth...</span>
-          ) : user ? (
-            <>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {loading ? (
+              <span className="text-sm text-slate-400">Loading auth...</span>
+            ) : user ? (
+              <>
+                <Link
+                  href={profileHref}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-600/25 text-sm font-semibold text-cyan-100 ring-1 ring-cyan-400/40"
+                >
+                  {initials(user.displayName, user.email)}
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void signOut()}
+                  className="rounded-full border border-cyan-400/35 px-3 py-1.5 text-sm text-cyan-100 hover:bg-cyan-500/15"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
               <Link
-                href={profileHref}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-cyan-600/25 text-sm font-semibold text-cyan-100 ring-1 ring-cyan-400/40"
-              >
-                {initials(user.displayName, user.email)}
-              </Link>
-              <button
-                type="button"
-                onClick={() => void signOut()}
+                href="/auth"
                 className="rounded-full border border-cyan-400/35 px-3 py-1.5 text-sm text-cyan-100 hover:bg-cyan-500/15"
               >
-                Sign out
-              </button>
-            </>
-          ) : (
-            <Link
-              href="/auth"
-              className="rounded-full border border-cyan-400/35 px-3 py-1.5 text-sm text-cyan-100 hover:bg-cyan-500/15"
-            >
-              Sign in
-            </Link>
-          )}
+                Sign in
+              </Link>
+            )}
+          </div>
         </div>
+
+        <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 text-sm text-slate-200 md:hidden">
+          <Link href="/predictions" className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 hover:border-cyan-300/60 hover:text-cyan-200">
+            Feed
+          </Link>
+          <Link href="/predictions/new" className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 hover:border-cyan-300/60 hover:text-cyan-200">
+            Create
+          </Link>
+          <Link href="/leaderboard" className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 hover:border-cyan-300/60 hover:text-cyan-200">
+            Leaderboard
+          </Link>
+        </nav>
       </div>
     </header>
   );

@@ -131,14 +131,14 @@ export function PredictionsFeed({ title }: { title: string }) {
               href={`/predictions/${item.id}`}
               className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition hover:border-cyan-300/60"
             >
-              <div className="mb-2 flex items-center justify-between text-sm">
+              <div className="mb-2 flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <p className="font-semibold text-cyan-200">
                   {item.ticker} · {item.direction}
                 </p>
-                <p className="text-slate-400">{new Date(item.createdAt).toLocaleString()}</p>
+                <p className="text-xs text-slate-400 sm:text-sm">{new Date(item.createdAt).toLocaleString()}</p>
               </div>
               <p className="line-clamp-2 text-sm text-slate-100">{item.thesis || "No thesis provided."}</p>
-              <div className="mt-3 flex items-center justify-between text-xs text-slate-300">
+              <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
                 <p>by {item.authorDisplayName ?? "Anonymous"}</p>
                 <p>
                   {item.status}
@@ -161,7 +161,7 @@ export function PredictionsFeed({ title }: { title: string }) {
             <button
               type="button"
               onClick={() => void loadMore()}
-              className="rounded-full border border-cyan-400/35 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-500/15"
+              className="w-full rounded-full border border-cyan-400/35 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-500/15 sm:w-auto"
             >
               Load more
             </button>

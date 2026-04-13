@@ -94,6 +94,31 @@ async function listTickerPredictions(
   }
 }
 
+async function applyAuthorNicknames(
+  db: FirebaseFirestore.Firestore,
+  items: Array<ReturnType<typeof mapPredictionDoc>>,
+) {
+  const userIds = Array.from(new Set(items.map((item) => item.userId).filter(Boolean)));
+  if (userIds.length === 0) {
+    return items;
+  }
+
+  const nicknameEntries = await Promise.all(
+    userIds.map(async (userId) => {
+      const userSnapshot = await db.collection("users").doc(userId).get();
+      const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+      const rawNickname = typeof userData?.nickname === "string" ? userData.nickname.trim() : "";
+      return [userId, rawNickname || null] as const;
+    }),
+  );
+  const nicknameByUserId = new Map<string, string | null>(nicknameEntries);
+
+  return items.map((item) => ({
+    ...item,
+    authorDisplayName: nicknameByUserId.get(item.userId) ?? item.authorDisplayName,
+  }));
+}
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ symbol: string }> },
@@ -105,9 +130,10 @@ export async function GET(
 
   try {
     const items = await listTickerPredictions(db, normalizedTicker, limit);
+    const itemsWithPreferredNames = await applyAuthorNicknames(db, items);
 
     return NextResponse.json({
-      items,
+      items: itemsWithPreferredNames,
       ticker: normalizedTicker,
     });
   } catch (error) {

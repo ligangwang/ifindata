@@ -103,7 +103,7 @@ export function SiteNav() {
             </Link>
             <nav className="hidden items-center gap-4 text-sm text-slate-200 md:flex">
               <Link href="/predictions" className="hover:text-cyan-200">Feed</Link>
-              <Link href="/predictions/new" className="hover:text-cyan-200">Create</Link>
+              <Link href="/predictions/new" className="hover:text-cyan-200">Predict</Link>
               <Link href="/leaderboard" className="hover:text-cyan-200">Leaderboard</Link>
             </nav>
           </div>
@@ -129,7 +129,7 @@ export function SiteNav() {
             Feed
           </Link>
           <Link href="/predictions/new" className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 hover:border-cyan-300/60 hover:text-cyan-200">
-            Create
+            Predict
           </Link>
           <Link href="/leaderboard" className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 hover:border-cyan-300/60 hover:text-cyan-200">
             Leaderboard

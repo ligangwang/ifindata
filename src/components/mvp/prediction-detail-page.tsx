@@ -9,6 +9,7 @@ type PredictionDetail = {
   id: string;
   userId: string;
   authorDisplayName: string | null;
+  authorNickname: string | null;
   ticker: string;
   direction: "UP" | "DOWN";
   entryPrice: number;
@@ -26,6 +27,7 @@ type PredictionComment = {
   id: string;
   predictionId: string;
   authorDisplayName: string | null;
+  authorNickname: string | null;
   content: string;
   createdAt: string;
 };
@@ -129,10 +131,19 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
         <p className="text-sm text-slate-200">{thesis || "No thesis provided."}</p>
 
         <div className="mt-4 grid gap-1 text-sm text-slate-300 md:grid-cols-2">
-          <p>Author: {prediction.authorDisplayName ?? "Anonymous"}</p>
+          <p>
+            Author:{" "}
+            {prediction.userId ? (
+              <Link href={`/analysts/${prediction.userId}`} className="text-cyan-300 hover:text-cyan-100">
+                {prediction.authorNickname ? `@${prediction.authorNickname}` : prediction.authorDisplayName ?? "Anonymous"}
+              </Link>
+            ) : (
+              prediction.authorNickname ? `@${prediction.authorNickname}` : prediction.authorDisplayName ?? "Anonymous"
+            )}
+          </p>
           <p>Created: {new Date(prediction.createdAt).toLocaleString()}</p>
           <p>Entry: {prediction.entryPrice.toFixed(2)}</p>
-          <p>Expiry: {new Date(prediction.expiryAt).toLocaleString()}</p>
+          <p>Expiry: {new Date(prediction.expiryAt).toLocaleDateString()}</p>
         </div>
 
         {prediction.result ? (
@@ -150,7 +161,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             <article key={comment.id} className="rounded-xl border border-white/10 p-3">
               <p className="text-sm text-slate-100">{comment.content}</p>
               <p className="mt-2 text-xs text-slate-400">
-                {comment.authorDisplayName ?? "Anonymous"} · {new Date(comment.createdAt).toLocaleString()}
+                {comment.authorNickname ? `@${comment.authorNickname}` : comment.authorDisplayName ?? "Anonymous"} · {new Date(comment.createdAt).toLocaleString()}
               </p>
             </article>
           ))}

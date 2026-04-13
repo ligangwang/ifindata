@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 
 type Prediction = {
   id: string;
+  userId: string;
   authorDisplayName: string | null;
+  authorNickname: string | null;
   direction: "UP" | "DOWN";
   thesis: string;
   status: "ACTIVE" | "SETTLED";
@@ -89,7 +91,16 @@ export function TickerPage({ ticker }: { ticker: string }) {
                 {prediction.thesis || "No thesis provided."}
               </p>
               <div className="mt-2 flex flex-col gap-1 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-                <p>by {prediction.authorDisplayName ?? "Anonymous"}</p>
+                <p>
+                  by{" "}
+                  {prediction.userId ? (
+                    <Link href={`/analysts/${prediction.userId}`} className="text-cyan-300 hover:text-cyan-100">
+                      {prediction.authorNickname ? `@${prediction.authorNickname}` : prediction.authorDisplayName ?? "Anonymous"}
+                    </Link>
+                  ) : (
+                    prediction.authorNickname ? `@${prediction.authorNickname}` : prediction.authorDisplayName ?? "Anonymous"
+                  )}
+                </p>
                 {prediction.result ? <p className="text-emerald-200">Result {scoreText(prediction.result.score)}</p> : null}
               </div>
             </Link>

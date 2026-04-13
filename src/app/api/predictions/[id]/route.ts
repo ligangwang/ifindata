@@ -52,10 +52,20 @@ export async function GET(
       prediction.authorDisplayName,
     );
 
+    const userId = typeof prediction.userId === "string" ? prediction.userId.trim() : "";
+    let authorNickname: string | null = null;
+    if (userId) {
+      const userSnapshot = await db.collection("users").doc(userId).get();
+      const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+      const nickname = typeof userData?.nickname === "string" ? userData.nickname.trim() : "";
+      authorNickname = nickname || null;
+    }
+
     return NextResponse.json({
       id: snapshot.id,
       ...prediction,
-      authorDisplayName,
+      authorDisplayName: prediction.authorDisplayName,
+      authorNickname,
       thesis: sanitizePredictionThesis(typeof prediction.thesis === "string" ? prediction.thesis : ""),
     });
   } catch (error) {

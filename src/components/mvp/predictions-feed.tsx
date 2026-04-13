@@ -166,7 +166,7 @@ export function PredictionsFeed({ title }: { title: string }) {
                     {item.result ? ` · ${formatScore(item.result.score)}` : ""}
                   </p>
                 </div>
-                <p className="mt-1 text-xs text-slate-400">Expires {new Date(item.expiryAt).toLocaleString()}</p>
+                <p className="mt-1 text-xs text-slate-400">Expires {new Date(item.expiryAt).toLocaleDateString()}</p>
               </div>
             );
           })}

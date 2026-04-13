@@ -136,7 +136,7 @@ async function applyCommentAuthorNicknames(
 
     return {
       ...item,
-      authorDisplayName: preferredNickname ?? item.authorDisplayName,
+      authorNickname: preferredNickname,
     };
   });
 }

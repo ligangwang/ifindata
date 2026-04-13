@@ -331,7 +331,7 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
                 {sanitizePredictionThesis(prediction.thesis) || "No thesis provided."}
               </p>
               <p className="mt-1 break-words text-xs text-slate-400">
-                Created {new Date(prediction.createdAt).toLocaleString()} · Expires {new Date(prediction.expiryAt).toLocaleString()}
+                Created {new Date(prediction.createdAt).toLocaleString()} · Expires {new Date(prediction.expiryAt).toLocaleDateString()}
               </p>
               {prediction.result ? (
                 <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>

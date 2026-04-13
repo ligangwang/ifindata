@@ -115,7 +115,7 @@ async function applyAuthorNicknames(
 
   return items.map((item) => ({
     ...item,
-    authorDisplayName: nicknameByUserId.get(item.userId) ?? item.authorDisplayName,
+    authorNickname: nicknameByUserId.get(item.userId) ?? null,
   }));
 }
 

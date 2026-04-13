@@ -54,6 +54,7 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
   const [editBio, setEditBio] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const preferredName = payload?.profile.nickname ?? payload?.profile.displayName ?? "Analyst";
 
   async function fetchProfile(cursorCreatedAt?: string): Promise<ProfilePayload> {
     const params = new URLSearchParams();
@@ -202,19 +203,16 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
             {payload.profile.photoURL ? (
               <img
                 src={payload.profile.photoURL}
-                alt={`${payload.profile.displayName ?? "Analyst"} avatar`}
+                alt={`${preferredName} avatar`}
                 className="h-12 w-12 rounded-full border border-white/15 object-cover"
               />
             ) : (
               <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-slate-800 text-sm text-cyan-200">
-                {(payload.profile.displayName ?? "A").slice(0, 1).toUpperCase()}
+                {preferredName.slice(0, 1).toUpperCase()}
               </div>
             )}
             <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
-              {payload.profile.displayName ?? "Analyst"}
-              {payload.profile.nickname ? (
-                <span className="ml-2 text-base font-normal text-cyan-400/80">@{payload.profile.nickname}</span>
-              ) : null}
+              {payload.profile.nickname ? `@${payload.profile.nickname}` : preferredName}
             </h1>
           </div>
           {isOwner && !editing ? (

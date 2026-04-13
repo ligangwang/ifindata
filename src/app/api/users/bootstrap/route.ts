@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       bio: "",
+      role: "user",
       stats: {
         totalPredictions: 0,
         activePredictions: 0,

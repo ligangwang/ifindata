@@ -160,6 +160,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
   const userRef = db.collection("users").doc(user.uid);
   const uniqueRef = db.collection("prediction_uniques").doc(duplicateKey);
 
+
   await db.runTransaction(async (tx) => {
     const [userSnapshot, uniqueSnapshot] = await Promise.all([tx.get(userRef), tx.get(uniqueRef)]);
     if (!userSnapshot.exists) {
@@ -205,11 +206,22 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       expiryDate,
       createdAt: nowIso,
     });
-    tx.update(userRef, {
-      updatedAt: nowIso,
-      "stats.totalPredictions": FieldValue.increment(1),
-      "stats.activePredictions": FieldValue.increment(1),
-    });
+
+    // If user is still 'user', promote to 'analyst' on first prediction
+    if ((userData.role ?? "user") === "user") {
+      tx.update(userRef, {
+        updatedAt: nowIso,
+        role: "analyst",
+        "stats.totalPredictions": FieldValue.increment(1),
+        "stats.activePredictions": FieldValue.increment(1),
+      });
+    } else {
+      tx.update(userRef, {
+        updatedAt: nowIso,
+        "stats.totalPredictions": FieldValue.increment(1),
+        "stats.activePredictions": FieldValue.increment(1),
+      });
+    }
   });
 
   return { id: predictionRef.id };

@@ -81,6 +81,6 @@ export async function getLatestPrice(ticker: string): Promise<MarketQuote> {
   }
 
   throw new Error(
-    "Market data provider not configured. Set FINNHUB_API_KEY.",
+    `We don't currently support market data for ${normalizedTicker}. Please try another ticker.`,
   );
 }

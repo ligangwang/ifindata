@@ -104,6 +104,43 @@ async function listCommentsWithFallback(
   }
 }
 
+async function applyCommentAuthorNicknames(
+  db: FirebaseFirestore.Firestore,
+  items: Array<Record<string, unknown> & { id: string }>,
+) {
+  const userIds = Array.from(
+    new Set(
+      items
+        .map((item) => (typeof item.userId === "string" ? item.userId.trim() : ""))
+        .filter(Boolean),
+    ),
+  );
+
+  if (userIds.length === 0) {
+    return items;
+  }
+
+  const nicknameEntries = await Promise.all(
+    userIds.map(async (userId) => {
+      const userSnapshot = await db.collection("users").doc(userId).get();
+      const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+      const nickname = typeof userData?.nickname === "string" ? userData.nickname.trim() : "";
+      return [userId, nickname || null] as const;
+    }),
+  );
+  const nicknameByUserId = new Map<string, string | null>(nicknameEntries);
+
+  return items.map((item) => {
+    const userId = typeof item.userId === "string" ? item.userId.trim() : "";
+    const preferredNickname = userId ? nicknameByUserId.get(userId) ?? null : null;
+
+    return {
+      ...item,
+      authorDisplayName: preferredNickname ?? item.authorDisplayName,
+    };
+  });
+}
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -127,8 +164,9 @@ export async function GET(
 
     const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
     const items = await listCommentsWithFallback(predictionSnapshot.ref, limit);
+    const itemsWithPreferredNames = await applyCommentAuthorNicknames(db, items);
 
-    return NextResponse.json({ items });
+    return NextResponse.json({ items: itemsWithPreferredNames });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch comments";
     return NextResponse.json({ error: message }, { status: 500 });

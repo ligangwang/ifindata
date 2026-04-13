@@ -3,25 +3,6 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 import { sanitizePredictionThesis } from "@/lib/predictions/types";
 import { NextRequest, NextResponse } from "next/server";
 
-async function resolvePreferredAuthorName(
-  db: FirebaseFirestore.Firestore,
-  userId: unknown,
-  fallbackName: unknown,
-): Promise<string | null> {
-  const fallback = typeof fallbackName === "string" && fallbackName.trim() ? fallbackName.trim() : null;
-  const resolvedUserId = typeof userId === "string" ? userId.trim() : "";
-
-  if (!resolvedUserId) {
-    return fallback;
-  }
-
-  const userSnapshot = await db.collection("users").doc(resolvedUserId).get();
-  const userData = userSnapshot.data() as Record<string, unknown> | undefined;
-  const nickname = typeof userData?.nickname === "string" ? userData.nickname.trim() : "";
-
-  return nickname || fallback;
-}
-
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -37,25 +18,32 @@ export async function GET(
 
     const prediction = snapshot.data() as Record<string, unknown>;
     const visibility = prediction.visibility;
-    const userId = prediction.userId;
+    const predictionUserId = typeof prediction.userId === "string" ? prediction.userId.trim() : "";
+    const authorDisplayName =
+      typeof prediction.authorDisplayName === "string" && prediction.authorDisplayName.trim()
+        ? prediction.authorDisplayName.trim()
+        : null;
 
     if (visibility !== "PUBLIC") {
       const decoded = await getDecodedUserFromRequest(request);
-      if (!decoded || decoded.uid !== userId) {
+      if (!decoded || !predictionUserId || decoded.uid !== predictionUserId) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
     }
 
-    const authorDisplayName = await resolvePreferredAuthorName(
-      db,
-      prediction.userId,
-      prediction.authorDisplayName,
-    );
+    let authorNickname: string | null = null;
+    if (predictionUserId) {
+      const userSnapshot = await db.collection("users").doc(predictionUserId).get();
+      const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+      const nickname = typeof userData?.nickname === "string" ? userData.nickname.trim() : "";
+      authorNickname = nickname || null;
+    }
 
     return NextResponse.json({
       id: snapshot.id,
       ...prediction,
       authorDisplayName,
+      authorNickname,
       thesis: sanitizePredictionThesis(typeof prediction.thesis === "string" ? prediction.thesis : ""),
     });
   } catch (error) {

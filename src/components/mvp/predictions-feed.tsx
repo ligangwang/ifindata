@@ -6,7 +6,9 @@ import { sanitizePredictionThesis } from "@/lib/predictions/types";
 
 type Prediction = {
   id: string;
+  userId: string;
   authorDisplayName: string | null;
+  authorNickname: string | null;
   ticker: string;
   direction: "UP" | "DOWN";
   thesis: string;
@@ -150,7 +152,15 @@ export function PredictionsFeed({ title }: { title: string }) {
                   {thesis || "No thesis provided."}
                 </Link>
                 <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-                  <p>by {item.authorDisplayName ?? "Anonymous"}</p>
+                  <p>
+                    by{" "}
+                    <Link
+                      href={`/analysts/${item.userId}`}
+                      className="text-cyan-300 hover:text-cyan-100"
+                    >
+                      {item.authorNickname ? `@${item.authorNickname}` : item.authorDisplayName ?? "Anonymous"}
+                    </Link>
+                  </p>
                   <p>
                     {item.status}
                     {item.result ? ` · ${formatScore(item.result.score)}` : ""}

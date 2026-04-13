@@ -14,7 +14,7 @@ test("homepage renders predictions feed", async ({ page }) => {
 
   // Verify navigation is present
   await expect(page.getByRole("link", { name: /Feed/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Create/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Predict/i })).toBeVisible();
   
   // Verify predictions feed is on the page
   const feedTitle = page.locator("h1, h2, h3").filter({ hasText: /Home feed|Feed/i }).first();

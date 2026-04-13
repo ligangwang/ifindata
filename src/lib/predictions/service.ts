@@ -31,7 +31,7 @@ type ListPredictionsInput = {
 };
 
 type ListPredictionsResult = {
-  items: Array<Prediction & { id: string }>;
+  items: Array<Prediction & { id: string; authorNickname: string | null }>;
   nextCursor: string | null;
 };
 
@@ -80,10 +80,27 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
       thesis: sanitizePredictionThesis(prediction.thesis),
     };
   });
+
+  const uniqueUserIds = Array.from(new Set(items.map((item) => item.userId).filter(Boolean)));
+  const nicknameEntries = await Promise.all(
+    uniqueUserIds.map(async (id) => {
+      const userSnapshot = await db.collection("users").doc(id).get();
+      const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+      const nickname = typeof userData?.nickname === "string" ? userData.nickname : null;
+      return [id, nickname] as const;
+    }),
+  );
+  const nicknameByUserId = new Map<string, string | null>(nicknameEntries);
+
+  const itemsWithNickname = items.map((item) => ({
+    ...item,
+    authorNickname: nicknameByUserId.get(item.userId) ?? null,
+  }));
+
   const nextCursor = hasMore && selected.length > 0 ? selected[selected.length - 1].get("createdAt") : null;
 
   return {
-    items,
+    items: itemsWithNickname,
     nextCursor: typeof nextCursor === "string" ? nextCursor : null,
   };
 }

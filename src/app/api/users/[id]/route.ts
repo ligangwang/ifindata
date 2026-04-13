@@ -29,22 +29,8 @@ export async function GET(
   const db = getAdminFirestore();
 
   try {
-    const userSnapshot = await db.collection("users").doc(id).get();
-    if (!userSnapshot.exists) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    const userData = userSnapshot.data() as Record<string, unknown>;
-    const isPublic = userData.settings && typeof userData.settings === "object"
-      ? (userData.settings as Record<string, unknown>).isPublic === true
-      : false;
-
     const decoded = await getDecodedUserFromRequest(request);
     const isOwner = Boolean(decoded && decoded.uid === id);
-
-    if (!isPublic && !isOwner) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
 
     const statusParam = request.nextUrl.searchParams.get("status");
     const status = statusParam === "ACTIVE" || statusParam === "SETTLED" ? statusParam : undefined;
@@ -56,6 +42,67 @@ export async function GET(
       limit: 25,
       cursorCreatedAt: request.nextUrl.searchParams.get("cursorCreatedAt") ?? undefined,
     });
+
+    const userSnapshot = await db.collection("users").doc(id).get();
+
+    if (!userSnapshot.exists) {
+      // If user document doesn't exist, check if they have predictions
+      // If they do, create a minimal profile from prediction data
+      if (predictions.items.length === 0) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
+
+      // Build profile from first prediction's author data and create user doc
+      const firstPrediction = predictions.items[0];
+      const profileData = {
+        displayName: firstPrediction.authorDisplayName ?? null,
+        photoURL: firstPrediction.authorPhotoURL ?? null,
+        authProviders: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        bio: "",
+        nickname: null,
+        stats: {
+          totalPredictions: 0,
+          activePredictions: 0,
+          settledPredictions: 0,
+          totalScore: 0,
+        },
+        settings: {
+          isPublic: true,
+        },
+      };
+
+      // Create the user profile document if it doesn't exist
+      try {
+        await db.collection("users").doc(id).set(profileData, { merge: true });
+      } catch {
+        // If set fails, continue anyway - we have the data to return
+      }
+
+      return NextResponse.json({
+        profile: {
+          id,
+          displayName: profileData.displayName,
+          photoURL: profileData.photoURL,
+          nickname: profileData.nickname,
+          bio: profileData.bio,
+          stats: profileData.stats,
+          settings: profileData.settings,
+        },
+        predictions: predictions.items,
+        nextCursor: predictions.nextCursor,
+      });
+    }
+
+    const userData = userSnapshot.data() as Record<string, unknown>;
+    const isPublic = userData.settings && typeof userData.settings === "object"
+      ? (userData.settings as Record<string, unknown>).isPublic !== false
+      : true;
+
+    if (!isPublic && !isOwner) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
 
     return NextResponse.json({
       profile: {

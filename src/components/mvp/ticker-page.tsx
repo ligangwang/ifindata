@@ -76,9 +76,8 @@ export function TickerPage({ ticker }: { ticker: string }) {
         <h2 className="mb-3 font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Predictions</h2>
         <div className="grid gap-2">
           {payload.items.map((prediction) => (
-            <Link
+            <article
               key={prediction.id}
-              href={`/predictions/${prediction.id}`}
               className="rounded-xl border border-white/10 p-3 hover:border-cyan-300/60"
             >
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -87,9 +86,9 @@ export function TickerPage({ ticker }: { ticker: string }) {
                 </p>
                 <p className="text-xs text-slate-400">{new Date(prediction.createdAt).toLocaleString()}</p>
               </div>
-              <p className="mt-2 line-clamp-2 text-sm text-slate-100">
+              <Link href={`/predictions/${prediction.id}`} className="mt-2 block line-clamp-2 text-sm text-slate-100 hover:text-slate-50">
                 {prediction.thesis || "No thesis provided."}
-              </p>
+              </Link>
               <div className="mt-2 flex flex-col gap-1 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                 <p>
                   by{" "}
@@ -103,7 +102,7 @@ export function TickerPage({ ticker }: { ticker: string }) {
                 </p>
                 {prediction.result ? <p className="text-emerald-200">Result {scoreText(prediction.result.score)}</p> : null}
               </div>
-            </Link>
+            </article>
           ))}
 
           {payload.items.length === 0 ? (

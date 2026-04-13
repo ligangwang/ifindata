@@ -12,6 +12,15 @@ const MAX_EXPIRY_BY_UNIT: Record<ExpiryUnit, number> = {
   YEARS: 1,
 };
 
+// Validate ticker format: letters, hyphens, dots only, 1-6 characters
+function isValidTickerFormat(ticker: string): boolean {
+  if (!ticker || ticker.length === 0 || ticker.length > 6) {
+    return false;
+  }
+  // Only allow letters, hyphens, and dots (e.g., BRK.A, BF-A)
+  return /^[A-Z\.\-]+$/.test(ticker);
+}
+
 function addMonthsClamped(date: Date, monthsToAdd: number): Date {
   const next = new Date(date);
   const targetDay = next.getDate();
@@ -80,6 +89,11 @@ export function CreatePredictionPage() {
   const expiryWithinOneYear = calculatedExpiryDate ? isWithinOneYear(calculatedExpiryDate) : false;
   const calculatedExpiryAt = calculatedExpiryDate && expiryWithinOneYear ? toEndOfDay(calculatedExpiryDate) : null;
 
+  const isValidTicker = isValidTickerFormat(ticker);
+  const tickerErrorMessage = ticker && !isValidTicker 
+    ? "Ticker must be 1-6 letters (e.g., AAPL, BRK.A)" 
+    : null;
+
   if (loading) {
     return <main className="mx-auto w-full max-w-3xl px-4 py-8 text-sm text-slate-300">Loading...</main>;
   }
@@ -104,6 +118,11 @@ export function CreatePredictionPage() {
 
   async function submit() {
     setError(null);
+
+    if (!isValidTicker) {
+      setError("Invalid ticker format.");
+      return;
+    }
 
     if (!hasValidExpiryAmount || !calculatedExpiryAt) {
       setError("Expiry must be within one year.");
@@ -160,8 +179,11 @@ export function CreatePredictionPage() {
               value={ticker}
               onChange={(event) => setTicker(event.target.value.toUpperCase())}
               placeholder="AAPL"
-              className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+              className={`rounded-xl border bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring ${
+                tickerErrorMessage ? "border-rose-400/50" : "border-white/15"
+              }`}
             />
+            {tickerErrorMessage ? <p className="text-xs text-rose-300">{tickerErrorMessage}</p> : null}
           </div>
 
           <div className="grid gap-2">
@@ -235,7 +257,7 @@ export function CreatePredictionPage() {
           <button
             type="button"
             onClick={() => void submit()}
-            disabled={submitting || !ticker || !calculatedExpiryAt}
+            disabled={submitting || !isValidTicker || !calculatedExpiryAt}
             className="w-full rounded-full bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-slate-900 disabled:opacity-60 sm:w-fit"
           >
             {submitting ? "Publishing..." : "Publish prediction"}

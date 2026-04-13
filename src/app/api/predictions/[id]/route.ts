@@ -3,6 +3,25 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 import { sanitizePredictionThesis } from "@/lib/predictions/types";
 import { NextRequest, NextResponse } from "next/server";
 
+async function resolvePreferredAuthorName(
+  db: FirebaseFirestore.Firestore,
+  userId: unknown,
+  fallbackName: unknown,
+): Promise<string | null> {
+  const fallback = typeof fallbackName === "string" && fallbackName.trim() ? fallbackName.trim() : null;
+  const resolvedUserId = typeof userId === "string" ? userId.trim() : "";
+
+  if (!resolvedUserId) {
+    return fallback;
+  }
+
+  const userSnapshot = await db.collection("users").doc(resolvedUserId).get();
+  const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+  const nickname = typeof userData?.nickname === "string" ? userData.nickname.trim() : "";
+
+  return nickname || fallback;
+}
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -27,9 +46,16 @@ export async function GET(
       }
     }
 
+    const authorDisplayName = await resolvePreferredAuthorName(
+      db,
+      prediction.userId,
+      prediction.authorDisplayName,
+    );
+
     return NextResponse.json({
       id: snapshot.id,
       ...prediction,
+      authorDisplayName,
       thesis: sanitizePredictionThesis(typeof prediction.thesis === "string" ? prediction.thesis : ""),
     });
   } catch (error) {

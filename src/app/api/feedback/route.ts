@@ -1,5 +1,6 @@
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { isAdminUser } from "@/lib/firebase/admin-role";
 import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -46,23 +47,14 @@ function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function hasAdminClaim(decoded: Record<string, unknown>): boolean {
-  return decoded.admin === true || decoded.role === "admin";
-}
-
-async function isAdminUser(request: NextRequest): Promise<boolean> {
+async function isAdminRequest(request: NextRequest): Promise<boolean> {
   const decoded = await getDecodedUserFromRequest(request);
 
   if (!decoded) {
     return false;
   }
 
-  if (hasAdminClaim(decoded)) {
-    return true;
-  }
-
-  const userSnapshot = await getAdminFirestore().collection("users").doc(decoded.uid).get();
-  return userSnapshot.exists && userSnapshot.data()?.role === "admin";
+  return isAdminUser(decoded);
 }
 
 function readString(value: unknown, fallback = ""): string {
@@ -96,7 +88,7 @@ function toFeedbackSubmission(snapshot: QueryDocumentSnapshot): FeedbackSubmissi
 
 export async function GET(request: NextRequest) {
   try {
-    const isAdmin = await isAdminUser(request);
+    const isAdmin = await isAdminRequest(request);
 
     if (!isAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

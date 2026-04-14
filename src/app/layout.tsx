@@ -44,7 +44,7 @@ export default function RootLayout({
               investment decisions.
               <div className="mt-3">
                 <Link href="/feedback" className="font-medium text-cyan-200 underline-offset-2 hover:underline">
-                  Send feedback
+                  Share thoughts
                 </Link>
               </div>
               <p className="mt-2 text-slate-500">Copyright {new Date().getFullYear()} Younalyst. All rights reserved.</p>

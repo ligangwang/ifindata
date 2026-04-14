@@ -90,8 +90,53 @@ function UserMenu({ profileHref, onSignOut }: { profileHref: string; onSignOut: 
 }
 
 export function SiteNav() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, getIdToken } = useAuth();
+  const [adminStatus, setAdminStatus] = useState<{ userId: string; isAdmin: boolean } | null>(null);
   const profileHref = useMemo(() => (user ? `/analysts/${user.uid}` : "/auth"), [user]);
+  const showAdminLink = Boolean(user && adminStatus?.userId === user.uid && adminStatus.isAdmin);
+
+  useEffect(() => {
+    if (loading || !user) {
+      return;
+    }
+
+    let cancelled = false;
+    const userId = user.uid;
+
+    async function loadAdminStatus() {
+      try {
+        const token = await getIdToken();
+
+        if (!token) {
+          if (!cancelled) {
+            setAdminStatus({ userId, isAdmin: false });
+          }
+          return;
+        }
+
+        const response = await fetch("/api/admin/me", {
+          headers: {
+            authorization: `Bearer ${token}`,
+          },
+        });
+        const payload = (await response.json().catch(() => ({}))) as { isAdmin?: boolean };
+
+        if (!cancelled) {
+          setAdminStatus({ userId, isAdmin: response.ok && payload.isAdmin === true });
+        }
+      } catch {
+        if (!cancelled) {
+          setAdminStatus({ userId, isAdmin: false });
+        }
+      }
+    }
+
+    void loadAdminStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getIdToken, loading, user]);
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/85 backdrop-blur">
@@ -105,6 +150,7 @@ export function SiteNav() {
               <Link href="/predictions" className="hover:text-cyan-200">Feed</Link>
               <Link href="/predictions/new" className="hover:text-cyan-200">Predict</Link>
               <Link href="/leaderboard" className="hover:text-cyan-200">Leaderboard</Link>
+              {showAdminLink ? <Link href="/feedback/admin" className="hover:text-cyan-200">Admin</Link> : null}
             </nav>
           </div>
 
@@ -134,6 +180,11 @@ export function SiteNav() {
           <Link href="/leaderboard" className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 hover:border-cyan-300/60 hover:text-cyan-200">
             Leaderboard
           </Link>
+          {showAdminLink ? (
+            <Link href="/feedback/admin" className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 hover:border-cyan-300/60 hover:text-cyan-200">
+              Admin
+            </Link>
+          ) : null}
         </nav>
       </div>
     </header>

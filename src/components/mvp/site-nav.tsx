@@ -105,7 +105,7 @@ export function SiteNav() {
 
     async function loadAdminStatus() {
       try {
-        const token = await getIdToken();
+        const token = await getIdToken(true);
 
         if (!token) {
           if (!cancelled) {

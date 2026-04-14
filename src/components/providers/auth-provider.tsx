@@ -30,7 +30,7 @@ type AuthContextValue = {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   createAccountWithEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  getIdToken: () => Promise<string | null>;
+  getIdToken: (forceRefresh?: boolean) => Promise<string | null>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -172,11 +172,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [configured]);
 
-  const getIdToken = useCallback(async () => {
+  const getIdToken = useCallback(async (forceRefresh = false) => {
     if (!user) {
       return null;
     }
-    return user.getIdToken();
+    return user.getIdToken(forceRefresh);
   }, [user]);
 
   const value = useMemo<AuthContextValue>(

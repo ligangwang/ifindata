@@ -125,7 +125,19 @@ export function SiteNav() {
             authorization: `Bearer ${token}`,
           },
         });
-        const payload = (await response.json().catch(() => ({}))) as { isAdmin?: boolean };
+        const payload = (await response.json().catch(() => ({}))) as {
+          isAdmin?: boolean;
+          roleDebug?: {
+            claimRole?: string | null;
+            claimAdmin?: boolean;
+            claimIsAdmin?: boolean;
+            firestoreRole?: string | null;
+            firestoreRoles?: string[];
+            firestoreAdmin?: boolean;
+            firestoreIsAdmin?: boolean;
+            firestoreUserExists?: boolean;
+          };
+        };
         const isAdmin = response.ok && payload.isAdmin === true;
 
         console.info("[admin-nav] Admin status check completed.", {
@@ -134,6 +146,7 @@ export function SiteNav() {
           status: response.status,
           ok: response.ok,
           isAdmin,
+          roleDebug: payload.roleDebug,
           payload,
         });
 

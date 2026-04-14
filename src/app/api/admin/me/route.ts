@@ -1,5 +1,5 @@
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
-import { isAdminUser } from "@/lib/firebase/admin-role";
+import { resolveAdminRoleStatus } from "@/lib/firebase/admin-role";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -10,8 +10,22 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const adminStatus = await resolveAdminRoleStatus(decoded);
+
     return NextResponse.json({
-      isAdmin: await isAdminUser(decoded),
+      isAdmin: adminStatus.isAdmin,
+      uid: decoded.uid,
+      email: decoded.email ?? null,
+      roleDebug: {
+        claimRole: adminStatus.claimRole,
+        claimAdmin: adminStatus.claimAdmin,
+        claimIsAdmin: adminStatus.claimIsAdmin,
+        firestoreRole: adminStatus.firestoreRole,
+        firestoreRoles: adminStatus.firestoreRoles,
+        firestoreAdmin: adminStatus.firestoreAdmin,
+        firestoreIsAdmin: adminStatus.firestoreIsAdmin,
+        firestoreUserExists: adminStatus.firestoreUserExists,
+      },
     });
   } catch (error) {
     console.error("Failed to resolve admin status:", error);

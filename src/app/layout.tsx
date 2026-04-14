@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, Sora } from "next/font/google";
+import Link from "next/link";
 import { AppProviders } from "@/components/providers/app-providers";
 import { EnvironmentBanner } from "@/components/environment-banner";
 import { SiteNav } from "@/components/mvp/site-nav";
@@ -41,6 +42,11 @@ export default function RootLayout({
               Predictions, rankings, and commentary on Younalyst are provided for informational purposes only and do
               not constitute financial, investment, legal, or tax advice. Always do your own research before making
               investment decisions.
+              <div className="mt-3">
+                <Link href="/feedback" className="font-medium text-cyan-200 underline-offset-2 hover:underline">
+                  Send feedback
+                </Link>
+              </div>
               <p className="mt-2 text-slate-500">Copyright {new Date().getFullYear()} Younalyst. All rights reserved.</p>
             </div>
           </footer>

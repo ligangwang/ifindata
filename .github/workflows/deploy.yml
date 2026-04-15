@@ -176,7 +176,7 @@ jobs:
             exit 1
           fi
 
-          gcloud services enable cloudscheduler.googleapis.com --project "$GCP_PROJECT_ID"
+          echo "Cloud Scheduler API must be enabled once for project ${GCP_PROJECT_ID}; this workflow only creates or updates the scheduler job."
 
           job_name="${EOD_MAINTENANCE_SCHEDULER_JOB:-daily-eod-maintenance-staging}"
           limit="${EOD_MAINTENANCE_SCHEDULER_LIMIT:-500}"
@@ -347,7 +347,7 @@ jobs:
             exit 1
           fi
 
-          gcloud services enable cloudscheduler.googleapis.com --project "$GCP_PROJECT_ID"
+          echo "Cloud Scheduler API must be enabled once for project ${GCP_PROJECT_ID}; this workflow only creates or updates the scheduler job."
 
           job_name="${EOD_MAINTENANCE_SCHEDULER_JOB:-daily-eod-maintenance-production}"
           limit="${EOD_MAINTENANCE_SCHEDULER_LIMIT:-500}"

@@ -114,6 +114,16 @@ jobs:
             echo "INTERNAL_API_TOKEN secret is not configured" >&2
             exit 1
           fi
+          if [[ "${#INTERNAL_API_TOKEN}" -gt 12 ]]; then
+            token_preview="${INTERNAL_API_TOKEN:0:6}...${INTERNAL_API_TOKEN: -6}"
+          else
+            token_preview="$INTERNAL_API_TOKEN"
+          fi
+          token_sha256="$(printf '%s' "$INTERNAL_API_TOKEN" | sha256sum | cut -d' ' -f1)"
+          echo "INTERNAL_API_TOKEN present: true"
+          echo "INTERNAL_API_TOKEN length: ${#INTERNAL_API_TOKEN}"
+          echo "INTERNAL_API_TOKEN preview: ${token_preview}"
+          echo "INTERNAL_API_TOKEN sha256: ${token_sha256}"
 
           body="$(jq -n \
             --arg runDate "$RUN_DATE" \

@@ -146,7 +146,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             )}
           </p>
           <p>Created: {new Date(prediction.createdAt).toLocaleString()}</p>
-          <p>Entry: {prediction.entryPrice.toFixed(2)} on {prediction.entryDate}</p>
+          <p>Entry: {prediction.entryPrice.toFixed(2)} @ {prediction.entryDate}</p>
           <p>Expiry: {new Date(prediction.expiryAt).toLocaleDateString()}</p>
         </div>
 

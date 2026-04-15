@@ -56,6 +56,13 @@ export type Prediction = {
   commentCount: number;
   createdAt: string;
   updatedAt: string;
+  markPrice?: number | null;
+  markPriceSource?: string | null;
+  markPriceDate?: string | null;
+  markPriceCapturedAt?: string | null;
+  markReturnValue?: number | null;
+  markScore?: number | null;
+  markDisplayPercent?: number | null;
   settledAt: string | null;
   result: PredictionResult | null;
 };

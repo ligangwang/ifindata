@@ -309,8 +309,8 @@ async function fetchTwelveDataEodPrices(
     const url = new URL(`${config.apiUrl}/time_series`);
     url.searchParams.set("symbol", tickerChunk.join(","));
     url.searchParams.set("interval", "1day");
-    url.searchParams.set("start_date", requestedDate);
-    url.searchParams.set("end_date", requestedDate);
+    url.searchParams.set("start_date", `${requestedDate} 00:00:00`);
+    url.searchParams.set("end_date", `${requestedDate} 23:59:59`);
     url.searchParams.set("apikey", config.apiKey);
 
     const response = await fetch(url, { cache: "no-store" });
@@ -458,6 +458,16 @@ export async function runDailyEodMaintenance(
   const limit = clampLimit(input.limit);
   const nowIso = new Date().toISOString();
   const manualTickers = input.tickers?.length ? uniqueTickers(input.tickers) : [];
+
+  console.info("[daily-eod-maintenance] Starting run", {
+    runDate,
+    dryRun,
+    loadPrices,
+    settle,
+    limit,
+    manualTickers,
+  });
+
   const {
     activePredictions,
     predictionsNeedingWork,
@@ -467,6 +477,15 @@ export async function runDailyEodMaintenance(
   const requestedTickers = manualTickers.length > 0
     ? manualTickers
     : uniqueTickers(predictionsNeedingWork.map((item) => item.ticker));
+
+  console.info("[daily-eod-maintenance] Active prediction scan completed", {
+    runDate,
+    activePredictions: activePredictions.length,
+    actionablePredictions: predictionsNeedingWork.length,
+    scannedActivePredictions,
+    hasMoreActivePredictions,
+    requestedTickers,
+  });
 
   const priceLoad: DailyEodMaintenanceResult["priceLoad"] = {
     requestedTickers: requestedTickers.length,
@@ -481,6 +500,11 @@ export async function runDailyEodMaintenance(
   const priceByTicker = new Map<string, EodPrice>();
 
   if (loadPrices && requestedTickers.length > 0) {
+    console.info("[daily-eod-maintenance] Loading EOD prices", {
+      runDate,
+      requestedTickers,
+    });
+
     const cachedPrices = await readCachedEodPrices(requestedTickers, runDate);
     cachedPrices.forEach((price, ticker) => {
       priceByTicker.set(ticker, price);
@@ -499,6 +523,17 @@ export async function runDailyEodMaintenance(
     }));
     priceLoad.failures = fetched.failures;
 
+    console.info("[daily-eod-maintenance] EOD price load completed", {
+      runDate,
+      requestedTickers: requestedTickers.length,
+      cacheHits: priceLoad.cacheHits,
+      tickersFetched: tickersToFetch.length,
+      loaded: priceLoad.loaded,
+      failed: priceLoad.failed,
+      prices: priceLoad.prices,
+      failures: priceLoad.failures,
+    });
+
     for (const price of fetched.prices) {
       priceByTicker.set(price.ticker, price);
       if (!dryRun) {
@@ -508,6 +543,12 @@ export async function runDailyEodMaintenance(
           .set(price, { merge: true });
       }
     }
+  } else {
+    console.info("[daily-eod-maintenance] EOD price load skipped", {
+      runDate,
+      loadPrices,
+      requestedTickers: requestedTickers.length,
+    });
   }
 
   const latestTradingDate = Array.from(priceByTicker.values())
@@ -523,7 +564,7 @@ export async function runDailyEodMaintenance(
   };
 
   if (!settle) {
-    return {
+    const result = {
       dryRun,
       runDate,
       latestTradingDate,
@@ -534,18 +575,31 @@ export async function runDailyEodMaintenance(
       priceLoad,
       settlement,
     };
+    console.info("[daily-eod-maintenance] Completed run", result);
+    return result;
   }
 
   for (const prediction of predictionsNeedingWork) {
     const price = priceByTicker.get(prediction.ticker);
     if (!price) {
       settlement.missingPrice += 1;
+      console.warn("[daily-eod-maintenance] Missing EOD price for prediction", {
+        runDate,
+        predictionId: prediction.id,
+        ticker: prediction.ticker,
+      });
       continue;
     }
 
     const mark = computeMark(prediction.direction, prediction.entryPrice, price.close);
     if (!mark) {
       settlement.skipped += 1;
+      console.warn("[daily-eod-maintenance] Skipped prediction with invalid mark inputs", {
+        runDate,
+        predictionId: prediction.id,
+        ticker: prediction.ticker,
+        direction: prediction.direction,
+      });
       continue;
     }
 
@@ -576,12 +630,23 @@ export async function runDailyEodMaintenance(
 
       if (!predictionSnapshot.exists || !userSnapshot.exists) {
         settlement.skipped += 1;
+        console.warn("[daily-eod-maintenance] Skipped prediction because prediction or user doc is missing", {
+          runDate,
+          predictionId: prediction.id,
+          userExists: userSnapshot.exists,
+          predictionExists: predictionSnapshot.exists,
+        });
         return;
       }
 
       const latest = predictionSnapshot.data() as Record<string, unknown>;
       if (latest.status !== "ACTIVE") {
         settlement.skipped += 1;
+        console.warn("[daily-eod-maintenance] Skipped prediction because status changed", {
+          runDate,
+          predictionId: prediction.id,
+          status: latest.status,
+        });
         return;
       }
 
@@ -621,7 +686,7 @@ export async function runDailyEodMaintenance(
     });
   }
 
-  return {
+  const result = {
     dryRun,
     runDate,
     latestTradingDate,
@@ -632,4 +697,6 @@ export async function runDailyEodMaintenance(
     priceLoad,
     settlement,
   };
+  console.info("[daily-eod-maintenance] Completed run", result);
+  return result;
 }

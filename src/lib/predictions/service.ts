@@ -192,6 +192,13 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       commentCount: 0,
       createdAt: nowIso,
       updatedAt: nowIso,
+      markPrice: null,
+      markPriceSource: null,
+      markPriceDate: null,
+      markPriceCapturedAt: null,
+      markReturnValue: null,
+      markScore: null,
+      markDisplayPercent: null,
       settledAt: null,
       result: null,
     };

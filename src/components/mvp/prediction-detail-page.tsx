@@ -14,6 +14,7 @@ type PredictionDetail = {
   ticker: string;
   direction: "UP" | "DOWN";
   entryPrice: number;
+  entryDate: string;
   expiryAt: string;
   thesis: string;
   status: "ACTIVE" | "SETTLED";
@@ -145,7 +146,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             )}
           </p>
           <p>Created: {new Date(prediction.createdAt).toLocaleString()}</p>
-          <p>Entry: {prediction.entryPrice.toFixed(2)}</p>
+          <p>Entry: {prediction.entryPrice.toFixed(2)} on {prediction.entryDate}</p>
           <p>Expiry: {new Date(prediction.expiryAt).toLocaleDateString()}</p>
         </div>
 

@@ -12,6 +12,8 @@ type Prediction = {
   authorNickname: string | null;
   ticker: string;
   direction: "UP" | "DOWN";
+  entryPrice: number;
+  entryDate: string;
   thesis: string;
   status: "ACTIVE" | "SETTLED";
   createdAt: string;

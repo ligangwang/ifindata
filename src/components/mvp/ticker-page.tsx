@@ -10,6 +10,8 @@ type Prediction = {
   authorDisplayName: string | null;
   authorNickname: string | null;
   direction: "UP" | "DOWN";
+  entryPrice: number;
+  entryDate: string;
   thesis: string;
   status: "ACTIVE" | "SETTLED";
   createdAt: string;

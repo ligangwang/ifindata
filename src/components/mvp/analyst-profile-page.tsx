@@ -10,6 +10,8 @@ type Prediction = {
   id: string;
   ticker: string;
   direction: "UP" | "DOWN";
+  entryPrice: number;
+  entryDate: string;
   thesis: string;
   createdAt: string;
   expiryAt: string;

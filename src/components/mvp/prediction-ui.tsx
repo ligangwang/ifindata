@@ -62,11 +62,11 @@ export function PredictionMarkSummary({ prediction }: { prediction: PredictionMa
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-      {hasEntryData ? <span>Entry {entryPrice.toFixed(2)} on {entryDate}</span> : null}
+      {hasEntryData ? <span>Entry {entryPrice.toFixed(2)} @ {entryDate}</span> : null}
       {hasMarkData ? (
         <>
           <span>
-            Mark {markPrice.toFixed(2)} on {markPriceDate}
+            Mark {markPrice.toFixed(2)} @ {markPriceDate}
           </span>
           <span className={markToneClass(markDisplayPercent)}>
             {formatMarkPercent(markDisplayPercent)}

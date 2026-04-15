@@ -102,18 +102,12 @@ export function SiteNav() {
 
     let cancelled = false;
     const userId = user.uid;
-    const userEmail = user.email;
 
     async function loadAdminStatus() {
       try {
         const token = await getIdToken(true);
 
         if (!token) {
-          console.info("[admin-nav] No ID token available for admin check.", {
-            userId,
-            userEmail,
-          });
-
           if (!cancelled) {
             setAdminStatus({ userId, isAdmin: false });
           }
@@ -125,41 +119,13 @@ export function SiteNav() {
             authorization: `Bearer ${token}`,
           },
         });
-        const payload = (await response.json().catch(() => ({}))) as {
-          isAdmin?: boolean;
-          roleDebug?: {
-            claimRole?: string | null;
-            claimAdmin?: boolean;
-            claimIsAdmin?: boolean;
-            firestoreRole?: string | null;
-            firestoreRoles?: string[];
-            firestoreAdmin?: boolean;
-            firestoreIsAdmin?: boolean;
-            firestoreUserExists?: boolean;
-          };
-        };
+        const payload = (await response.json().catch(() => ({}))) as { isAdmin?: boolean };
         const isAdmin = response.ok && payload.isAdmin === true;
-
-        console.info("[admin-nav] Admin status check completed.", {
-          userId,
-          userEmail,
-          status: response.status,
-          ok: response.ok,
-          isAdmin,
-          roleDebug: payload.roleDebug,
-          payload,
-        });
 
         if (!cancelled) {
           setAdminStatus({ userId, isAdmin });
         }
-      } catch (error) {
-        console.info("[admin-nav] Admin status check failed.", {
-          userId,
-          userEmail,
-          error: error instanceof Error ? error.message : String(error),
-        });
-
+      } catch {
         if (!cancelled) {
           setAdminStatus({ userId, isAdmin: false });
         }

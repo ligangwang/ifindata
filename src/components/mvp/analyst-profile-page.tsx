@@ -14,8 +14,7 @@ type Prediction = {
   entryDate: string;
   thesis: string;
   createdAt: string;
-  expiryAt: string;
-  status: "ACTIVE" | "SETTLED";
+  status: "OPEN" | "CLOSED";
   markPrice?: number | null;
   markPriceDate?: string | null;
   markDisplayPercent?: number | null;
@@ -34,8 +33,8 @@ type ProfilePayload = {
     bio: string;
     stats: {
       totalPredictions: number;
-      activePredictions: number;
-      settledPredictions: number;
+      openPredictions: number;
+      closedPredictions: number;
       totalScore: number;
     };
   };
@@ -51,7 +50,7 @@ function scoreText(score: number): string {
 export function AnalystProfilePage({ userId }: { userId: string }) {
   const { user, getIdToken } = useAuth();
   const isOwner = Boolean(user && user.uid === userId);
-  const [status, setStatus] = useState<"ALL" | "ACTIVE" | "SETTLED">("ALL");
+  const [status, setStatus] = useState<"ALL" | "OPEN" | "CLOSED">("ALL");
   const [payload, setPayload] = useState<ProfilePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -296,12 +295,12 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
             <p className="font-semibold text-cyan-100">{payload.profile.stats.totalPredictions}</p>
           </div>
           <div className="rounded-xl border border-white/10 p-3">
-            <p className="text-slate-400">Active</p>
-            <p className="font-semibold text-cyan-100">{payload.profile.stats.activePredictions}</p>
+            <p className="text-slate-400">Open</p>
+            <p className="font-semibold text-cyan-100">{payload.profile.stats.openPredictions}</p>
           </div>
           <div className="rounded-xl border border-white/10 p-3">
-            <p className="text-slate-400">Settled</p>
-            <p className="font-semibold text-cyan-100">{payload.profile.stats.settledPredictions}</p>
+            <p className="text-slate-400">Closed</p>
+            <p className="font-semibold text-cyan-100">{payload.profile.stats.closedPredictions}</p>
           </div>
         </div>
       </section>
@@ -310,7 +309,7 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Prediction history</h2>
           <div className="inline-flex rounded-full border border-slate-700 bg-slate-800/70 p-1 text-xs">
-            {(["ALL", "ACTIVE", "SETTLED"] as const).map((option) => (
+            {(["ALL", "OPEN", "CLOSED"] as const).map((option) => (
               <button
                 key={option}
                 type="button"
@@ -342,7 +341,7 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
                 {sanitizePredictionThesis(prediction.thesis) || "No thesis provided."}
               </p>
               <p className="mt-1 break-words text-xs text-slate-400">
-                Created {new Date(prediction.createdAt).toLocaleString()} / Expires {new Date(prediction.expiryAt).toLocaleDateString()}
+                Created {new Date(prediction.createdAt).toLocaleString()}
               </p>
               {prediction.result ? (
                 <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>

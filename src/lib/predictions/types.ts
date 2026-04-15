@@ -1,5 +1,5 @@
 export const PREDICTION_DIRECTIONS = ["UP", "DOWN"] as const;
-export const PREDICTION_STATUSES = ["ACTIVE", "SETTLED"] as const;
+export const PREDICTION_STATUSES = ["OPEN", "CLOSED"] as const;
 export const PREDICTION_VISIBILITIES = ["PUBLIC", "PRIVATE"] as const;
 
 export type PredictionDirection = (typeof PREDICTION_DIRECTIONS)[number];
@@ -8,8 +8,8 @@ export type PredictionVisibility = (typeof PREDICTION_VISIBILITIES)[number];
 
 export type UserStats = {
   totalPredictions: number;
-  activePredictions: number;
-  settledPredictions: number;
+  openPredictions: number;
+  closedPredictions: number;
   totalScore: number;
 };
 
@@ -48,8 +48,6 @@ export type Prediction = {
   entryDate: string;
   entryTime: string;
   entryCapturedAt: string;
-  expiryDate: string;
-  expiryAt: string;
   thesis: string;
   status: PredictionStatus;
   visibility: PredictionVisibility;
@@ -63,7 +61,7 @@ export type Prediction = {
   markReturnValue?: number | null;
   markScore?: number | null;
   markDisplayPercent?: number | null;
-  settledAt: string | null;
+  closedAt: string | null;
   result: PredictionResult | null;
 };
 
@@ -81,7 +79,6 @@ export type PredictionComment = {
 export type CreatePredictionInput = {
   ticker: string;
   direction: PredictionDirection;
-  expiryAt: string;
   thesis?: string;
   visibility?: PredictionVisibility;
 };

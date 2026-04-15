@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
   const cursorCreatedAt = request.nextUrl.searchParams.get("cursorCreatedAt")?.trim() ?? "";
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
 
-  if (statusParam && statusParam !== "ACTIVE" && statusParam !== "SETTLED") {
-    return NextResponse.json({ error: "status must be ACTIVE or SETTLED" }, { status: 400 });
+  if (statusParam && statusParam !== "OPEN" && statusParam !== "CLOSED") {
+    return NextResponse.json({ error: "status must be OPEN or CLOSED" }, { status: 400 });
   }
 
   const includePrivate = includePrivateParam === "true";
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await listPredictions({
-      status: statusParam === "ACTIVE" || statusParam === "SETTLED" ? statusParam : undefined,
+      status: statusParam === "OPEN" || statusParam === "CLOSED" ? statusParam : undefined,
       userId: userId || undefined,
       includePrivate: includePrivateForQuery,
       cursorCreatedAt: cursorCreatedAt || undefined,

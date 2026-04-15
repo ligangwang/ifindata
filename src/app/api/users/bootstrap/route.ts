@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
       role: "user",
       stats: {
         totalPredictions: 0,
-        activePredictions: 0,
-        settledPredictions: 0,
+        openPredictions: 0,
+        closedPredictions: 0,
         totalScore: 0,
       },
       settings: {

@@ -2,9 +2,6 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { getLatestPrice } from "@/lib/predictions/market-data";
 import {
-  computeDisplayPercent,
-  computeReturnValue,
-  computeScoreFromReturn,
   isPredictionDirection,
   isPredictionVisibility,
   normalizeTicker,
@@ -13,7 +10,6 @@ import {
   type CreatePredictionInput,
   type Prediction,
   type PredictionComment,
-  type PredictionResult,
 } from "@/lib/predictions/types";
 
 type AuthedUser = {
@@ -24,7 +20,7 @@ type AuthedUser = {
 
 type ListPredictionsInput = {
   limit?: number;
-  status?: "ACTIVE" | "SETTLED";
+  status?: "OPEN" | "CLOSED";
   userId?: string;
   cursorCreatedAt?: string;
   includePrivate?: boolean;
@@ -113,7 +109,6 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
   const input = raw as Record<string, unknown>;
   const ticker = typeof input.ticker === "string" ? normalizeTicker(input.ticker) : "";
   const direction = input.direction;
-  const expiryAt = typeof input.expiryAt === "string" ? input.expiryAt : "";
   const thesis = typeof input.thesis === "string" ? sanitizePredictionThesis(input.thesis) : "";
   const visibility = input.visibility;
 
@@ -125,15 +120,6 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
     throw new Error("direction must be UP or DOWN");
   }
 
-  const expiry = new Date(expiryAt);
-  if (!expiryAt || Number.isNaN(expiry.getTime())) {
-    throw new Error("expiryAt must be an ISO timestamp");
-  }
-
-  if (expiry.getTime() <= Date.now()) {
-    throw new Error("expiryAt must be in the future");
-  }
-
   if (thesis.length > 2000) {
     throw new Error("thesis must be <= 2000 chars");
   }
@@ -143,7 +129,6 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
   return {
     ticker,
     direction,
-    expiryAt,
     thesis,
     visibility: resolvedVisibility,
   };
@@ -154,7 +139,6 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
   const nowIso = new Date().toISOString();
   const quote = await getLatestPrice(input.ticker);
   const { entryDate, entryTime } = splitIsoDateTime(quote.capturedAt);
-  const { entryDate: expiryDate } = splitIsoDateTime(input.expiryAt);
   const duplicateKey = [user.uid, input.ticker, entryDate].join("__");
   const predictionRef = db.collection("predictions").doc();
   const userRef = db.collection("users").doc(user.uid);
@@ -184,10 +168,8 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       entryDate,
       entryTime,
       entryCapturedAt: quote.capturedAt,
-      expiryDate,
-      expiryAt: input.expiryAt,
       thesis: sanitizePredictionThesis(input.thesis),
-      status: "ACTIVE",
+      status: "OPEN",
       visibility: input.visibility ?? "PUBLIC",
       commentCount: 0,
       createdAt: nowIso,
@@ -199,7 +181,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       markReturnValue: null,
       markScore: null,
       markDisplayPercent: null,
-      settledAt: null,
+      closedAt: null,
       result: null,
     };
 
@@ -210,7 +192,6 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       ticker: input.ticker,
       direction: input.direction,
       entryDate,
-      expiryDate,
       createdAt: nowIso,
     });
 
@@ -220,13 +201,13 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
         updatedAt: nowIso,
         role: "analyst",
         "stats.totalPredictions": FieldValue.increment(1),
-        "stats.activePredictions": FieldValue.increment(1),
+        "stats.openPredictions": FieldValue.increment(1),
       });
     } else {
       tx.update(userRef, {
         updatedAt: nowIso,
         "stats.totalPredictions": FieldValue.increment(1),
-        "stats.activePredictions": FieldValue.increment(1),
+        "stats.openPredictions": FieldValue.increment(1),
       });
     }
   });
@@ -284,98 +265,4 @@ export async function addComment(predictionId: string, content: string, user: Au
   });
 
   return { id: commentRef.id };
-}
-
-function assertActivePrediction(prediction: Record<string, unknown>): void {
-  if (prediction.status !== "ACTIVE") {
-    throw new Error("Prediction is already settled");
-  }
-
-  const expiryAt = typeof prediction.expiryAt === "string" ? prediction.expiryAt : "";
-  const expiry = new Date(expiryAt);
-
-  if (!expiryAt || Number.isNaN(expiry.getTime())) {
-    throw new Error("Prediction has invalid expiryAt");
-  }
-
-  if (expiry.getTime() > Date.now()) {
-    throw new Error("Prediction has not expired yet");
-  }
-}
-
-export async function settleExpiredPredictions(limit: number = 100): Promise<{ settled: number }> {
-  const db = getAdminFirestore();
-  const nowIso = new Date().toISOString();
-
-  const snapshot = await db
-    .collection("predictions")
-    .where("status", "==", "ACTIVE")
-    .where("expiryAt", "<=", nowIso)
-    .limit(Math.max(1, Math.min(limit, 500)))
-    .get();
-
-  let settled = 0;
-
-  for (const doc of snapshot.docs) {
-    const data = doc.data() as Record<string, unknown>;
-
-    try {
-      assertActivePrediction(data);
-    } catch {
-      continue;
-    }
-
-    const ticker = typeof data.ticker === "string" ? normalizeTicker(data.ticker) : "";
-    const userId = typeof data.userId === "string" ? data.userId : "";
-    const direction = data.direction;
-    const entryPrice = Number(data.entryPrice);
-
-    if (!ticker || !userId || !isPredictionDirection(direction) || !Number.isFinite(entryPrice) || entryPrice <= 0) {
-      continue;
-    }
-
-    const exitQuote = await getLatestPrice(ticker);
-    const returnValue = computeReturnValue(direction, entryPrice, exitQuote.price);
-    const score = computeScoreFromReturn(returnValue);
-    const result: PredictionResult = {
-      exitPrice: exitQuote.price,
-      exitPriceSource: exitQuote.source,
-      returnValue,
-      score,
-      displayPercent: computeDisplayPercent(score),
-    };
-
-    const userRef = db.collection("users").doc(userId);
-
-    await db.runTransaction(async (tx) => {
-      const [predictionSnapshot, userSnapshot] = await Promise.all([tx.get(doc.ref), tx.get(userRef)]);
-
-      if (!predictionSnapshot.exists || !userSnapshot.exists) {
-        return;
-      }
-
-      const latest = predictionSnapshot.data() as Record<string, unknown>;
-      if (latest.status !== "ACTIVE") {
-        return;
-      }
-
-      tx.update(doc.ref, {
-        status: "SETTLED",
-        settledAt: nowIso,
-        updatedAt: nowIso,
-        result,
-      });
-
-      tx.update(userRef, {
-        updatedAt: nowIso,
-        "stats.activePredictions": FieldValue.increment(-1),
-        "stats.settledPredictions": FieldValue.increment(1),
-        "stats.totalScore": FieldValue.increment(score),
-      });
-
-      settled += 1;
-    });
-  }
-
-  return { settled };
 }

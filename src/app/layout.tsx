@@ -19,7 +19,7 @@ const ibmPlexSans = IBM_Plex_Sans({
 
 export const metadata: Metadata = {
   title: "Be the analyst. Prove it.",
-  description: "Publish stock predictions, settle outcomes, and climb the analyst leaderboard.",
+  description: "Open stock theses, track marked performance, and climb the analyst leaderboard.",
 };
 
 export default function RootLayout({

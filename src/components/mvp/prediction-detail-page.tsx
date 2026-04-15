@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
+import { DirectionBadge, formatScorePercent, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
 import { sanitizePredictionThesis } from "@/lib/predictions/types";
 
 type PredictionDetail = {
@@ -17,6 +18,10 @@ type PredictionDetail = {
   thesis: string;
   status: "ACTIVE" | "SETTLED";
   createdAt: string;
+  markPrice?: number | null;
+  markPriceDate?: string | null;
+  markDisplayPercent?: number | null;
+  commentCount: number;
   result: {
     score: number;
     exitPrice: number;
@@ -31,11 +36,6 @@ type PredictionComment = {
   content: string;
   createdAt: string;
 };
-
-function scoreText(score: number): string {
-  const sign = score > 0 ? "+" : "";
-  return `${sign}${(score / 100).toFixed(2)}%`;
-}
 
 export function PredictionDetailPage({ predictionId }: { predictionId: string }) {
   const { getIdToken, user } = useAuth();
@@ -122,13 +122,16 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
     <main className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
-            {prediction.ticker} · {prediction.direction}
+          <h1 className="flex flex-wrap items-center gap-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
+            <span>{prediction.ticker}</span>
+            <span className="text-slate-500">/</span>
+            <DirectionBadge direction={prediction.direction} />
           </h1>
           <p className="text-sm text-slate-300">{prediction.status}</p>
         </div>
 
         <p className="text-sm text-slate-200">{thesis || "No thesis provided."}</p>
+        <PredictionMarkSummary prediction={prediction} />
 
         <div className="mt-4 grid gap-1 text-sm text-slate-300 md:grid-cols-2">
           <p>
@@ -148,7 +151,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
 
         {prediction.result ? (
           <div className="mt-4 rounded-xl border border-emerald-400/35 bg-emerald-900/20 p-3 text-sm text-emerald-50">
-            Settled at {prediction.result.exitPrice.toFixed(2)} with score {scoreText(prediction.result.score)}.
+            Settled at {prediction.result.exitPrice.toFixed(2)} with score {formatScorePercent(prediction.result.score)}.
           </div>
         ) : null}
       </section>
@@ -161,7 +164,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             <article key={comment.id} className="rounded-xl border border-white/10 p-3">
               <p className="text-sm text-slate-100">{comment.content}</p>
               <p className="mt-2 text-xs text-slate-400">
-                {comment.authorNickname ? `@${comment.authorNickname}` : comment.authorDisplayName ?? "Anonymous"} · {new Date(comment.createdAt).toLocaleString()}
+                {comment.authorNickname ? `@${comment.authorNickname}` : comment.authorDisplayName ?? "Anonymous"} / {new Date(comment.createdAt).toLocaleString()}
               </p>
             </article>
           ))}

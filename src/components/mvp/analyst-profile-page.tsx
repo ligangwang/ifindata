@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
+import { DirectionBadge, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
 import { sanitizePredictionThesis } from "@/lib/predictions/types";
 
 type Prediction = {
@@ -13,6 +14,10 @@ type Prediction = {
   createdAt: string;
   expiryAt: string;
   status: "ACTIVE" | "SETTLED";
+  markPrice?: number | null;
+  markPriceDate?: string | null;
+  markDisplayPercent?: number | null;
+  commentCount: number;
   result: {
     score: number;
   } | null;
@@ -324,18 +329,23 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
               href={`/predictions/${prediction.id}`}
               className="rounded-xl border border-white/10 p-3 hover:border-cyan-300/60"
             >
-              <p className="text-sm text-slate-100">
-                {prediction.ticker} · {prediction.direction} · {prediction.status}
+              <p className="flex flex-wrap items-center gap-1 text-sm text-slate-100">
+                <span>{prediction.ticker}</span>
+                <span className="text-slate-500">/</span>
+                <DirectionBadge direction={prediction.direction} />
+                <span className="text-slate-500">/</span>
+                <span>{prediction.status}</span>
               </p>
               <p className="mt-1 line-clamp-2 break-words text-xs text-slate-300">
                 {sanitizePredictionThesis(prediction.thesis) || "No thesis provided."}
               </p>
               <p className="mt-1 break-words text-xs text-slate-400">
-                Created {new Date(prediction.createdAt).toLocaleString()} · Expires {new Date(prediction.expiryAt).toLocaleDateString()}
+                Created {new Date(prediction.createdAt).toLocaleString()} / Expires {new Date(prediction.expiryAt).toLocaleDateString()}
               </p>
               {prediction.result ? (
                 <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>
               ) : null}
+              <PredictionMarkSummary prediction={prediction} />
             </Link>
           ))}
 
@@ -356,3 +366,4 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
     </main>
   );
 }
+

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { DirectionBadge, formatScorePercent, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
 import { sanitizePredictionThesis } from "@/lib/predictions/types";
 
 type Prediction = {
@@ -11,10 +12,16 @@ type Prediction = {
   authorNickname: string | null;
   ticker: string;
   direction: "UP" | "DOWN";
+  entryPrice: number;
+  entryDate: string;
   thesis: string;
   status: "ACTIVE" | "SETTLED";
   createdAt: string;
   expiryAt: string;
+  markPrice?: number | null;
+  markPriceDate?: string | null;
+  markDisplayPercent?: number | null;
+  commentCount: number;
   result: {
     score: number;
   } | null;
@@ -24,11 +31,6 @@ type FeedResponse = {
   items: Prediction[];
   nextCursor: string | null;
 };
-
-function formatScore(score: number): string {
-  const sign = score > 0 ? "+" : "";
-  return `${sign}${(score / 100).toFixed(2)}%`;
-}
 
 export function PredictionsFeed({ title }: { title: string }) {
   const [status, setStatus] = useState<"ALL" | "ACTIVE" | "SETTLED">("ALL");
@@ -139,9 +141,11 @@ export function PredictionsFeed({ title }: { title: string }) {
                 <div className="mb-2 flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <Link
                     href={`/ticker/${item.ticker}`}
-                    className="w-fit font-semibold text-cyan-200 hover:text-cyan-100"
+                    className="flex w-fit items-center gap-1 font-semibold text-cyan-200 hover:text-cyan-100"
                   >
-                    {item.ticker} · {item.direction}
+                    <span>{item.ticker}</span>
+                    <span className="text-slate-500">/</span>
+                    <DirectionBadge direction={item.direction} />
                   </Link>
                   <p className="text-xs text-slate-400 sm:text-sm">{new Date(item.createdAt).toLocaleString()}</p>
                 </div>
@@ -163,9 +167,10 @@ export function PredictionsFeed({ title }: { title: string }) {
                   </p>
                   <p>
                     {item.status}
-                    {item.result ? ` · ${formatScore(item.result.score)}` : ""}
+                    {item.result ? ` / ${formatScorePercent(item.result.score)}` : ""}
                   </p>
                 </div>
+                <PredictionMarkSummary prediction={item} />
                 <p className="mt-1 text-xs text-slate-400">Expires {new Date(item.expiryAt).toLocaleDateString()}</p>
               </div>
             );

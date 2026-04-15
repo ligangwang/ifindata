@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { DirectionBadge, formatScorePercent, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
 
 type Prediction = {
   id: string;
@@ -9,10 +10,16 @@ type Prediction = {
   authorDisplayName: string | null;
   authorNickname: string | null;
   direction: "UP" | "DOWN";
+  entryPrice: number;
+  entryDate: string;
   thesis: string;
   status: "ACTIVE" | "SETTLED";
   createdAt: string;
   expiryAt: string;
+  markPrice?: number | null;
+  markPriceDate?: string | null;
+  markDisplayPercent?: number | null;
+  commentCount: number;
   result: {
     score: number;
   } | null;
@@ -22,11 +29,6 @@ type TickerResponse = {
   items: Prediction[];
   ticker: string;
 };
-
-function scoreText(score: number): string {
-  const sign = score > 0 ? "+" : "";
-  return `${sign}${(score / 100).toFixed(2)}%`;
-}
 
 export function TickerPage({ ticker }: { ticker: string }) {
   const [payload, setPayload] = useState<TickerResponse | null>(null);
@@ -81,8 +83,10 @@ export function TickerPage({ ticker }: { ticker: string }) {
               className="rounded-xl border border-white/10 p-3 hover:border-cyan-300/60"
             >
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm font-semibold text-cyan-200">
-                  {prediction.direction} · {prediction.status}
+                <p className="flex items-center gap-1 text-sm font-semibold text-cyan-200">
+                  <DirectionBadge direction={prediction.direction} />
+                  <span className="text-slate-500">/</span>
+                  <span>{prediction.status}</span>
                 </p>
                 <p className="text-xs text-slate-400">{new Date(prediction.createdAt).toLocaleString()}</p>
               </div>
@@ -100,8 +104,9 @@ export function TickerPage({ ticker }: { ticker: string }) {
                     prediction.authorNickname ? `@${prediction.authorNickname}` : prediction.authorDisplayName ?? "Anonymous"
                   )}
                 </p>
-                {prediction.result ? <p className="text-emerald-200">Result {scoreText(prediction.result.score)}</p> : null}
+                {prediction.result ? <p className="text-emerald-200">Result {formatScorePercent(prediction.result.score)}</p> : null}
               </div>
+              <PredictionMarkSummary prediction={prediction} />
             </article>
           ))}
 

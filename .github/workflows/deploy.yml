@@ -66,6 +66,9 @@ jobs:
       CLOUD_BUILD_SOURCE_STAGING_DIR: ${{ vars.CLOUD_BUILD_SOURCE_STAGING_DIR }}
       FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
       FINNHUB_API_URL: ${{ vars.FINNHUB_API_URL }}
+      TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+      TWELVE_DATA_API_URL: ${{ vars.TWELVE_DATA_API_URL }}
+      INTERNAL_API_TOKEN: ${{ secrets.INTERNAL_API_TOKEN }}
       NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
       NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
       NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
@@ -137,6 +140,9 @@ jobs:
           APP_ENVIRONMENT: staging
           FINNHUB_API_KEY: ${{ env.FINNHUB_API_KEY }}
           FINNHUB_API_URL: ${{ env.FINNHUB_API_URL }}
+          TWELVE_DATA_API_KEY: ${{ env.TWELVE_DATA_API_KEY }}
+          TWELVE_DATA_API_URL: ${{ env.TWELVE_DATA_API_URL }}
+          INTERNAL_API_TOKEN: ${{ env.INTERNAL_API_TOKEN }}
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ env.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ env.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
@@ -150,6 +156,56 @@ jobs:
         id: staging-url
         run: |
           echo "url=$(gcloud run services describe $CLOUD_RUN_SERVICE_STAGING --region $GCP_REGION --format='value(status.url)')" >> "$GITHUB_OUTPUT"
+
+      - name: Upsert staging EOD scheduler
+        env:
+          CLOUD_RUN_URL: ${{ steps.staging-url.outputs.url }}
+          EOD_MAINTENANCE_SCHEDULER_ENABLED: ${{ vars.EOD_MAINTENANCE_SCHEDULER_ENABLED }}
+          EOD_MAINTENANCE_SCHEDULER_JOB: ${{ vars.EOD_MAINTENANCE_SCHEDULER_JOB }}
+          EOD_MAINTENANCE_SCHEDULER_LIMIT: ${{ vars.EOD_MAINTENANCE_SCHEDULER_LIMIT }}
+          EOD_MAINTENANCE_SCHEDULER_DRY_RUN: ${{ vars.EOD_MAINTENANCE_SCHEDULER_DRY_RUN }}
+          INTERNAL_API_TOKEN: ${{ env.INTERNAL_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ "${EOD_MAINTENANCE_SCHEDULER_ENABLED:-0}" != "1" ]]; then
+            echo "EOD scheduler provisioning disabled for staging."
+            exit 0
+          fi
+          if [[ -z "${INTERNAL_API_TOKEN:-}" ]]; then
+            echo "INTERNAL_API_TOKEN is required to provision the EOD scheduler" >&2
+            exit 1
+          fi
+
+          gcloud services enable cloudscheduler.googleapis.com --project "$GCP_PROJECT_ID"
+
+          job_name="${EOD_MAINTENANCE_SCHEDULER_JOB:-daily-eod-maintenance-staging}"
+          limit="${EOD_MAINTENANCE_SCHEDULER_LIMIT:-500}"
+          dry_run="${EOD_MAINTENANCE_SCHEDULER_DRY_RUN:-false}"
+          body="$(jq -nc --argjson limit "$limit" --argjson dryRun "$dry_run" '{ limit: $limit, dryRun: $dryRun }')"
+          uri="${CLOUD_RUN_URL}/api/internal/daily-eod-maintenance"
+          headers="Authorization=Bearer ${INTERNAL_API_TOKEN},Content-Type=application/json"
+
+          if gcloud scheduler jobs describe "$job_name" --project "$GCP_PROJECT_ID" --location "$GCP_REGION" >/dev/null 2>&1; then
+            gcloud scheduler jobs update http "$job_name" \
+              --project "$GCP_PROJECT_ID" \
+              --location "$GCP_REGION" \
+              --schedule "0 20 * * 1-5" \
+              --time-zone "America/New_York" \
+              --uri "$uri" \
+              --http-method POST \
+              --headers "$headers" \
+              --message-body "$body"
+          else
+            gcloud scheduler jobs create http "$job_name" \
+              --project "$GCP_PROJECT_ID" \
+              --location "$GCP_REGION" \
+              --schedule "0 20 * * 1-5" \
+              --time-zone "America/New_York" \
+              --uri "$uri" \
+              --http-method POST \
+              --headers "$headers" \
+              --message-body "$body"
+          fi
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
@@ -181,6 +237,9 @@ jobs:
       CLOUD_BUILD_SOURCE_STAGING_DIR: ${{ vars.CLOUD_BUILD_SOURCE_STAGING_DIR }}
       FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
       FINNHUB_API_URL: ${{ vars.FINNHUB_API_URL }}
+      TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+      TWELVE_DATA_API_URL: ${{ vars.TWELVE_DATA_API_URL }}
+      INTERNAL_API_TOKEN: ${{ secrets.INTERNAL_API_TOKEN }}
       NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
       NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
       NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
@@ -252,6 +311,9 @@ jobs:
           APP_ENVIRONMENT: production
           FINNHUB_API_KEY: ${{ env.FINNHUB_API_KEY }}
           FINNHUB_API_URL: ${{ env.FINNHUB_API_URL }}
+          TWELVE_DATA_API_KEY: ${{ env.TWELVE_DATA_API_KEY }}
+          TWELVE_DATA_API_URL: ${{ env.TWELVE_DATA_API_URL }}
+          INTERNAL_API_TOKEN: ${{ env.INTERNAL_API_TOKEN }}
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ env.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ env.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
@@ -265,6 +327,56 @@ jobs:
         id: production-url
         run: |
           echo "url=$(gcloud run services describe $CLOUD_RUN_SERVICE_PRODUCTION --region $GCP_REGION --format='value(status.url)')" >> "$GITHUB_OUTPUT"
+
+      - name: Upsert production EOD scheduler
+        env:
+          CLOUD_RUN_URL: ${{ steps.production-url.outputs.url }}
+          EOD_MAINTENANCE_SCHEDULER_ENABLED: ${{ vars.EOD_MAINTENANCE_SCHEDULER_ENABLED }}
+          EOD_MAINTENANCE_SCHEDULER_JOB: ${{ vars.EOD_MAINTENANCE_SCHEDULER_JOB }}
+          EOD_MAINTENANCE_SCHEDULER_LIMIT: ${{ vars.EOD_MAINTENANCE_SCHEDULER_LIMIT }}
+          EOD_MAINTENANCE_SCHEDULER_DRY_RUN: ${{ vars.EOD_MAINTENANCE_SCHEDULER_DRY_RUN }}
+          INTERNAL_API_TOKEN: ${{ env.INTERNAL_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ "${EOD_MAINTENANCE_SCHEDULER_ENABLED:-0}" != "1" ]]; then
+            echo "EOD scheduler provisioning disabled for production."
+            exit 0
+          fi
+          if [[ -z "${INTERNAL_API_TOKEN:-}" ]]; then
+            echo "INTERNAL_API_TOKEN is required to provision the EOD scheduler" >&2
+            exit 1
+          fi
+
+          gcloud services enable cloudscheduler.googleapis.com --project "$GCP_PROJECT_ID"
+
+          job_name="${EOD_MAINTENANCE_SCHEDULER_JOB:-daily-eod-maintenance-production}"
+          limit="${EOD_MAINTENANCE_SCHEDULER_LIMIT:-500}"
+          dry_run="${EOD_MAINTENANCE_SCHEDULER_DRY_RUN:-false}"
+          body="$(jq -nc --argjson limit "$limit" --argjson dryRun "$dry_run" '{ limit: $limit, dryRun: $dryRun }')"
+          uri="${CLOUD_RUN_URL}/api/internal/daily-eod-maintenance"
+          headers="Authorization=Bearer ${INTERNAL_API_TOKEN},Content-Type=application/json"
+
+          if gcloud scheduler jobs describe "$job_name" --project "$GCP_PROJECT_ID" --location "$GCP_REGION" >/dev/null 2>&1; then
+            gcloud scheduler jobs update http "$job_name" \
+              --project "$GCP_PROJECT_ID" \
+              --location "$GCP_REGION" \
+              --schedule "0 20 * * 1-5" \
+              --time-zone "America/New_York" \
+              --uri "$uri" \
+              --http-method POST \
+              --headers "$headers" \
+              --message-body "$body"
+          else
+            gcloud scheduler jobs create http "$job_name" \
+              --project "$GCP_PROJECT_ID" \
+              --location "$GCP_REGION" \
+              --schedule "0 20 * * 1-5" \
+              --time-zone "America/New_York" \
+              --uri "$uri" \
+              --http-method POST \
+              --headers "$headers" \
+              --message-body "$body"
+          fi
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium

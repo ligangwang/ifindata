@@ -15,9 +15,8 @@ type PredictionDetail = {
   direction: "UP" | "DOWN";
   entryPrice: number;
   entryDate: string;
-  expiryAt: string;
   thesis: string;
-  status: "ACTIVE" | "SETTLED";
+  status: "OPEN" | "CLOSED";
   createdAt: string;
   markPrice?: number | null;
   markPriceDate?: string | null;
@@ -147,12 +146,11 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           </p>
           <p>Created: {new Date(prediction.createdAt).toLocaleString()}</p>
           <p>Entry: {prediction.entryPrice.toFixed(2)} @ {prediction.entryDate}</p>
-          <p>Expiry: {new Date(prediction.expiryAt).toLocaleDateString()}</p>
         </div>
 
         {prediction.result ? (
           <div className="mt-4 rounded-xl border border-emerald-400/35 bg-emerald-900/20 p-3 text-sm text-emerald-50">
-            Settled at {prediction.result.exitPrice.toFixed(2)} with score {formatScorePercent(prediction.result.score)}.
+            Closed at {prediction.result.exitPrice.toFixed(2)} with score {formatScorePercent(prediction.result.score)}.
           </div>
         ) : null}
       </section>

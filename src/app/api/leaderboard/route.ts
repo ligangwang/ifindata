@@ -6,7 +6,7 @@ type LeaderboardUser = {
   displayName: string | null;
   photoURL: string | null;
   totalScore: number;
-  settledPredictions: number;
+  closedPredictions: number;
 };
 
 function asNumber(value: unknown): number {
@@ -22,7 +22,7 @@ function parseLimit(raw: string | null): number {
   return Math.max(1, Math.min(100, Math.trunc(parsed)));
 }
 
-function parseMinSettled(raw: string | null): number {
+function parseMinClosed(raw: string | null): number {
   const parsed = Number(raw ?? "1");
   if (!Number.isFinite(parsed)) {
     return 1;
@@ -34,7 +34,7 @@ function parseMinSettled(raw: string | null): number {
 export async function GET(request: NextRequest) {
   const db = getAdminFirestore();
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
-  const minSettled = parseMinSettled(request.nextUrl.searchParams.get("minSettled"));
+  const minClosed = parseMinClosed(request.nextUrl.searchParams.get("minClosed"));
 
   try {
     const snapshot = await db
@@ -48,10 +48,10 @@ export async function GET(request: NextRequest) {
     for (const doc of snapshot.docs) {
       const data = doc.data() as Record<string, unknown>;
       const stats = (data.stats as Record<string, unknown> | undefined) ?? {};
-      const settledPredictions = asNumber(stats.settledPredictions);
+      const closedPredictions = asNumber(stats.closedPredictions);
       const totalScore = asNumber(stats.totalScore);
 
-      if (settledPredictions < minSettled) {
+      if (closedPredictions < minClosed) {
         continue;
       }
 
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
         displayName: (data.displayName as string | null | undefined) ?? null,
         photoURL: (data.photoURL as string | null | undefined) ?? null,
         totalScore,
-        settledPredictions,
+        closedPredictions,
       });
 
       if (users.length >= limit) {
@@ -72,12 +72,12 @@ export async function GET(request: NextRequest) {
       if (b.totalScore !== a.totalScore) {
         return b.totalScore - a.totalScore;
       }
-      return b.settledPredictions - a.settledPredictions;
+      return b.closedPredictions - a.closedPredictions;
     });
 
     return NextResponse.json({
       items: users,
-      minSettled,
+      minClosed,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch leaderboard";

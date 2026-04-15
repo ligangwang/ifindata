@@ -13,9 +13,8 @@ type Prediction = {
   entryPrice: number;
   entryDate: string;
   thesis: string;
-  status: "ACTIVE" | "SETTLED";
+  status: "OPEN" | "CLOSED";
   createdAt: string;
-  expiryAt: string;
   markPrice?: number | null;
   markPriceDate?: string | null;
   markDisplayPercent?: number | null;

@@ -7,12 +7,12 @@ type LeaderboardEntry = {
   userId: string;
   displayName: string | null;
   totalScore: number;
-  settledPredictions: number;
+  closedPredictions: number;
 };
 
 type LeaderboardResponse = {
   items: LeaderboardEntry[];
-  minSettled: number;
+  minClosed: number;
 };
 
 function scoreText(score: number): string {
@@ -27,7 +27,7 @@ export function LeaderboardPage() {
   useEffect(() => {
     let cancelled = false;
 
-    void fetch("/api/leaderboard?limit=100&minSettled=1")
+    void fetch("/api/leaderboard?limit=100&minClosed=1")
       .then(async (response) => {
         if (!response.ok) {
           throw new Error("Unable to load leaderboard.");
@@ -61,7 +61,7 @@ export function LeaderboardPage() {
     <main className="mx-auto w-full max-w-4xl px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
         <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">Leaderboard</h1>
-        <p className="mb-4 text-sm text-slate-300">Only analysts with at least {payload.minSettled} settled predictions are ranked.</p>
+        <p className="mb-4 text-sm text-slate-300">Only analysts with at least {payload.minClosed} closed positions are ranked.</p>
 
         <div className="grid gap-2">
           {payload.items.map((entry, index) => (
@@ -73,7 +73,7 @@ export function LeaderboardPage() {
               <p className="text-sm font-semibold text-cyan-200">#{index + 1}</p>
               <p className="text-sm text-slate-100">{entry.displayName ?? "Anonymous"}</p>
               <p className="text-sm text-emerald-200 sm:text-right">{scoreText(entry.totalScore)}</p>
-              <p className="text-xs text-slate-400 sm:text-right">{entry.settledPredictions} settled</p>
+              <p className="text-xs text-slate-400 sm:text-right">{entry.closedPredictions} closed</p>
             </Link>
           ))}
 

@@ -2,6 +2,8 @@ import type { PredictionDirection } from "@/lib/predictions/types";
 
 export type PredictionMarkFields = {
   direction: PredictionDirection;
+  entryPrice?: number | null;
+  entryDate?: string | null;
   markPrice?: number | null;
   markPriceDate?: string | null;
   markDisplayPercent?: number | null;
@@ -43,9 +45,15 @@ export function DirectionBadge({ direction }: { direction: PredictionDirection }
 }
 
 export function PredictionMarkSummary({ prediction }: { prediction: PredictionMarkFields }) {
+  const entryPrice = prediction.entryPrice;
+  const entryDate = prediction.entryDate;
   const markPrice = prediction.markPrice;
   const markPriceDate = prediction.markPriceDate;
   const markDisplayPercent = prediction.markDisplayPercent;
+  const hasEntryData =
+    typeof entryPrice === "number" &&
+    typeof entryDate === "string" &&
+    entryDate.length > 0;
   const hasMarkData =
     typeof markPrice === "number" &&
     typeof markDisplayPercent === "number" &&
@@ -54,6 +62,7 @@ export function PredictionMarkSummary({ prediction }: { prediction: PredictionMa
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+      {hasEntryData ? <span>Entry {entryPrice.toFixed(2)} on {entryDate}</span> : null}
       {hasMarkData ? (
         <>
           <span>

@@ -309,8 +309,8 @@ async function fetchTwelveDataEodPrices(
     const url = new URL(`${config.apiUrl}/time_series`);
     url.searchParams.set("symbol", tickerChunk.join(","));
     url.searchParams.set("interval", "1day");
-    url.searchParams.set("start_date", requestedDate);
-    url.searchParams.set("end_date", requestedDate);
+    url.searchParams.set("start_date", `${requestedDate} 00:00:00`);
+    url.searchParams.set("end_date", `${requestedDate} 23:59:59`);
     url.searchParams.set("apikey", config.apiKey);
 
     const response = await fetch(url, { cache: "no-store" });

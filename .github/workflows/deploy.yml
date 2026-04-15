@@ -193,7 +193,7 @@ jobs:
               --time-zone "America/New_York" \
               --uri "$uri" \
               --http-method POST \
-              --headers "$headers" \
+              --update-headers "$headers" \
               --message-body "$body"
           else
             gcloud scheduler jobs create http "$job_name" \
@@ -364,7 +364,7 @@ jobs:
               --time-zone "America/New_York" \
               --uri "$uri" \
               --http-method POST \
-              --headers "$headers" \
+              --update-headers "$headers" \
               --message-body "$body"
           else
             gcloud scheduler jobs create http "$job_name" \

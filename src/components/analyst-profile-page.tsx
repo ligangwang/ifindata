@@ -316,10 +316,15 @@ export function AnalystProfilePage({
               <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
                 {payload.profile.nickname ? `@${payload.profile.nickname}` : preferredName}
               </h1>
-              <p className="mt-1 text-xs text-slate-400">
-                {countText(payload.profile.stats.followersCount, "follower")} ·{" "}
-                {countText(payload.profile.stats.followingCount, "following", "following")}
-              </p>
+              <nav className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400" aria-label="Profile follow lists">
+                <Link href={`/analysts/${userId}/followers`} className="hover:text-cyan-200">
+                  {countText(payload.profile.stats.followersCount, "follower")}
+                </Link>
+                <span aria-hidden="true">/</span>
+                <Link href={`/analysts/${userId}/following`} className="hover:text-cyan-200">
+                  {countText(payload.profile.stats.followingCount, "following", "following")}
+                </Link>
+              </nav>
             </div>
           </div>
           {isOwner && !editing ? (

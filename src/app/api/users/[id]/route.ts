@@ -11,6 +11,8 @@ type UserStats = {
   closedPredictions: number;
   canceledPredictions: number;
   totalScore: number;
+  followersCount: number;
+  followingCount: number;
 };
 
 function coerceStats(raw: unknown): UserStats {
@@ -24,6 +26,8 @@ function coerceStats(raw: unknown): UserStats {
     closedPredictions: Number(source.closedPredictions ?? 0),
     canceledPredictions: Number(source.canceledPredictions ?? 0),
     totalScore: Number(source.totalScore ?? 0),
+    followersCount: Number(source.followersCount ?? 0),
+    followingCount: Number(source.followingCount ?? 0),
   };
 }
 
@@ -41,6 +45,14 @@ export async function GET(
   try {
     const decoded = await getDecodedUserFromRequest(request);
     const isOwner = Boolean(decoded && decoded.uid === id);
+    const relationship =
+      decoded && decoded.uid !== id
+        ? {
+            isFollowing: (await db.collection("users").doc(decoded.uid).collection("following").doc(id).get()).exists,
+          }
+        : {
+            isFollowing: false,
+          };
 
     const statusParam = request.nextUrl.searchParams.get("status");
     const status = isPredictionStatus(statusParam) ? statusParam : undefined;
@@ -80,6 +92,8 @@ export async function GET(
           closedPredictions: 0,
           canceledPredictions: 0,
           totalScore: 0,
+          followersCount: 0,
+          followingCount: 0,
         },
         settings: {
           isPublic: true,
@@ -103,6 +117,7 @@ export async function GET(
           stats: profileData.stats,
           settings: profileData.settings,
         },
+        relationship,
         predictions: predictions.items,
         nextCursor: predictions.nextCursor,
       });
@@ -129,6 +144,7 @@ export async function GET(
           isPublic,
         },
       },
+      relationship,
       predictions: predictions.items,
       nextCursor: predictions.nextCursor,
     });

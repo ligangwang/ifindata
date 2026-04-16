@@ -1,6 +1,6 @@
-# Contributing to Younalyst
+# Contributing to YouAnalyst
 
-Thank you for your interest in contributing to Younalyst! We welcome contributions from the community.
+Thank you for your interest in contributing to YouAnalyst! We welcome contributions from the community.
 
 ## 🚀 Getting Started
 

@@ -22,25 +22,15 @@ function parseLimit(raw: string | null): number {
   return Math.max(1, Math.min(100, Math.trunc(parsed)));
 }
 
-function parseMinClosed(raw: string | null): number {
-  const parsed = Number(raw ?? "1");
-  if (!Number.isFinite(parsed)) {
-    return 1;
-  }
-
-  return Math.max(0, Math.trunc(parsed));
-}
-
 export async function GET(request: NextRequest) {
   const db = getAdminFirestore();
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
-  const minClosed = parseMinClosed(request.nextUrl.searchParams.get("minClosed"));
 
   try {
     const snapshot = await db
       .collection("users")
       .orderBy("stats.totalScore", "desc")
-      .limit(Math.max(100, limit * 4))
+      .limit(limit)
       .get();
 
     const users: LeaderboardUser[] = [];
@@ -51,10 +41,6 @@ export async function GET(request: NextRequest) {
       const closedPredictions = asNumber(stats.closedPredictions);
       const totalScore = asNumber(stats.totalScore);
 
-      if (closedPredictions < minClosed) {
-        continue;
-      }
-
       users.push({
         userId: doc.id,
         displayName: (data.displayName as string | null | undefined) ?? null,
@@ -62,22 +48,12 @@ export async function GET(request: NextRequest) {
         totalScore,
         closedPredictions,
       });
-
-      if (users.length >= limit) {
-        break;
-      }
     }
 
-    users.sort((a, b) => {
-      if (b.totalScore !== a.totalScore) {
-        return b.totalScore - a.totalScore;
-      }
-      return b.closedPredictions - a.closedPredictions;
-    });
+    users.sort((a, b) => b.totalScore - a.totalScore);
 
     return NextResponse.json({
       items: users,
-      minClosed,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch leaderboard";

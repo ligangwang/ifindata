@@ -12,12 +12,11 @@ type LeaderboardEntry = {
 
 type LeaderboardResponse = {
   items: LeaderboardEntry[];
-  minClosed: number;
 };
 
 function scoreText(score: number): string {
   const sign = score > 0 ? "+" : "";
-  return `${sign}${(score / 100).toFixed(2)}%`;
+  return `${sign}${Math.round(score)}`;
 }
 
 export function LeaderboardPage() {
@@ -27,7 +26,7 @@ export function LeaderboardPage() {
   useEffect(() => {
     let cancelled = false;
 
-    void fetch("/api/leaderboard?limit=100&minClosed=1")
+    void fetch("/api/leaderboard?limit=100")
       .then(async (response) => {
         if (!response.ok) {
           throw new Error("Unable to load leaderboard.");
@@ -61,7 +60,7 @@ export function LeaderboardPage() {
     <main className="mx-auto w-full max-w-4xl px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
         <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">Leaderboard</h1>
-        <p className="mb-4 text-sm text-slate-300">Only analysts with at least {payload.minClosed} closed predictions are ranked.</p>
+        <p className="mb-4 text-sm text-slate-300">Analysts ranked by total score in basis points.</p>
 
         <div className="grid gap-2">
           {payload.items.map((entry, index) => (
@@ -77,7 +76,7 @@ export function LeaderboardPage() {
             </Link>
           ))}
 
-          {payload.items.length === 0 ? <p className="text-sm text-slate-300">No eligible analysts yet.</p> : null}
+          {payload.items.length === 0 ? <p className="text-sm text-slate-300">No analysts yet.</p> : null}
         </div>
       </section>
     </main>

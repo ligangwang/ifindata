@@ -23,8 +23,11 @@ service cloud.firestore {
 
       allow create: if isOwner(userId)
         && request.resource.data.stats.totalPredictions == 0
-        && request.resource.data.stats.activePredictions == 0
-        && request.resource.data.stats.settledPredictions == 0
+        && request.resource.data.stats.openingPredictions == 0
+        && request.resource.data.stats.openPredictions == 0
+        && request.resource.data.stats.closingPredictions == 0
+        && request.resource.data.stats.closedPredictions == 0
+        && request.resource.data.stats.canceledPredictions == 0
         && request.resource.data.stats.totalScore == 0;
 
       allow update: if isOwner(userId)
@@ -44,8 +47,12 @@ service cloud.firestore {
 
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.status == 'ACTIVE'
-        && request.resource.data.settledAt == null
+        && request.resource.data.status == 'OPENING'
+        && request.resource.data.entryPrice == null
+        && request.resource.data.entryPriceSource == null
+        && request.resource.data.entryDate == null
+        && request.resource.data.entryCapturedAt == null
+        && request.resource.data.closedAt == null
         && request.resource.data.result == null;
 
       allow update: if isSignedIn()
@@ -55,10 +62,10 @@ service cloud.firestore {
         && request.resource.data.direction == resource.data.direction
         && request.resource.data.entryPrice == resource.data.entryPrice
         && request.resource.data.entryPriceSource == resource.data.entryPriceSource
+        && request.resource.data.entryDate == resource.data.entryDate
         && request.resource.data.entryCapturedAt == resource.data.entryCapturedAt
-        && request.resource.data.expiryAt == resource.data.expiryAt
         && request.resource.data.status == resource.data.status
-        && request.resource.data.settledAt == resource.data.settledAt
+        && request.resource.data.closedAt == resource.data.closedAt
         && request.resource.data.result == resource.data.result;
 
       allow delete: if false;

@@ -3,14 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
+import { TickerSearchInput } from "@/components/ticker-search-input";
 
-// Validate ticker format: letters, hyphens, dots only, 1-6 characters
 function isValidTickerFormat(ticker: string): boolean {
-  if (!ticker || ticker.length === 0 || ticker.length > 6) {
+  if (!ticker || ticker.length === 0 || ticker.length > 12) {
     return false;
   }
-  // Only allow letters, hyphens, and dots (e.g., BRK.A, BF-A)
-  return /^[A-Z\.\-]+$/.test(ticker);
+  return /^[A-Z0-9.\-]+$/.test(ticker);
 }
 
 export function CreatePredictionPage() {
@@ -23,8 +22,8 @@ export function CreatePredictionPage() {
   const [error, setError] = useState<string | null>(null);
 
   const isValidTicker = isValidTickerFormat(ticker);
-  const tickerErrorMessage = ticker && !isValidTicker 
-    ? "Ticker must be 1-6 letters (e.g., AAPL, BRK.A)" 
+  const tickerErrorMessage = ticker && !isValidTicker
+    ? "Ticker must be 1-12 letters, numbers, dots, or hyphens."
     : null;
 
   if (loading) {
@@ -101,16 +100,11 @@ export function CreatePredictionPage() {
 
         <div className="grid gap-4">
           <div className="grid gap-2">
-            <label className="text-sm text-slate-200">Ticker</label>
-            <input
+            <TickerSearchInput
               value={ticker}
-              onChange={(event) => setTicker(event.target.value.toUpperCase())}
-              placeholder="AAPL"
-              className={`rounded-xl border bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring ${
-                tickerErrorMessage ? "border-rose-400/50" : "border-white/15"
-              }`}
+              onChange={setTicker}
+              error={tickerErrorMessage}
             />
-            {tickerErrorMessage ? <p className="text-xs text-rose-300">{tickerErrorMessage}</p> : null}
           </div>
 
           <div className="grid gap-2">

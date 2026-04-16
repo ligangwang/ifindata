@@ -13,6 +13,10 @@ export function AuthPage() {
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  function destinationForAuth(userId: string, shouldCompleteProfile: boolean) {
+    return shouldCompleteProfile ? `/analysts/${userId}?onboarding=nickname` : "/predictions";
+  }
+
   if (user) {
     return (
       <main className="mx-auto w-full max-w-xl px-4 py-16">
@@ -36,12 +40,15 @@ export function AuthPage() {
     setLocalError(null);
 
     try {
+      const result = isCreate
+        ? await createAccountWithEmail(email, password)
+        : await signInWithEmail(email, password);
+
       if (isCreate) {
-        await createAccountWithEmail(email, password);
-      } else {
-        await signInWithEmail(email, password);
+        setIsCreate(false);
       }
-      router.push("/predictions");
+
+      router.push(destinationForAuth(result.user.uid, result.shouldCompleteProfile));
     } catch (nextError) {
       setLocalError(nextError instanceof Error ? nextError.message : "Authentication failed");
     } finally {
@@ -57,7 +64,11 @@ export function AuthPage() {
 
         <button
           type="button"
-          onClick={() => void signInWithGoogle().then(() => router.push("/predictions")).catch(() => undefined)}
+          onClick={() =>
+            void signInWithGoogle()
+              .then((result) => router.push(destinationForAuth(result.user.uid, result.shouldCompleteProfile)))
+              .catch(() => undefined)
+          }
           className="mb-4 w-full rounded-xl border border-cyan-300/40 bg-cyan-400/10 px-4 py-2.5 text-sm font-medium text-cyan-100 hover:bg-cyan-400/20"
         >
           Continue with Google

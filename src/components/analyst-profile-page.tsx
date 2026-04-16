@@ -47,6 +47,11 @@ type ProfilePayload = {
   nextCursor: string | null;
 };
 
+function basisPointText(score: number): string {
+  const sign = score > 0 ? "+" : "";
+  return `${sign}${Math.round(score)} bp`;
+}
+
 function scoreText(score: number): string {
   const sign = score > 0 ? "+" : "";
   return `${sign}${(score / 100).toFixed(2)}%`;
@@ -56,7 +61,13 @@ function statusFilterLabel(status: ProfileStatusFilter): string {
   return status === "ALL" ? "All" : formatPredictionStatus(status);
 }
 
-export function AnalystProfilePage({ userId }: { userId: string }) {
+export function AnalystProfilePage({
+  userId,
+  promptForNickname = false,
+}: {
+  userId: string;
+  promptForNickname?: boolean;
+}) {
   const { user, getIdToken } = useAuth();
   const isOwner = Boolean(user && user.uid === userId);
   const [status, setStatus] = useState<ProfileStatusFilter>("ALL");
@@ -69,6 +80,7 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
   const [editBio, setEditBio] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [nicknamePromptOpened, setNicknamePromptOpened] = useState(false);
   const preferredName = payload?.profile.nickname ?? payload?.profile.displayName ?? "Analyst";
 
   async function fetchProfile(cursorCreatedAt?: string): Promise<ProfilePayload> {
@@ -150,6 +162,18 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
     setSaveError(null);
     setEditing(true);
   }
+
+  useEffect(() => {
+    if (!promptForNickname || nicknamePromptOpened || editing || !isOwner || !payload || payload.profile.nickname) {
+      return;
+    }
+
+    setEditNickname("");
+    setEditBio(payload.profile.bio);
+    setSaveError(null);
+    setEditing(true);
+    setNicknamePromptOpened(true);
+  }, [editing, isOwner, nicknamePromptOpened, payload, promptForNickname]);
 
   function cancelEditing() {
     setEditing(false);
@@ -243,10 +267,16 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
 
         {editing ? (
           <div className="mt-3 grid gap-3">
+            {promptForNickname && !payload.profile.nickname ? (
+              <p className="rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-100">
+                Choose a nickname. This is the name people will see publicly on Younalyst.
+              </p>
+            ) : null}
             <div>
               <label className="mb-1 block text-xs text-slate-400" htmlFor="edit-nickname">
                 Nickname
               </label>
+              <p className="mb-2 text-xs text-slate-500">This is the name people will see publicly on Younalyst.</p>
               <input
                 id="edit-nickname"
                 type="text"
@@ -297,7 +327,7 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-4 lg:grid-cols-6">
           <div className="rounded-xl border border-white/10 p-3">
             <p className="text-slate-400">Total Score</p>
-            <p className="font-semibold text-cyan-100">{scoreText(payload.profile.stats.totalScore)}</p>
+            <p className="font-semibold text-cyan-100">{basisPointText(payload.profile.stats.totalScore)}</p>
           </div>
           <div className="rounded-xl border border-white/10 p-3">
             <p className="text-slate-400">Total</p>

@@ -1,4 +1,4 @@
-import type { PredictionDirection } from "@/lib/predictions/types";
+import type { PredictionDirection, PredictionStatus } from "@/lib/predictions/types";
 
 export type PredictionMarkFields = {
   direction: PredictionDirection;
@@ -31,6 +31,21 @@ export function markToneClass(value: number): string {
     return "text-rose-300";
   }
   return "text-slate-300";
+}
+
+export function formatPredictionStatus(status: PredictionStatus): string {
+  switch (status) {
+    case "OPENING":
+      return "Opening";
+    case "OPEN":
+      return "Open";
+    case "CLOSING":
+      return "Closing";
+    case "CLOSED":
+      return "Closed";
+    case "CANCELED":
+      return "Canceled";
+  }
 }
 
 export function DirectionBadge({ direction }: { direction: PredictionDirection }) {

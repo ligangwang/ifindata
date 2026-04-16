@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatScorePercent, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type PredictionDetail = {
@@ -175,7 +175,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             <DirectionBadge direction={prediction.direction} />
           </h1>
           <div className="flex items-center gap-3">
-            <p className="text-sm text-slate-300">{prediction.status}</p>
+            <p className="text-sm text-slate-300">{formatPredictionStatus(prediction.status)}</p>
             {ownerAction ? (
               <button
                 type="button"

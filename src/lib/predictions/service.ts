@@ -19,7 +19,7 @@ type AuthedUser = {
 
 type ListPredictionsInput = {
   limit?: number;
-  status?: PredictionStatus;
+  status?: PredictionStatus | "ACTIVE";
   userId?: string;
   cursorCreatedAt?: string;
   includePrivate?: boolean;
@@ -31,6 +31,7 @@ type ListPredictionsResult = {
 };
 
 const PUBLIC_PREDICTION_STATUSES: PredictionStatus[] = ["OPENING", "OPEN", "CLOSING", "CLOSED"];
+const ACTIVE_PREDICTION_STATUSES: PredictionStatus[] = ["OPENING", "OPEN", "CLOSING"];
 
 function getCurrentEasternDate(): string {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -93,7 +94,9 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
     query = query.where("visibility", "==", "PUBLIC");
   }
 
-  if (status) {
+  if (status === "ACTIVE") {
+    query = query.where("status", "in", ACTIVE_PREDICTION_STATUSES);
+  } else if (status) {
     if (status === "CANCELED" && !includePrivate) {
       return { items: [], nextCursor: null };
     }

@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { DirectionBadge, formatScorePercent, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
-type PublicStatusFilter = "ALL" | "OPENING" | "OPEN" | "CLOSING" | "CLOSED";
+type PublicStatusFilter = "ALL" | "ACTIVE" | "CLOSED";
 
 type Prediction = {
   id: string;
@@ -33,7 +33,13 @@ type FeedResponse = {
   nextCursor: string | null;
 };
 
-export function PredictionsFeed({ title }: { title: string }) {
+const FILTERS: Array<{ label: string; value: PublicStatusFilter }> = [
+  { label: "All", value: "ALL" },
+  { label: "Active", value: "ACTIVE" },
+  { label: "Closed", value: "CLOSED" },
+];
+
+export function PredictionsFeed() {
   const [status, setStatus] = useState<PublicStatusFilter>("ALL");
   const [items, setItems] = useState<Prediction[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -101,27 +107,26 @@ export function PredictionsFeed({ title }: { title: string }) {
   }
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8">
-      <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">{title}</h1>
+    <main className="mx-auto w-full max-w-6xl px-4 py-5">
+      <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-4 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
+        <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
           <div className="inline-flex rounded-full border border-slate-700 bg-slate-800/70 p-1 text-xs">
-            {(["ALL", "OPENING", "OPEN", "CLOSING", "CLOSED"] as const).map((option) => (
+            {FILTERS.map((option) => (
               <button
-                key={option}
+                key={option.value}
                 type="button"
                 onClick={() => {
-                  setStatus(option);
+                  setStatus(option.value);
                   setLoading(true);
                   setError(null);
                   setItems([]);
                   setNextCursor(null);
                 }}
                 className={`rounded-full px-3 py-1.5 transition ${
-                  status === option ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"
+                  status === option.value ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"
                 }`}
               >
-                {option}
+                {option.label}
               </button>
             ))}
           </div>
@@ -167,7 +172,7 @@ export function PredictionsFeed({ title }: { title: string }) {
                     </Link>
                   </p>
                   <p>
-                    {item.status}
+                    {formatPredictionStatus(item.status)}
                     {item.result ? ` / ${formatScorePercent(item.result.score)}` : ""}
                   </p>
                 </div>

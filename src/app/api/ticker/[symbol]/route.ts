@@ -5,12 +5,22 @@ import { normalizeTicker, sanitizePredictionThesis, type Prediction } from "@/li
 const PUBLIC_PREDICTION_STATUSES = ["OPENING", "OPEN", "CLOSING", "CLOSED"] as const;
 
 function parseLimit(raw: string | null): number {
-  const parsed = Number(raw ?? "50");
+  const parsed = Number(raw ?? "25");
   if (!Number.isFinite(parsed)) {
-    return 50;
+    return 25;
   }
 
-  return Math.max(1, Math.min(100, Math.trunc(parsed)));
+  return Math.max(1, Math.min(50, Math.trunc(parsed)));
+}
+
+function parseCursor(raw: string | null): string | undefined {
+  const trimmed = raw?.trim() ?? "";
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
 
 function isMissingIndexError(error: unknown): boolean {
@@ -43,33 +53,49 @@ async function listTickerPredictions(
   db: FirebaseFirestore.Firestore,
   ticker: string,
   limit: number,
+  cursorCreatedAt?: string,
 ) {
   try {
-    const snapshot = await db
+    let query = db
       .collection("predictions")
       .where("ticker", "==", ticker)
       .where("visibility", "==", "PUBLIC")
       .orderBy("createdAt", "desc")
-      .limit(limit)
-      .get();
+      .limit(limit + 1);
 
-    return snapshot.docs
-      .filter((doc) => PUBLIC_PREDICTION_STATUSES.includes(doc.get("status") as (typeof PUBLIC_PREDICTION_STATUSES)[number]))
-      .map(mapPredictionDoc);
+    if (cursorCreatedAt) {
+      query = query.startAfter(cursorCreatedAt);
+    }
+
+    const snapshot = await query.get();
+    const docs = snapshot.docs;
+    const hasMore = docs.length > limit;
+    const selected = hasMore ? docs.slice(0, limit) : docs;
+    const nextCursor = hasMore && selected.length > 0 ? selected[selected.length - 1].get("createdAt") : null;
+
+    return {
+      items: selected
+        .filter((doc) => PUBLIC_PREDICTION_STATUSES.includes(doc.get("status") as (typeof PUBLIC_PREDICTION_STATUSES)[number]))
+        .map(mapPredictionDoc),
+      nextCursor: typeof nextCursor === "string" ? nextCursor : null,
+    };
   } catch (error) {
     if (!isMissingIndexError(error)) {
       throw error;
     }
 
     const items: ReturnType<typeof mapPredictionDoc>[] = [];
+    let nextCursor: string | null = null;
     const batchSize = Math.max(limit, 50);
     let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
 
-    while (items.length < limit) {
+    while (items.length < limit + 1) {
       let query = db.collection("predictions").orderBy("createdAt", "desc").limit(batchSize);
 
       if (cursor) {
         query = query.startAfter(cursor);
+      } else if (cursorCreatedAt) {
+        query = query.startAfter(cursorCreatedAt);
       }
 
       const snapshot = await query.get();
@@ -88,7 +114,7 @@ async function listTickerPredictions(
           items.push(mapPredictionDoc(doc));
         }
 
-        if (items.length >= limit) {
+        if (items.length >= limit + 1) {
           break;
         }
       }
@@ -99,7 +125,15 @@ async function listTickerPredictions(
       }
     }
 
-    return items;
+    if (items.length > limit) {
+      const nextItem = items[limit - 1];
+      nextCursor = typeof nextItem.createdAt === "string" ? nextItem.createdAt : null;
+    }
+
+    return {
+      items: items.slice(0, limit),
+      nextCursor,
+    };
   }
 }
 
@@ -135,14 +169,16 @@ export async function GET(
   const { symbol } = await context.params;
   const normalizedTicker = normalizeTicker(symbol);
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
+  const cursorCreatedAt = parseCursor(request.nextUrl.searchParams.get("cursorCreatedAt"));
   const db = getAdminFirestore();
 
   try {
-    const items = await listTickerPredictions(db, normalizedTicker, limit);
-    const itemsWithPreferredNames = await applyAuthorNicknames(db, items);
+    const result = await listTickerPredictions(db, normalizedTicker, limit, cursorCreatedAt);
+    const itemsWithPreferredNames = await applyAuthorNicknames(db, result.items);
 
     return NextResponse.json({
       items: itemsWithPreferredNames,
+      nextCursor: result.nextCursor,
       ticker: normalizedTicker,
     });
   } catch (error) {

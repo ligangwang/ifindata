@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DirectionBadge, formatScorePercent, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type Prediction = {
@@ -86,7 +86,7 @@ export function TickerPage({ ticker }: { ticker: string }) {
                 <p className="flex items-center gap-1 text-sm font-semibold text-cyan-200">
                   <DirectionBadge direction={prediction.direction} />
                   <span className="text-slate-500">/</span>
-                  <span>{prediction.status}</span>
+                  <span>{formatPredictionStatus(prediction.status)}</span>
                 </p>
                 <p className="text-xs text-slate-400">{new Date(prediction.createdAt).toLocaleString()}</p>
               </div>

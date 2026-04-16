@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type ProfileStatusFilter = "ALL" | PredictionStatus;
@@ -50,6 +50,10 @@ type ProfilePayload = {
 function scoreText(score: number): string {
   const sign = score > 0 ? "+" : "";
   return `${sign}${(score / 100).toFixed(2)}%`;
+}
+
+function statusFilterLabel(status: ProfileStatusFilter): string {
+  return status === "ALL" ? "All" : formatPredictionStatus(status);
 }
 
 export function AnalystProfilePage({ userId }: { userId: string }) {
@@ -335,7 +339,7 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
                   status === option ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"
                 }`}
               >
-                {option}
+                {statusFilterLabel(option)}
               </button>
             ))}
           </div>
@@ -352,7 +356,7 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
                 <span className="text-slate-500">/</span>
                 <DirectionBadge direction={prediction.direction} />
                 <span className="text-slate-500">/</span>
-                <span>{prediction.status}</span>
+                <span>{formatPredictionStatus(prediction.status)}</span>
               </p>
               <p className="mt-1 line-clamp-2 break-words text-xs text-slate-300">
                 {sanitizePredictionThesis(prediction.thesis) || "No thesis provided."}

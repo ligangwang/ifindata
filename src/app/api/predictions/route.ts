@@ -12,8 +12,8 @@ function parseLimit(raw: string | null): number {
   return Math.max(1, Math.min(50, Math.trunc(parsed)));
 }
 
-function isPredictionStatus(value: string | null): value is PredictionStatus {
-  return typeof value === "string" && (PREDICTION_STATUSES as readonly string[]).includes(value);
+function isPredictionStatus(value: string | null): value is PredictionStatus | "ACTIVE" {
+  return value === "ACTIVE" || (typeof value === "string" && (PREDICTION_STATUSES as readonly string[]).includes(value));
 }
 
 export async function GET(request: NextRequest) {
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
 
   if (statusParam && !isPredictionStatus(statusParam)) {
-    return NextResponse.json({ error: "status must be OPENING, OPEN, CLOSING, CLOSED, or CANCELED" }, { status: 400 });
+    return NextResponse.json({ error: "status must be ACTIVE, OPENING, OPEN, CLOSING, CLOSED, or CANCELED" }, { status: 400 });
   }
 
   const includePrivate = includePrivateParam === "true";

@@ -4,9 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 type LeaderboardUser = {
   userId: string;
   displayName: string | null;
+  nickname: string | null;
   photoURL: string | null;
   totalScore: number;
-  closedPredictions: number;
 };
 
 function asNumber(value: unknown): number {
@@ -38,15 +38,14 @@ export async function GET(request: NextRequest) {
     for (const doc of snapshot.docs) {
       const data = doc.data() as Record<string, unknown>;
       const stats = (data.stats as Record<string, unknown> | undefined) ?? {};
-      const closedPredictions = asNumber(stats.closedPredictions);
       const totalScore = asNumber(stats.totalScore);
 
       users.push({
         userId: doc.id,
         displayName: (data.displayName as string | null | undefined) ?? null,
+        nickname: typeof data.nickname === "string" && data.nickname.trim() ? data.nickname.trim() : null,
         photoURL: (data.photoURL as string | null | undefined) ?? null,
         totalScore,
-        closedPredictions,
       });
     }
 

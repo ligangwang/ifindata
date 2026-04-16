@@ -13,12 +13,13 @@ test("homepage renders predictions feed", async ({ page }) => {
   await page.goto("/");
 
   // Verify navigation is present
-  await expect(page.getByRole("link", { name: /Feed/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Feed", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: /Predict/i })).toBeVisible();
   
   // Verify predictions feed is on the page
-  const feedTitle = page.locator("h1, h2, h3").filter({ hasText: /Home feed|Feed/i }).first();
-  await expect(feedTitle).toBeVisible();
+  await expect(page.getByRole("button", { name: "All", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Active", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Closed", exact: true })).toBeVisible();
 });
 
 test("staging banner is present only when expected", async ({ page }) => {

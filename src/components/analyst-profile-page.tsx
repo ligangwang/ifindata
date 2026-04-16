@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, PredictionMarkSummary } from "@/components/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type ProfileStatusFilter = "ALL" | PredictionStatus;

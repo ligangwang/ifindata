@@ -397,6 +397,10 @@ function computeMark(
   };
 }
 
+function previousAppliedScore(value: unknown): number {
+  return Number.isFinite(Number(value)) ? Number(value) : 0;
+}
+
 function buildMarkUpdate(price: EodPrice, mark: { returnValue: number; score: number; displayPercent: number }, nowIso: string) {
   return {
     updatedAt: nowIso,
@@ -407,6 +411,7 @@ function buildMarkUpdate(price: EodPrice, mark: { returnValue: number; score: nu
     markReturnValue: mark.returnValue,
     markScore: mark.score,
     markDisplayPercent: mark.displayPercent,
+    scoreAppliedToUser: mark.score,
   };
 }
 
@@ -714,6 +719,7 @@ export async function runDailyEodMaintenance(
           }
 
           const markUpdate = buildMarkUpdate(price, mark, nowIso);
+          const scoreDelta = mark.score - previousAppliedScore(latest.scoreAppliedToUser);
 
           if (latestStatus === "CLOSING") {
             const result = buildResult(price, mark);
@@ -727,7 +733,7 @@ export async function runDailyEodMaintenance(
               updatedAt: nowIso,
               "stats.closingPredictions": FieldValue.increment(-1),
               "stats.closedPredictions": FieldValue.increment(1),
-              "stats.totalScore": FieldValue.increment(result.score),
+              "stats.totalScore": FieldValue.increment(scoreDelta),
             });
             marking.marked += 1;
             marking.closed += 1;
@@ -735,6 +741,10 @@ export async function runDailyEodMaintenance(
           }
 
           tx.update(prediction.ref, markUpdate);
+          tx.update(db.collection("users").doc(prediction.userId), {
+            updatedAt: nowIso,
+            "stats.totalScore": FieldValue.increment(scoreDelta),
+          });
           marking.marked += 1;
         });
       }

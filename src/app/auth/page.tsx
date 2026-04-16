@@ -1,4 +1,4 @@
-import { AuthPage } from "@/components/mvp/auth-page";
+import { AuthPage } from "@/components/auth-page";
 
 export default function AuthRoutePage() {
   return <AuthPage />;

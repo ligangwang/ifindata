@@ -3,7 +3,7 @@ import { IBM_Plex_Sans, Sora } from "next/font/google";
 import Link from "next/link";
 import { AppProviders } from "@/components/providers/app-providers";
 import { EnvironmentBanner } from "@/components/environment-banner";
-import { SiteNav } from "@/components/mvp/site-nav";
+import { SiteNav } from "@/components/site-nav";
 import "./globals.css";
 
 const sora = Sora({

@@ -66,6 +66,7 @@ export type Prediction = {
   markReturnValue?: number | null;
   markScore?: number | null;
   markDisplayPercent?: number | null;
+  scoreAppliedToUser?: number | null;
   closeRequestedAt?: string | null;
   closeTargetDate?: string | null;
   closedAt: string | null;

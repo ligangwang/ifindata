@@ -1,4 +1,4 @@
-import { PredictionsFeed } from "@/components/mvp/predictions-feed";
+import { PredictionsFeed } from "@/components/predictions-feed";
 
 export default function Home() {
   return <PredictionsFeed />;

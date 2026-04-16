@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { DirectionBadge, formatPredictionStatus, PredictionMarkSummary } from "@/components/prediction-ui";
@@ -71,6 +72,14 @@ function countText(count: number, singular: string, plural = `${singular}s`): st
   return `${rounded.toLocaleString()} ${rounded === 1 ? singular : plural}`;
 }
 
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 export function AnalystProfilePage({
   userId,
   promptForNickname = false,
@@ -93,7 +102,11 @@ export function AnalystProfilePage({
   const [nicknamePromptOpened, setNicknamePromptOpened] = useState(false);
   const [followSaving, setFollowSaving] = useState(false);
   const [followError, setFollowError] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const preferredName = payload?.profile.nickname ?? payload?.profile.displayName ?? "Analyst";
+  const badgePath = `/api/users/${userId}/badge.svg`;
+  const profilePath = `/analysts/${userId}`;
 
   async function fetchProfile(cursorCreatedAt?: string): Promise<ProfilePayload> {
     const params = new URLSearchParams();
@@ -288,6 +301,31 @@ export function AnalystProfilePage({
     }
   }
 
+  function absoluteUrl(path: string): string {
+    if (typeof window === "undefined") {
+      return path;
+    }
+    return `${window.location.origin}${path}`;
+  }
+
+  function badgeEmbedCode(): string {
+    const badgeUrl = absoluteUrl(badgePath);
+    const profileUrl = absoluteUrl(profilePath);
+    const label = payload?.profile.nickname ? `@${payload.profile.nickname}` : preferredName;
+
+    return `<a href="${profileUrl}"><img src="${badgeUrl}" alt="Younalyst badge for ${escapeHtmlAttribute(label)}" width="420" height="180" /></a>`;
+  }
+
+  async function copyBadgeText(text: string, message: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyMessage(message);
+      window.setTimeout(() => setCopyMessage(null), 2000);
+    } catch {
+      setCopyMessage("Unable to copy.");
+    }
+  }
+
   if (loading || !payload) {
     return (
       <main className="mx-auto w-full max-w-5xl px-4 py-8 text-sm text-slate-300">
@@ -322,37 +360,46 @@ export function AnalystProfilePage({
               </p>
             </div>
           </div>
-          {isOwner && !editing ? (
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {isOwner && !editing ? (
+              <button
+                type="button"
+                onClick={startEditing}
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:border-cyan-400/40 hover:text-cyan-200"
+              >
+                Edit profile
+              </button>
+            ) : null}
+            {!isOwner && !authLoading && user ? (
+              <button
+                type="button"
+                onClick={() => void toggleFollow()}
+                disabled={followSaving}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                  payload.relationship.isFollowing
+                    ? "border border-white/10 text-slate-300 hover:border-rose-400/40 hover:text-rose-200"
+                    : "bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+                }`}
+              >
+                {followSaving ? "Saving..." : payload.relationship.isFollowing ? "Unfollow" : "Follow"}
+              </button>
+            ) : null}
+            {!isOwner && !authLoading && !user ? (
+              <Link
+                href="/auth"
+                className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
+              >
+                Sign in to follow
+              </Link>
+            ) : null}
             <button
               type="button"
-              onClick={startEditing}
-              className="shrink-0 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:border-cyan-400/40 hover:text-cyan-200"
+              onClick={() => setShareOpen(true)}
+              className="rounded-lg border border-cyan-400/35 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/15"
             >
-              Edit profile
+              Share badge
             </button>
-          ) : null}
-          {!isOwner && !authLoading && user ? (
-            <button
-              type="button"
-              onClick={() => void toggleFollow()}
-              disabled={followSaving}
-              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
-                payload.relationship.isFollowing
-                  ? "border border-white/10 text-slate-300 hover:border-rose-400/40 hover:text-rose-200"
-                  : "bg-cyan-500 text-slate-950 hover:bg-cyan-400"
-              }`}
-            >
-              {followSaving ? "Saving..." : payload.relationship.isFollowing ? "Unfollow" : "Follow"}
-            </button>
-          ) : null}
-          {!isOwner && !authLoading && !user ? (
-            <Link
-              href="/auth"
-              className="shrink-0 rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
-            >
-              Sign in to follow
-            </Link>
-          ) : null}
+          </div>
         </div>
         {followError ? <p className="mt-2 text-xs text-rose-300">{followError}</p> : null}
 
@@ -446,6 +493,73 @@ export function AnalystProfilePage({
           </div>
         </div>
       </section>
+
+      {shareOpen ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/80 px-4">
+          <div className="w-full max-w-lg rounded-lg border border-cyan-500/25 bg-slate-950 p-4 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Share badge</h2>
+                <p className="mt-1 text-sm text-slate-400">Embed your Younalyst analyst badge anywhere.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShareOpen(false)}
+                className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:border-white/25"
+              >
+                Close
+              </button>
+            </div>
+
+            <Image
+              src={badgePath}
+              alt={`Younalyst badge for ${preferredName}`}
+              width={420}
+              height={180}
+              className="mt-4 w-full rounded-lg border border-white/10"
+            />
+
+            <div className="mt-4 grid gap-3">
+              <div>
+                <p className="mb-1 text-xs text-slate-400">Badge URL</p>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={absoluteUrl(badgePath)}
+                    className="min-w-0 flex-1 rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-xs text-slate-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void copyBadgeText(absoluteUrl(badgePath), "Badge URL copied.")}
+                    className="rounded-lg bg-cyan-500 px-3 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs text-slate-400">Embed code</p>
+                <textarea
+                  readOnly
+                  rows={3}
+                  value={badgeEmbedCode()}
+                  className="w-full resize-none rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-xs text-slate-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => void copyBadgeText(badgeEmbedCode(), "Embed code copied.")}
+                  className="mt-2 rounded-lg bg-cyan-500 px-3 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
+                >
+                  Copy embed
+                </button>
+              </div>
+
+              {copyMessage ? <p className="text-xs text-emerald-300">{copyMessage}</p> : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <section className="rounded-2xl border border-white/15 bg-slate-950/55 p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

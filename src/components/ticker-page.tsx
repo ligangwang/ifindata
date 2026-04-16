@@ -27,17 +27,23 @@ type Prediction = {
 
 type TickerResponse = {
   items: Prediction[];
+  nextCursor: string | null;
   ticker: string;
 };
 
 export function TickerPage({ ticker }: { ticker: string }) {
   const [payload, setPayload] = useState<TickerResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
-    void fetch(`/api/ticker/${ticker}?limit=100`)
+    setPayload(null);
+    setError(null);
+    setLoadingMore(false);
+
+    void fetch(`/api/ticker/${ticker}?limit=25`)
       .then(async (response) => {
         if (!response.ok) {
           throw new Error("Unable to load ticker predictions.");
@@ -58,6 +64,39 @@ export function TickerPage({ ticker }: { ticker: string }) {
       cancelled = true;
     };
   }, [ticker]);
+
+  async function loadMorePredictions() {
+    if (!payload?.nextCursor || loadingMore) {
+      return;
+    }
+
+    setLoadingMore(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({
+        limit: "25",
+        cursorCreatedAt: payload.nextCursor,
+      });
+      const response = await fetch(`/api/ticker/${ticker}?${params.toString()}`);
+
+      if (!response.ok) {
+        throw new Error("Unable to load more predictions.");
+      }
+
+      const nextPayload = (await response.json()) as TickerResponse;
+      setPayload((current) => current
+        ? {
+            ...nextPayload,
+            items: [...current.items, ...nextPayload.items],
+          }
+        : nextPayload);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to load more predictions.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   if (!payload) {
     return (
@@ -116,6 +155,23 @@ export function TickerPage({ ticker }: { ticker: string }) {
             </p>
           ) : null}
         </div>
+
+        {payload.nextCursor ? (
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              onClick={loadMorePredictions}
+              disabled={loadingMore}
+              className="rounded-lg border border-cyan-400/40 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loadingMore ? "Loading..." : "Load more"}
+            </button>
+          </div>
+        ) : null}
+
+        {error && payload.items.length > 0 ? (
+          <p className="mt-3 text-center text-sm text-rose-200">{error}</p>
+        ) : null}
       </section>
     </main>
   );

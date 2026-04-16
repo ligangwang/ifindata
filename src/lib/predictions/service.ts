@@ -1,15 +1,14 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
-import { getLatestPrice } from "@/lib/predictions/market-data";
 import {
   isPredictionDirection,
   isPredictionVisibility,
   normalizeTicker,
   sanitizePredictionThesis,
-  splitIsoDateTime,
   type CreatePredictionInput,
   type Prediction,
   type PredictionComment,
+  type PredictionStatus,
 } from "@/lib/predictions/types";
 
 type AuthedUser = {
@@ -20,7 +19,7 @@ type AuthedUser = {
 
 type ListPredictionsInput = {
   limit?: number;
-  status?: "OPEN" | "CLOSED";
+  status?: PredictionStatus;
   userId?: string;
   cursorCreatedAt?: string;
   includePrivate?: boolean;
@@ -30,6 +29,51 @@ type ListPredictionsResult = {
   items: Array<Prediction & { id: string; authorNickname: string | null }>;
   nextCursor: string | null;
 };
+
+const PUBLIC_PREDICTION_STATUSES: PredictionStatus[] = ["OPENING", "OPEN", "CLOSING", "CLOSED"];
+
+function getCurrentEasternDate(): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  if (!year || !month || !day) {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(date: string, days: number): string {
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+  return parsed.toISOString().slice(0, 10);
+}
+
+function eodRunDocId(runDate: string, market = "US"): string {
+  return [market, runDate].join("_");
+}
+
+function targetDateFromRunStatus(today: string, status: unknown): string {
+  return status === "STARTED" || status === "COMPLETED" || status === "FAILED"
+    ? addDays(today, 1)
+    : today;
+}
+
+async function resolveEodTargetDateInTransaction(
+  tx: FirebaseFirestore.Transaction,
+  db: FirebaseFirestore.Firestore,
+): Promise<string> {
+  const today = getCurrentEasternDate();
+  const snapshot = await tx.get(db.collection("eod_runs").doc(eodRunDocId(today)));
+  return targetDateFromRunStatus(today, snapshot.exists ? snapshot.get("status") : null);
+}
 
 export async function listPredictions(input: ListPredictionsInput): Promise<ListPredictionsResult> {
   const db = getAdminFirestore();
@@ -50,6 +94,9 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
   }
 
   if (status) {
+    if (status === "CANCELED" && !includePrivate) {
+      return { items: [], nextCursor: null };
+    }
     query = query.where("status", "==", status);
   }
 
@@ -67,7 +114,10 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
   const docs = snapshot.docs;
   const hasMore = docs.length > clampedLimit;
   const selected = hasMore ? docs.slice(0, clampedLimit) : docs;
-  const items = selected.map((doc) => {
+  const visibleSelected = includePrivate
+    ? selected
+    : selected.filter((doc) => PUBLIC_PREDICTION_STATUSES.includes(doc.get("status") as PredictionStatus));
+  const items = visibleSelected.map((doc) => {
     const prediction = doc.data() as Prediction;
 
     return {
@@ -137,22 +187,24 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
 export async function createPrediction(input: CreatePredictionInput, user: AuthedUser) {
   const db = getAdminFirestore();
   const nowIso = new Date().toISOString();
-  const quote = await getLatestPrice(input.ticker);
-  const { entryDate, entryTime } = splitIsoDateTime(quote.capturedAt);
-  const duplicateKey = [user.uid, input.ticker, entryDate].join("__");
   const predictionRef = db.collection("predictions").doc();
   const userRef = db.collection("users").doc(user.uid);
-  const uniqueRef = db.collection("prediction_uniques").doc(duplicateKey);
 
 
   await db.runTransaction(async (tx) => {
-    const [userSnapshot, uniqueSnapshot] = await Promise.all([tx.get(userRef), tx.get(uniqueRef)]);
+    const [userSnapshot, entryTargetDate] = await Promise.all([
+      tx.get(userRef),
+      resolveEodTargetDateInTransaction(tx, db),
+    ]);
     if (!userSnapshot.exists) {
       throw new Error("User profile not found. Complete bootstrap first.");
     }
 
+    const duplicateKey = [user.uid, input.ticker, entryTargetDate].join("__");
+    const uniqueRef = db.collection("prediction_uniques").doc(duplicateKey);
+    const uniqueSnapshot = await tx.get(uniqueRef);
     if (uniqueSnapshot.exists) {
-      throw new Error("Duplicate prediction exists for the same user, ticker, and entryDate.");
+      throw new Error("Duplicate prediction exists for the same user, ticker, and entry target date.");
     }
 
     const userData = userSnapshot.data() ?? {};
@@ -163,13 +215,15 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       authorPhotoURL: (userData.photoURL as string | null | undefined) ?? user.photoURL ?? null,
       ticker: input.ticker,
       direction: input.direction,
-      entryPrice: quote.price,
-      entryPriceSource: quote.source,
-      entryDate,
-      entryTime,
-      entryCapturedAt: quote.capturedAt,
+      entryRequestedAt: nowIso,
+      entryTargetDate,
+      entryPrice: null,
+      entryPriceSource: null,
+      entryDate: null,
+      entryTime: null,
+      entryCapturedAt: null,
       thesis: sanitizePredictionThesis(input.thesis),
-      status: "OPEN",
+      status: "OPENING",
       visibility: input.visibility ?? "PUBLIC",
       commentCount: 0,
       createdAt: nowIso,
@@ -181,6 +235,8 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       markReturnValue: null,
       markScore: null,
       markDisplayPercent: null,
+      closeRequestedAt: null,
+      closeTargetDate: null,
       closedAt: null,
       result: null,
     };
@@ -191,7 +247,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       userId: user.uid,
       ticker: input.ticker,
       direction: input.direction,
-      entryDate,
+      entryTargetDate,
       createdAt: nowIso,
     });
 
@@ -201,18 +257,125 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
         updatedAt: nowIso,
         role: "analyst",
         "stats.totalPredictions": FieldValue.increment(1),
-        "stats.openPredictions": FieldValue.increment(1),
+        "stats.openingPredictions": FieldValue.increment(1),
       });
     } else {
       tx.update(userRef, {
         updatedAt: nowIso,
         "stats.totalPredictions": FieldValue.increment(1),
-        "stats.openPredictions": FieldValue.increment(1),
+        "stats.openingPredictions": FieldValue.increment(1),
       });
     }
   });
 
   return { id: predictionRef.id };
+}
+
+export async function closePrediction(predictionId: string, user: AuthedUser) {
+  const db = getAdminFirestore();
+  const nowIso = new Date().toISOString();
+  const predictionRef = db.collection("predictions").doc(predictionId);
+  const userRef = db.collection("users").doc(user.uid);
+
+  await db.runTransaction(async (tx) => {
+    const [predictionSnapshot, userSnapshot, closeTargetDate] = await Promise.all([
+      tx.get(predictionRef),
+      tx.get(userRef),
+      resolveEodTargetDateInTransaction(tx, db),
+    ]);
+
+    if (!predictionSnapshot.exists) {
+      throw new Error("Prediction not found");
+    }
+    if (!userSnapshot.exists) {
+      throw new Error("User profile not found. Complete bootstrap first.");
+    }
+
+    const prediction = predictionSnapshot.data() as Prediction;
+    if (prediction.userId !== user.uid) {
+      throw new Error("Forbidden");
+    }
+    if (prediction.status !== "OPEN") {
+      throw new Error("Only OPEN predictions can be closed.");
+    }
+
+    tx.update(predictionRef, {
+      status: "CLOSING",
+      updatedAt: nowIso,
+      closeRequestedAt: nowIso,
+      closeTargetDate,
+    });
+    tx.update(userRef, {
+      updatedAt: nowIso,
+      "stats.openPredictions": FieldValue.increment(-1),
+      "stats.closingPredictions": FieldValue.increment(1),
+    });
+  });
+
+  return { closed: false, status: "CLOSING" as const };
+}
+
+export async function cancelPrediction(predictionId: string, user: AuthedUser) {
+  const db = getAdminFirestore();
+  const nowIso = new Date().toISOString();
+  const predictionRef = db.collection("predictions").doc(predictionId);
+  const userRef = db.collection("users").doc(user.uid);
+
+  let nextStatus: "CANCELED" | "OPEN" = "CANCELED";
+
+  await db.runTransaction(async (tx) => {
+    const [predictionSnapshot, userSnapshot] = await Promise.all([
+      tx.get(predictionRef),
+      tx.get(userRef),
+    ]);
+
+    if (!predictionSnapshot.exists) {
+      throw new Error("Prediction not found");
+    }
+    if (!userSnapshot.exists) {
+      throw new Error("User profile not found. Complete bootstrap first.");
+    }
+
+    const prediction = predictionSnapshot.data() as Prediction;
+    if (prediction.userId !== user.uid) {
+      throw new Error("Forbidden");
+    }
+
+    if (prediction.status === "OPENING") {
+      nextStatus = "CANCELED";
+      tx.update(predictionRef, {
+        status: "CANCELED",
+        updatedAt: nowIso,
+        canceledAt: nowIso,
+      });
+      tx.update(userRef, {
+        updatedAt: nowIso,
+        "stats.openingPredictions": FieldValue.increment(-1),
+        "stats.canceledPredictions": FieldValue.increment(1),
+      });
+      return;
+    }
+
+    if (prediction.status === "CLOSING") {
+      nextStatus = "OPEN";
+      tx.update(predictionRef, {
+        status: "OPEN",
+        updatedAt: nowIso,
+        closeRequestedAt: null,
+        closeTargetDate: null,
+      });
+      tx.update(userRef, {
+        updatedAt: nowIso,
+        "stats.closingPredictions": FieldValue.increment(-1),
+        "stats.openPredictions": FieldValue.increment(1),
+      });
+      return;
+    }
+
+    throw new Error("Only OPENING or CLOSING predictions can be canceled.");
+  });
+
+  return { status: nextStatus };
 }
 
 export async function addComment(predictionId: string, content: string, user: AuthedUser) {

@@ -1,5 +1,5 @@
 export const PREDICTION_DIRECTIONS = ["UP", "DOWN"] as const;
-export const PREDICTION_STATUSES = ["OPEN", "CLOSED"] as const;
+export const PREDICTION_STATUSES = ["OPENING", "OPEN", "CLOSING", "CLOSED", "CANCELED"] as const;
 export const PREDICTION_VISIBILITIES = ["PUBLIC", "PRIVATE"] as const;
 
 export type PredictionDirection = (typeof PREDICTION_DIRECTIONS)[number];
@@ -8,8 +8,11 @@ export type PredictionVisibility = (typeof PREDICTION_VISIBILITIES)[number];
 
 export type UserStats = {
   totalPredictions: number;
+  openingPredictions: number;
   openPredictions: number;
+  closingPredictions: number;
   closedPredictions: number;
+  canceledPredictions: number;
   totalScore: number;
 };
 
@@ -43,11 +46,13 @@ export type Prediction = {
   authorPhotoURL: string | null;
   ticker: string;
   direction: PredictionDirection;
-  entryPrice: number;
-  entryPriceSource: string;
-  entryDate: string;
-  entryTime: string;
-  entryCapturedAt: string;
+  entryRequestedAt: string;
+  entryTargetDate: string;
+  entryPrice: number | null;
+  entryPriceSource: string | null;
+  entryDate: string | null;
+  entryTime: string | null;
+  entryCapturedAt: string | null;
   thesis: string;
   status: PredictionStatus;
   visibility: PredictionVisibility;
@@ -61,7 +66,10 @@ export type Prediction = {
   markReturnValue?: number | null;
   markScore?: number | null;
   markDisplayPercent?: number | null;
+  closeRequestedAt?: string | null;
+  closeTargetDate?: string | null;
   closedAt: string | null;
+  canceledAt?: string | null;
   result: PredictionResult | null;
 };
 

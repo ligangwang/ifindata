@@ -155,7 +155,7 @@ export async function GET(
     }
 
     const prediction = predictionSnapshot.data() as Record<string, unknown>;
-    if (prediction.visibility !== "PUBLIC") {
+    if (prediction.visibility !== "PUBLIC" || prediction.status === "CANCELED") {
       const decoded = await getDecodedUserFromRequest(request);
       if (!decoded || decoded.uid !== prediction.userId) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });

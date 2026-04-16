@@ -1,4 +1,4 @@
-import { PredictionDetailPage } from "@/components/mvp/prediction-detail-page";
+import { PredictionDetailPage } from "@/components/prediction-detail-page";
 
 export default async function PredictionDetailRoutePage({
   params,

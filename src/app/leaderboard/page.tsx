@@ -1,4 +1,4 @@
-import { LeaderboardPage } from "@/components/mvp/leaderboard-page";
+import { LeaderboardPage } from "@/components/leaderboard-page";
 
 export default function LeaderboardRoutePage() {
   return <LeaderboardPage />;

@@ -23,7 +23,7 @@ export type DailyEodMaintenanceInput = {
   dryRun?: boolean;
   tickers?: string[];
   loadPrices?: boolean;
-  markPositions?: boolean;
+  markPredictions?: boolean;
 };
 
 export type EodPrice = {
@@ -95,7 +95,7 @@ type TwelveDataSymbolResponse = {
 
 type TwelveDataBatchResponse = Record<string, TwelveDataSymbolResponse>;
 
-type PositionRecord = {
+type EodPredictionRecord = {
   ref: FirebaseFirestore.DocumentReference;
   id: string;
   userId: string;
@@ -108,9 +108,9 @@ type PositionRecord = {
   status: PredictionStatus;
 };
 
-type PositionScanResult = {
-  candidatePredictions: PositionRecord[];
-  predictionsNeedingWork: PositionRecord[];
+type EodPredictionScanResult = {
+  candidatePredictions: EodPredictionRecord[];
+  predictionsNeedingWork: EodPredictionRecord[];
   scannedCandidatePredictions: number;
   hasMoreCandidatePredictions: boolean;
 };
@@ -348,7 +348,7 @@ function isEodCandidateStatus(value: unknown): value is "OPENING" | "OPEN" | "CL
   return value === "OPENING" || value === "OPEN" || value === "CLOSING";
 }
 
-function toPositionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapshot): PositionRecord | null {
+function toEodPredictionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapshot): EodPredictionRecord | null {
   const data = snapshot.data() as Record<string, unknown>;
   const ticker = typeof data.ticker === "string" ? normalizeTicker(data.ticker) : "";
   const userId = typeof data.userId === "string" ? data.userId : "";
@@ -420,7 +420,7 @@ function buildResult(price: EodPrice, mark: { returnValue: number; score: number
   };
 }
 
-function isActionablePosition(prediction: PositionRecord, runDate: string, manualTickers: string[]): boolean {
+function isActionablePrediction(prediction: EodPredictionRecord, runDate: string, manualTickers: string[]): boolean {
   if (manualTickers.length > 0 && !manualTickers.includes(prediction.ticker)) {
     return false;
   }
@@ -436,14 +436,14 @@ function isActionablePosition(prediction: PositionRecord, runDate: string, manua
   return prediction.markPriceDate !== runDate;
 }
 
-async function scanPositionPredictions(
+async function scanEodPredictions(
   db: FirebaseFirestore.Firestore,
   runDate: string,
   limit: number,
   manualTickers: string[],
-): Promise<PositionScanResult> {
-  const candidatePredictions: PositionRecord[] = [];
-  const predictionsNeedingWork: PositionRecord[] = [];
+): Promise<EodPredictionScanResult> {
+  const candidatePredictions: EodPredictionRecord[] = [];
+  const predictionsNeedingWork: EodPredictionRecord[] = [];
   let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
   let scannedCandidatePredictions = 0;
   let hasMoreCandidatePredictions = false;
@@ -468,14 +468,14 @@ async function scanPositionPredictions(
     scannedCandidatePredictions += snapshot.size;
 
     for (const doc of snapshot.docs) {
-      const prediction = toPositionRecord(doc);
+      const prediction = toEodPredictionRecord(doc);
       if (!prediction) {
         continue;
       }
 
       candidatePredictions.push(prediction);
 
-      if (isActionablePosition(prediction, runDate, manualTickers)) {
+      if (isActionablePrediction(prediction, runDate, manualTickers)) {
         predictionsNeedingWork.push(prediction);
         if (predictionsNeedingWork.length >= limit) {
           break;
@@ -505,7 +505,7 @@ export async function runDailyEodMaintenance(
   const db = getAdminFirestore();
   const dryRun = input.dryRun === true;
   const loadPrices = input.loadPrices !== false;
-  const markPositions = input.markPositions !== false;
+  const markPredictions = input.markPredictions !== false;
   const runDate = resolveRunDate(input.runDate);
   const limit = clampLimit(input.limit);
   const nowIso = new Date().toISOString();
@@ -516,7 +516,7 @@ export async function runDailyEodMaintenance(
     runDate,
     dryRun,
     loadPrices,
-    markPositions,
+    markPredictions,
     limit,
     manualTickers,
   });
@@ -539,12 +539,12 @@ export async function runDailyEodMaintenance(
       predictionsNeedingWork,
       scannedCandidatePredictions,
       hasMoreCandidatePredictions,
-    } = await scanPositionPredictions(db, runDate, limit, manualTickers);
+    } = await scanEodPredictions(db, runDate, limit, manualTickers);
     const requestedTickers = manualTickers.length > 0
       ? manualTickers
       : uniqueTickers(predictionsNeedingWork.map((item) => item.ticker));
 
-    console.info("[daily-eod-maintenance] Position scan completed", {
+    console.info("[daily-eod-maintenance] Prediction scan completed", {
       runDate,
       candidatePredictions: candidatePredictions.length,
       actionablePredictions: predictionsNeedingWork.length,
@@ -622,7 +622,7 @@ export async function runDailyEodMaintenance(
       .sort()
       .at(-1) ?? null;
     const marking: DailyEodMaintenanceResult["marking"] = {
-      checked: markPositions ? predictionsNeedingWork.length : 0,
+      checked: markPredictions ? predictionsNeedingWork.length : 0,
       opened: 0,
       marked: 0,
       closed: 0,
@@ -630,7 +630,7 @@ export async function runDailyEodMaintenance(
       skipped: 0,
     };
 
-    if (markPositions) {
+    if (markPredictions) {
       for (const prediction of predictionsNeedingWork) {
         const price = priceByTicker.get(prediction.ticker);
         if (!price) {

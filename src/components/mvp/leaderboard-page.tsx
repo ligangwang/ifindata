@@ -61,7 +61,7 @@ export function LeaderboardPage() {
     <main className="mx-auto w-full max-w-4xl px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
         <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">Leaderboard</h1>
-        <p className="mb-4 text-sm text-slate-300">Only analysts with at least {payload.minClosed} closed positions are ranked.</p>
+        <p className="mb-4 text-sm text-slate-300">Only analysts with at least {payload.minClosed} closed predictions are ranked.</p>
 
         <div className="grid gap-2">
           {payload.items.map((entry, index) => (

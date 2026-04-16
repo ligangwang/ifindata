@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { error: "This endpoint is no longer supported. Positions stay OPEN until explicitly closed." },
+    { error: "This endpoint is no longer supported. Predictions stay OPEN until explicitly closed." },
     { status: 410 },
   );
 }

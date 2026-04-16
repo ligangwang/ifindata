@@ -29,8 +29,8 @@ on:
         required: true
         default: true
         type: boolean
-      mark_positions:
-        description: Mark open positions
+      mark_predictions:
+        description: Mark open predictions
         required: true
         default: true
         type: boolean
@@ -106,7 +106,7 @@ jobs:
           LIMIT: ${{ inputs.limit }}
           TICKERS: ${{ inputs.tickers }}
           LOAD_PRICES: ${{ inputs.load_prices }}
-          MARK_POSITIONS: ${{ inputs.mark_positions }}
+          MARK_PREDICTIONS: ${{ inputs.mark_predictions }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
@@ -130,12 +130,12 @@ jobs:
             --arg tickers "$TICKERS" \
             --argjson limit "$LIMIT" \
             --argjson loadPrices "$LOAD_PRICES" \
-            --argjson markPositions "$MARK_POSITIONS" \
+            --argjson markPredictions "$MARK_PREDICTIONS" \
             --argjson dryRun "$DRY_RUN" \
             '{
               limit: $limit,
               loadPrices: $loadPrices,
-              markPositions: $markPositions,
+              markPredictions: $markPredictions,
               dryRun: $dryRun
             }
             + (if $runDate == "" then {} else { runDate: $runDate } end)

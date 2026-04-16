@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AdminFeedbackPage } from "@/components/mvp/admin-feedback-page";
+import { AdminFeedbackPage } from "@/components/admin-feedback-page";
 
 export const metadata: Metadata = {
   title: "Feedback Admin | Younalyst",

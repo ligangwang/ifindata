@@ -1,4 +1,4 @@
-import { CreatePredictionPage } from "@/components/mvp/create-prediction-page";
+import { CreatePredictionPage } from "@/components/create-prediction-page";
 
 export default function NewPredictionRoutePage() {
   return <CreatePredictionPage />;

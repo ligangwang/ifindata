@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { FeedbackPage } from "@/components/mvp/feedback-page";
+import { FeedbackPage } from "@/components/feedback-page";
 
 export const metadata: Metadata = {
   title: "Feedback | Younalyst",

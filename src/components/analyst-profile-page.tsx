@@ -313,7 +313,7 @@ export function AnalystProfilePage({
     const profileUrl = absoluteUrl(profilePath);
     const label = payload?.profile.nickname ? `@${payload.profile.nickname}` : preferredName;
 
-    return `<a href="${profileUrl}"><img src="${badgeUrl}" alt="Younalyst badge for ${escapeHtmlAttribute(label)}" width="420" height="180" /></a>`;
+    return `<a href="${profileUrl}"><img src="${badgeUrl}" alt="YouAnalyst badge for ${escapeHtmlAttribute(label)}" width="420" height="180" /></a>`;
   }
 
   async function copyBadgeText(text: string, message: string) {
@@ -412,14 +412,14 @@ export function AnalystProfilePage({
           <div className="mt-3 grid gap-3">
             {promptForNickname && !payload.profile.nickname ? (
               <p className="rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-100">
-                Choose a nickname. This is the name people will see publicly on Younalyst.
+                Choose a nickname. This is the name people will see publicly on YouAnalyst.
               </p>
             ) : null}
             <div>
               <label className="mb-1 block text-xs text-slate-400" htmlFor="edit-nickname">
                 Nickname
               </label>
-              <p className="mb-2 text-xs text-slate-500">This is the name people will see publicly on Younalyst.</p>
+              <p className="mb-2 text-xs text-slate-500">This is the name people will see publicly on YouAnalyst.</p>
               <input
                 id="edit-nickname"
                 type="text"
@@ -505,7 +505,7 @@ export function AnalystProfilePage({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Share badge</h2>
-                <p className="mt-1 text-sm text-slate-400">Embed your Younalyst analyst badge anywhere.</p>
+                <p className="mt-1 text-sm text-slate-400">Embed your YouAnalyst analyst badge anywhere.</p>
               </div>
               <button
                 type="button"
@@ -518,7 +518,7 @@ export function AnalystProfilePage({
 
             <Image
               src={badgePath}
-              alt={`Younalyst badge for ${preferredName}`}
+              alt={`YouAnalyst badge for ${preferredName}`}
               width={420}
               height={180}
               className="mt-4 w-full rounded-lg border border-white/10"

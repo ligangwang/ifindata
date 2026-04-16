@@ -144,8 +144,15 @@ export function SiteNav() {
       <div className="mx-auto w-full max-w-6xl px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-5">
-            <Link href="/" className="font-[var(--font-sora)] text-lg font-semibold tracking-tight text-cyan-200">
-              Younalyst
+            <Link href="/" className="inline-flex shrink-0 items-center">
+              <Image
+                src="/youanalyst-logo.svg"
+                alt="YouAnalyst"
+                width={140}
+                height={32}
+                priority
+                className="h-8 w-auto"
+              />
             </Link>
             <nav className="hidden items-center gap-4 text-sm text-slate-200 md:flex">
               <Link href="/predictions" className="hover:text-cyan-200">Feed</Link>

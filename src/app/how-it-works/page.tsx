@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "How It Works | Younalyst",
-  description: "How Younalyst predictions open, mark, close, and score using end-of-day prices.",
+  title: "How It Works | YouAnalyst",
+  description: "How YouAnalyst predictions open, mark, close, and score using end-of-day prices.",
 };
 
 const lifecycle = [
@@ -38,7 +38,7 @@ export default function HowItWorksPage() {
           Predictions run on end-of-day prices.
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-          Younalyst keeps prediction timing simple. Create and close requests do not use realtime quotes. The daily
+          YouAnalyst keeps prediction timing simple. Create and close requests do not use realtime quotes. The daily
           end-of-day run assigns entry prices, updates marks, closes requested predictions, and calculates scores.
         </p>
       </section>

@@ -1,6 +1,6 @@
-# Younalyst Web
+# YouAnalyst Web
 
-Younalyst is a Next.js web app for analyst-driven stock predictions and leaderboard tracking.
+YouAnalyst is a Next.js web app for analyst-driven stock predictions and leaderboard tracking.
 
 Current stack:
 - Next.js 16 (App Router)

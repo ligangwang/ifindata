@@ -18,7 +18,7 @@ const ibmPlexSans = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Younalyst | You're the analyst.",
+  title: "YouAnalyst | You're the analyst.",
   description: "Make public market calls, track your score, and build your analyst reputation.",
 };
 
@@ -39,7 +39,7 @@ export default function RootLayout({
           <div className="flex-1">{children}</div>
           <footer className="border-t border-white/10 bg-slate-950/80">
             <div className="mx-auto w-full max-w-6xl px-4 py-4 text-center text-xs leading-6 text-slate-400">
-              Predictions, rankings, and commentary on Younalyst are provided for informational purposes only and do
+              Predictions, rankings, and commentary on YouAnalyst are provided for informational purposes only and do
               not constitute financial, investment, legal, or tax advice. Always do your own research before making
               investment decisions.
               <div className="mt-3">
@@ -47,7 +47,7 @@ export default function RootLayout({
                   Share thoughts
                 </Link>
               </div>
-              <p className="mt-2 text-slate-500">Copyright {new Date().getFullYear()} Younalyst. All rights reserved.</p>
+              <p className="mt-2 text-slate-500">Copyright {new Date().getFullYear()} YouAnalyst. All rights reserved.</p>
             </div>
           </footer>
         </AppProviders>

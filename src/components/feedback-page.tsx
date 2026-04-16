@@ -9,7 +9,7 @@ const categoryOptions: Array<{ value: FeedbackCategory; label: string; help: str
   {
     value: "FEATURE_REQUEST",
     label: "Feature request",
-    help: "Something that would make Younalyst more useful.",
+    help: "Something that would make YouAnalyst more useful.",
   },
   {
     value: "BUG_REPORT",
@@ -88,7 +88,7 @@ export function FeedbackPage() {
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-6 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
         <p className="mb-2 text-sm font-medium text-cyan-200">Feedback</p>
         <h1 className="mb-3 font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">
-          Help shape Younalyst
+          Help shape YouAnalyst
         </h1>
         <p className="mb-6 text-sm leading-6 text-slate-300">
           Send a feature request, report a bug, or share a suggestion. The more specific you are, the easier it is to

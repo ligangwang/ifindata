@@ -412,14 +412,14 @@ export function AnalystProfilePage({
           <div className="mt-3 grid gap-3">
             {promptForNickname && !payload.profile.nickname ? (
               <p className="rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-100">
-                Choose a nickname. This is the name people will see publicly on Younalyst.
+                Choose a nickname. This is the name people will see publicly on YouAnalyst.
               </p>
             ) : null}
             <div>
               <label className="mb-1 block text-xs text-slate-400" htmlFor="edit-nickname">
                 Nickname
               </label>
-              <p className="mb-2 text-xs text-slate-500">This is the name people will see publicly on Younalyst.</p>
+              <p className="mb-2 text-xs text-slate-500">This is the name people will see publicly on YouAnalyst.</p>
               <input
                 id="edit-nickname"
                 type="text"

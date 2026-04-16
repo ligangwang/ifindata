@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       bio: "",
+      nickname: null,
       role: "user",
       stats: {
         totalPredictions: 0,
@@ -47,6 +48,8 @@ export async function POST(request: NextRequest) {
         closedPredictions: 0,
         canceledPredictions: 0,
         totalScore: 0,
+        followersCount: 0,
+        followingCount: 0,
       },
       settings: {
         isPublic: true,

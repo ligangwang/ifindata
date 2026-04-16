@@ -3,6 +3,7 @@
 import {
   browserLocalPersistence,
   createUserWithEmailAndPassword,
+  getAdditionalUserInfo,
   onAuthStateChanged,
   setPersistence,
   signInWithEmailAndPassword,
@@ -26,14 +27,19 @@ type AuthContextValue = {
   loading: boolean;
   configured: boolean;
   error: string | null;
-  signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string, password: string) => Promise<void>;
-  createAccountWithEmail: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<AuthActionResult>;
+  signInWithEmail: (email: string, password: string) => Promise<AuthActionResult>;
+  createAccountWithEmail: (email: string, password: string) => Promise<AuthActionResult>;
   signOut: () => Promise<void>;
   getIdToken: (forceRefresh?: boolean) => Promise<string | null>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+type AuthActionResult = {
+  user: User;
+  shouldCompleteProfile: boolean;
+};
 
 type AuthProviderProps = {
   children: ReactNode;
@@ -70,6 +76,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!response.ok) {
       throw new Error("Unable to create user profile.");
     }
+
+    return (await response.json()) as { created: boolean };
   }, []);
 
   useEffect(() => {
@@ -108,12 +116,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
     try {
       const { auth, googleProvider } = getFirebaseServices();
-      await signInWithPopup(auth, googleProvider);
+      const credential = await signInWithPopup(auth, googleProvider);
+      const additionalUserInfo = getAdditionalUserInfo(credential);
+      await bootstrapUserProfile(credential.user);
+
+      return {
+        user: credential.user,
+        shouldCompleteProfile: additionalUserInfo?.isNewUser ?? false,
+      };
     } catch (nextError) {
       setError(toMessage(nextError, "Google sign-in failed."));
       throw nextError;
     }
-  }, [configured]);
+  }, [bootstrapUserProfile, configured]);
 
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
@@ -126,13 +141,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setError(null);
       try {
         const { auth } = getFirebaseServices();
-        await signInWithEmailAndPassword(auth, email, password);
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        await bootstrapUserProfile(credential.user);
+
+        return {
+          user: credential.user,
+          shouldCompleteProfile: false,
+        };
       } catch (nextError) {
         setError(toMessage(nextError, "Email sign-in failed."));
         throw nextError;
       }
     },
-    [configured],
+    [bootstrapUserProfile, configured],
   );
 
   const createAccountWithEmail = useCallback(
@@ -146,13 +167,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setError(null);
       try {
         const { auth } = getFirebaseServices();
-        await createUserWithEmailAndPassword(auth, email, password);
+        const credential = await createUserWithEmailAndPassword(auth, email, password);
+        await bootstrapUserProfile(credential.user);
+
+        return {
+          user: credential.user,
+          shouldCompleteProfile: true,
+        };
       } catch (nextError) {
         setError(toMessage(nextError, "Email account creation failed."));
         throw nextError;
       }
     },
-    [configured],
+    [bootstrapUserProfile, configured],
   );
 
   const signOut = useCallback(async () => {

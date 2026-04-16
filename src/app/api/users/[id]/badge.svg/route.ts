@@ -69,7 +69,7 @@ function buildBadgeSvg(input: {
   const predictions = escapeXml(formatCount(input.totalPredictions));
   const scoreFill = scoreColor(input.score);
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="180" viewBox="0 0 420 180" role="img" aria-label="Younalyst analyst badge for ${displayName}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="180" viewBox="0 0 420 180" role="img" aria-label="YouAnalyst analyst badge for ${displayName}">
   <defs>
     <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
       <stop offset="0%" stop-color="#020617"/>
@@ -84,7 +84,7 @@ function buildBadgeSvg(input: {
   <rect x="1" y="1" width="418" height="178" rx="7" fill="none" stroke="#164e63" stroke-width="2"/>
   <rect x="18" y="18" width="32" height="32" rx="7" fill="#083344" stroke="#22d3ee" stroke-width="1.5"/>
   <text x="34" y="40" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#a5f3fc">Y</text>
-  <text x="62" y="31" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#ecfeff">Younalyst</text>
+  <text x="62" y="31" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#ecfeff">YouAnalyst</text>
   <text x="62" y="47" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="600" fill="#67e8f9" letter-spacing="1">ANALYST</text>
   <path d="M18 66 H402" stroke="#164e63" stroke-width="1"/>
   <text x="22" y="92" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#f8fafc">${displayName}</text>
@@ -116,7 +116,7 @@ export async function GET(
     const data = snapshot.data() as Record<string, unknown>;
     const stats = coerceStats(data.stats);
     const nickname = readString(data.nickname);
-    const displayName = nickname ? `@${nickname}` : readString(data.displayName) ?? "Younalyst Analyst";
+    const displayName = nickname ? `@${nickname}` : readString(data.displayName) ?? "YouAnalyst Analyst";
     const svg = buildBadgeSvg({
       displayName,
       score: stats.totalScore,

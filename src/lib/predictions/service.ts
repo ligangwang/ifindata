@@ -238,6 +238,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       markReturnValue: null,
       markScore: null,
       markDisplayPercent: null,
+      scoreAppliedToUser: null,
       closeRequestedAt: null,
       closeTargetDate: null,
       closedAt: null,

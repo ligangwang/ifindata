@@ -313,7 +313,7 @@ export function AnalystProfilePage({
     const profileUrl = absoluteUrl(profilePath);
     const label = payload?.profile.nickname ? `@${payload.profile.nickname}` : preferredName;
 
-    return `<a href="${profileUrl}"><img src="${badgeUrl}" alt="Younalyst badge for ${escapeHtmlAttribute(label)}" width="420" height="180" /></a>`;
+    return `<a href="${profileUrl}"><img src="${badgeUrl}" alt="YouAnalyst badge for ${escapeHtmlAttribute(label)}" width="420" height="180" /></a>`;
   }
 
   async function copyBadgeText(text: string, message: string) {
@@ -505,7 +505,7 @@ export function AnalystProfilePage({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Share badge</h2>
-                <p className="mt-1 text-sm text-slate-400">Embed your Younalyst analyst badge anywhere.</p>
+                <p className="mt-1 text-sm text-slate-400">Embed your YouAnalyst analyst badge anywhere.</p>
               </div>
               <button
                 type="button"
@@ -518,7 +518,7 @@ export function AnalystProfilePage({
 
             <Image
               src={badgePath}
-              alt={`Younalyst badge for ${preferredName}`}
+              alt={`YouAnalyst badge for ${preferredName}`}
               width={420}
               height={180}
               className="mt-4 w-full rounded-lg border border-white/10"

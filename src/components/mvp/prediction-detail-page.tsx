@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { DirectionBadge, formatScorePercent, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
-import { sanitizePredictionThesis } from "@/lib/predictions/types";
+import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type PredictionDetail = {
   id: string;
@@ -13,10 +13,10 @@ type PredictionDetail = {
   authorNickname: string | null;
   ticker: string;
   direction: "UP" | "DOWN";
-  entryPrice: number;
-  entryDate: string;
+  entryPrice: number | null;
+  entryDate: string | null;
   thesis: string;
-  status: "OPEN" | "CLOSED";
+  status: PredictionStatus;
   createdAt: string;
   markPrice?: number | null;
   markPriceDate?: string | null;
@@ -44,15 +44,18 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   const [commentText, setCommentText] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionPending, setActionPending] = useState<"close" | "cancel" | null>(null);
 
   async function loadAll() {
     setLoading(true);
     setError(null);
 
     try {
+      const token = await getIdToken();
+      const headers = token ? { authorization: `Bearer ${token}` } : undefined;
       const [predictionResponse, commentResponse] = await Promise.all([
-        fetch(`/api/predictions/${predictionId}`),
-        fetch(`/api/predictions/${predictionId}/comments?limit=100`),
+        fetch(`/api/predictions/${predictionId}`, { headers }),
+        fetch(`/api/predictions/${predictionId}/comments?limit=100`, { headers }),
       ]);
 
       if (!predictionResponse.ok) {
@@ -108,6 +111,37 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
     await loadAll();
   }
 
+  async function runPredictionAction(action: "close" | "cancel") {
+    const token = await getIdToken();
+    if (!token) {
+      setError("Sign in to manage this prediction.");
+      return;
+    }
+
+    setActionPending(action);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/predictions/${predictionId}/${action}`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error ?? "Unable to update prediction.");
+      }
+
+      await loadAll();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to update prediction.");
+    } finally {
+      setActionPending(null);
+    }
+  }
+
   if (loading) {
     return <main className="mx-auto w-full max-w-4xl px-4 py-8 text-sm text-slate-300">Loading prediction...</main>;
   }
@@ -117,6 +151,19 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   }
 
   const thesis = sanitizePredictionThesis(prediction.thesis);
+  const isOwner = Boolean(user && user.uid === prediction.userId);
+  const entryText =
+    typeof prediction.entryPrice === "number" && prediction.entryDate
+      ? `${prediction.entryPrice.toFixed(2)} @ ${prediction.entryDate}`
+      : "Pending";
+  const ownerAction =
+    isOwner && prediction.status === "OPENING"
+      ? { action: "cancel" as const, label: "Cancel" }
+      : isOwner && prediction.status === "OPEN"
+        ? { action: "close" as const, label: "Close" }
+        : isOwner && prediction.status === "CLOSING"
+          ? { action: "cancel" as const, label: "Cancel close" }
+          : null;
 
   return (
     <main className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-8">
@@ -127,7 +174,19 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             <span className="text-slate-500">/</span>
             <DirectionBadge direction={prediction.direction} />
           </h1>
-          <p className="text-sm text-slate-300">{prediction.status}</p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-slate-300">{prediction.status}</p>
+            {ownerAction ? (
+              <button
+                type="button"
+                onClick={() => void runPredictionAction(ownerAction.action)}
+                disabled={actionPending !== null}
+                className="rounded-lg border border-cyan-400/35 px-3 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {actionPending === ownerAction.action ? "Working..." : ownerAction.label}
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <p className="text-sm text-slate-200">{thesis || "No thesis provided."}</p>
@@ -145,7 +204,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             )}
           </p>
           <p>Created: {new Date(prediction.createdAt).toLocaleString()}</p>
-          <p>Entry: {prediction.entryPrice.toFixed(2)} @ {prediction.entryDate}</p>
+          <p>Entry: {entryText}</p>
         </div>
 
         {prediction.result ? (

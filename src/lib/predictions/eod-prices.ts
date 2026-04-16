@@ -1,3 +1,4 @@
+import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
   computeDisplayPercent,
@@ -5,13 +6,15 @@ import {
   computeScoreFromReturn,
   isPredictionDirection,
   normalizeTicker,
+  type PredictionResult,
+  type PredictionStatus,
 } from "@/lib/predictions/types";
 
 const EOD_PRICE_SOURCE = "twelve-data-time-series";
 const DEFAULT_MARKET = "US";
 const DEFAULT_LIMIT = 500;
 const MAX_LIMIT = 1000;
-const OPEN_SCAN_PAGE_SIZE = 500;
+const POSITION_SCAN_PAGE_SIZE = 500;
 const TWELVE_DATA_CHUNK_SIZE = 8;
 
 export type DailyEodMaintenanceInput = {
@@ -46,10 +49,10 @@ export type DailyEodMaintenanceResult = {
   dryRun: boolean;
   runDate: string;
   latestTradingDate: string | null;
-  openPredictions: number;
+  candidatePredictions: number;
   actionablePredictions: number;
-  scannedOpenPredictions: number;
-  hasMoreOpenPredictions: boolean;
+  scannedCandidatePredictions: number;
+  hasMoreCandidatePredictions: boolean;
   priceLoad: {
     requestedTickers: number;
     cacheHits: number;
@@ -61,7 +64,9 @@ export type DailyEodMaintenanceResult = {
   };
   marking: {
     checked: number;
+    opened: number;
     marked: number;
+    closed: number;
     missingPrice: number;
     skipped: number;
   };
@@ -90,22 +95,24 @@ type TwelveDataSymbolResponse = {
 
 type TwelveDataBatchResponse = Record<string, TwelveDataSymbolResponse>;
 
-type OpenPredictionRecord = {
+type PositionRecord = {
   ref: FirebaseFirestore.DocumentReference;
   id: string;
   userId: string;
   ticker: string;
   direction: unknown;
-  entryPrice: number;
+  entryPrice: number | null;
+  entryTargetDate: string | null;
+  closeTargetDate: string | null;
   markPriceDate: string | null;
-  status: unknown;
+  status: PredictionStatus;
 };
 
-type OpenPredictionScanResult = {
-  openPredictions: OpenPredictionRecord[];
-  predictionsNeedingWork: OpenPredictionRecord[];
-  scannedOpenPredictions: number;
-  hasMoreOpenPredictions: boolean;
+type PositionScanResult = {
+  candidatePredictions: PositionRecord[];
+  predictionsNeedingWork: PositionRecord[];
+  scannedCandidatePredictions: number;
+  hasMoreCandidatePredictions: boolean;
 };
 
 function getTwelveDataConfig(): { apiKey: string; apiUrl: string } {
@@ -148,6 +155,10 @@ function getCurrentEasternDate(): string {
   }
 
   return `${year}-${month}-${day}`;
+}
+
+function eodRunDocId(runDate: string, market = DEFAULT_MARKET): string {
+  return [market, runDate].join("_");
 }
 
 function resolveRunDate(value: string | undefined): string {
@@ -333,14 +344,24 @@ async function fetchTwelveDataEodPrices(
   return { prices, failures };
 }
 
-function toOpenPredictionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapshot): OpenPredictionRecord | null {
+function isEodCandidateStatus(value: unknown): value is "OPENING" | "OPEN" | "CLOSING" {
+  return value === "OPENING" || value === "OPEN" || value === "CLOSING";
+}
+
+function toPositionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapshot): PositionRecord | null {
   const data = snapshot.data() as Record<string, unknown>;
   const ticker = typeof data.ticker === "string" ? normalizeTicker(data.ticker) : "";
   const userId = typeof data.userId === "string" ? data.userId : "";
   const markPriceDate = typeof data.markPriceDate === "string" ? data.markPriceDate : null;
-  const entryPrice = Number(data.entryPrice);
+  const entryTargetDate = typeof data.entryTargetDate === "string" ? data.entryTargetDate : null;
+  const closeTargetDate = typeof data.closeTargetDate === "string" ? data.closeTargetDate : null;
+  const entryPrice = data.entryPrice === null || data.entryPrice === undefined ? null : Number(data.entryPrice);
 
-  if (!ticker || !userId || !Number.isFinite(entryPrice) || entryPrice <= 0) {
+  if (!ticker || !userId || !isEodCandidateStatus(data.status)) {
+    return null;
+  }
+
+  if (entryPrice !== null && (!Number.isFinite(entryPrice) || entryPrice <= 0)) {
     return null;
   }
 
@@ -351,6 +372,8 @@ function toOpenPredictionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapsho
     ticker,
     direction: data.direction,
     entryPrice,
+    entryTargetDate,
+    closeTargetDate,
     markPriceDate,
     status: data.status,
   };
@@ -374,24 +397,63 @@ function computeMark(
   };
 }
 
-async function scanOpenPredictions(
+function buildMarkUpdate(price: EodPrice, mark: { returnValue: number; score: number; displayPercent: number }, nowIso: string) {
+  return {
+    updatedAt: nowIso,
+    markPrice: price.close,
+    markPriceSource: price.source,
+    markPriceDate: price.tradingDate,
+    markPriceCapturedAt: price.loadedAt,
+    markReturnValue: mark.returnValue,
+    markScore: mark.score,
+    markDisplayPercent: mark.displayPercent,
+  };
+}
+
+function buildResult(price: EodPrice, mark: { returnValue: number; score: number; displayPercent: number }): PredictionResult {
+  return {
+    exitPrice: price.close,
+    exitPriceSource: price.source,
+    returnValue: mark.returnValue,
+    score: mark.score,
+    displayPercent: mark.displayPercent,
+  };
+}
+
+function isActionablePosition(prediction: PositionRecord, runDate: string, manualTickers: string[]): boolean {
+  if (manualTickers.length > 0 && !manualTickers.includes(prediction.ticker)) {
+    return false;
+  }
+
+  if (prediction.status === "OPENING") {
+    return typeof prediction.entryTargetDate === "string" && prediction.entryTargetDate <= runDate;
+  }
+
+  if (prediction.status === "CLOSING") {
+    return typeof prediction.closeTargetDate === "string" && prediction.closeTargetDate <= runDate;
+  }
+
+  return prediction.markPriceDate !== runDate;
+}
+
+async function scanPositionPredictions(
   db: FirebaseFirestore.Firestore,
   runDate: string,
   limit: number,
   manualTickers: string[],
-): Promise<OpenPredictionScanResult> {
-  const openPredictions: OpenPredictionRecord[] = [];
-  const predictionsNeedingWork: OpenPredictionRecord[] = [];
+): Promise<PositionScanResult> {
+  const candidatePredictions: PositionRecord[] = [];
+  const predictionsNeedingWork: PositionRecord[] = [];
   let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
-  let scannedOpenPredictions = 0;
-  let hasMoreOpenPredictions = false;
+  let scannedCandidatePredictions = 0;
+  let hasMoreCandidatePredictions = false;
 
   while (predictionsNeedingWork.length < limit) {
     let query = db
       .collection("predictions")
-      .where("status", "==", "OPEN")
+      .where("status", "in", ["OPENING", "OPEN", "CLOSING"])
       .orderBy("__name__")
-      .limit(OPEN_SCAN_PAGE_SIZE);
+      .limit(POSITION_SCAN_PAGE_SIZE);
 
     if (lastDoc) {
       query = query.startAfter(lastDoc);
@@ -399,25 +461,21 @@ async function scanOpenPredictions(
 
     const snapshot = await query.get();
     if (snapshot.empty) {
-      hasMoreOpenPredictions = false;
+      hasMoreCandidatePredictions = false;
       break;
     }
 
-    scannedOpenPredictions += snapshot.size;
+    scannedCandidatePredictions += snapshot.size;
 
     for (const doc of snapshot.docs) {
-      const prediction = toOpenPredictionRecord(doc);
+      const prediction = toPositionRecord(doc);
       if (!prediction) {
         continue;
       }
 
-      openPredictions.push(prediction);
+      candidatePredictions.push(prediction);
 
-      const isActionable = manualTickers.length > 0
-        ? manualTickers.includes(prediction.ticker)
-        : prediction.markPriceDate !== runDate;
-
-      if (isActionable) {
+      if (isActionablePosition(prediction, runDate, manualTickers)) {
         predictionsNeedingWork.push(prediction);
         if (predictionsNeedingWork.length >= limit) {
           break;
@@ -426,18 +484,18 @@ async function scanOpenPredictions(
     }
 
     lastDoc = snapshot.docs[snapshot.docs.length - 1] ?? null;
-    hasMoreOpenPredictions = snapshot.size === OPEN_SCAN_PAGE_SIZE;
+    hasMoreCandidatePredictions = snapshot.size === POSITION_SCAN_PAGE_SIZE;
 
-    if (!hasMoreOpenPredictions) {
+    if (!hasMoreCandidatePredictions) {
       break;
     }
   }
 
   return {
-    openPredictions,
+    candidatePredictions,
     predictionsNeedingWork,
-    scannedOpenPredictions,
-    hasMoreOpenPredictions,
+    scannedCandidatePredictions,
+    hasMoreCandidatePredictions,
   };
 }
 
@@ -452,6 +510,7 @@ export async function runDailyEodMaintenance(
   const limit = clampLimit(input.limit);
   const nowIso = new Date().toISOString();
   const manualTickers = input.tickers?.length ? uniqueTickers(input.tickers) : [];
+  const runRef = db.collection("eod_runs").doc(eodRunDocId(runDate));
 
   console.info("[daily-eod-maintenance] Starting run", {
     runDate,
@@ -462,195 +521,257 @@ export async function runDailyEodMaintenance(
     manualTickers,
   });
 
-  const {
-    openPredictions,
-    predictionsNeedingWork,
-    scannedOpenPredictions,
-    hasMoreOpenPredictions,
-  } = await scanOpenPredictions(db, runDate, limit, manualTickers);
-  const requestedTickers = manualTickers.length > 0
-    ? manualTickers
-    : uniqueTickers(predictionsNeedingWork.map((item) => item.ticker));
-
-  console.info("[daily-eod-maintenance] Open prediction scan completed", {
-    runDate,
-    openPredictions: openPredictions.length,
-    actionablePredictions: predictionsNeedingWork.length,
-    scannedOpenPredictions,
-    hasMoreOpenPredictions,
-    requestedTickers,
-  });
-
-  const priceLoad: DailyEodMaintenanceResult["priceLoad"] = {
-    requestedTickers: requestedTickers.length,
-    cacheHits: 0,
-    loaded: 0,
-    failed: 0,
-    skipped: loadPrices ? openPredictions.length - predictionsNeedingWork.length : requestedTickers.length,
-    prices: [],
-    failures: [],
-  };
-
-  const priceByTicker = new Map<string, EodPrice>();
-
-  if (loadPrices && requestedTickers.length > 0) {
-    console.info("[daily-eod-maintenance] Loading EOD prices", {
+  if (!dryRun) {
+    await runRef.set({
+      market: DEFAULT_MARKET,
       runDate,
+      status: "STARTED",
+      startedAt: nowIso,
+      completedAt: null,
+      failedAt: null,
+      error: null,
+    }, { merge: true });
+  }
+
+  try {
+    const {
+      candidatePredictions,
+      predictionsNeedingWork,
+      scannedCandidatePredictions,
+      hasMoreCandidatePredictions,
+    } = await scanPositionPredictions(db, runDate, limit, manualTickers);
+    const requestedTickers = manualTickers.length > 0
+      ? manualTickers
+      : uniqueTickers(predictionsNeedingWork.map((item) => item.ticker));
+
+    console.info("[daily-eod-maintenance] Position scan completed", {
+      runDate,
+      candidatePredictions: candidatePredictions.length,
+      actionablePredictions: predictionsNeedingWork.length,
+      scannedCandidatePredictions,
+      hasMoreCandidatePredictions,
       requestedTickers,
     });
 
-    const cachedPrices = await readCachedEodPrices(requestedTickers, runDate);
-    cachedPrices.forEach((price, ticker) => {
-      priceByTicker.set(ticker, price);
-    });
-    priceLoad.cacheHits = cachedPrices.size;
-
-    const tickersToFetch = requestedTickers.filter((ticker) => !cachedPrices.has(ticker));
-    const fetched = await fetchTwelveDataEodPrices(tickersToFetch, runDate, nowIso);
-    priceLoad.loaded = fetched.prices.length;
-    priceLoad.failed = fetched.failures.length;
-    priceLoad.prices = [...cachedPrices.values(), ...fetched.prices].map((price) => ({
-      ticker: price.ticker,
-      tradingDate: price.tradingDate,
-      close: price.close,
-      source: price.source,
-    }));
-    priceLoad.failures = fetched.failures;
-
-    console.info("[daily-eod-maintenance] EOD price load completed", {
-      runDate,
+    const priceLoad: DailyEodMaintenanceResult["priceLoad"] = {
       requestedTickers: requestedTickers.length,
-      cacheHits: priceLoad.cacheHits,
-      tickersFetched: tickersToFetch.length,
-      loaded: priceLoad.loaded,
-      failed: priceLoad.failed,
-      prices: priceLoad.prices,
-      failures: priceLoad.failures,
-    });
+      cacheHits: 0,
+      loaded: 0,
+      failed: 0,
+      skipped: loadPrices ? candidatePredictions.length - predictionsNeedingWork.length : requestedTickers.length,
+      prices: [],
+      failures: [],
+    };
 
-    for (const price of fetched.prices) {
-      priceByTicker.set(price.ticker, price);
-      if (!dryRun) {
-        await db
-          .collection("eod_prices")
-          .doc(eodPriceDocId(price.ticker, price.tradingDate, price.market))
-          .set(price, { merge: true });
+    const priceByTicker = new Map<string, EodPrice>();
+
+    if (loadPrices && requestedTickers.length > 0) {
+      console.info("[daily-eod-maintenance] Loading EOD prices", {
+        runDate,
+        requestedTickers,
+      });
+
+      const cachedPrices = await readCachedEodPrices(requestedTickers, runDate);
+      cachedPrices.forEach((price, ticker) => {
+        priceByTicker.set(ticker, price);
+      });
+      priceLoad.cacheHits = cachedPrices.size;
+
+      const tickersToFetch = requestedTickers.filter((ticker) => !cachedPrices.has(ticker));
+      const fetched = await fetchTwelveDataEodPrices(tickersToFetch, runDate, nowIso);
+      priceLoad.loaded = fetched.prices.length;
+      priceLoad.failed = fetched.failures.length;
+      priceLoad.prices = [...cachedPrices.values(), ...fetched.prices].map((price) => ({
+        ticker: price.ticker,
+        tradingDate: price.tradingDate,
+        close: price.close,
+        source: price.source,
+      }));
+      priceLoad.failures = fetched.failures;
+
+      console.info("[daily-eod-maintenance] EOD price load completed", {
+        runDate,
+        requestedTickers: requestedTickers.length,
+        cacheHits: priceLoad.cacheHits,
+        tickersFetched: tickersToFetch.length,
+        loaded: priceLoad.loaded,
+        failed: priceLoad.failed,
+        prices: priceLoad.prices,
+        failures: priceLoad.failures,
+      });
+
+      for (const price of fetched.prices) {
+        priceByTicker.set(price.ticker, price);
+        if (!dryRun) {
+          await db
+            .collection("eod_prices")
+            .doc(eodPriceDocId(price.ticker, price.tradingDate, price.market))
+            .set(price, { merge: true });
+        }
+      }
+    } else {
+      console.info("[daily-eod-maintenance] EOD price load skipped", {
+        runDate,
+        loadPrices,
+        requestedTickers: requestedTickers.length,
+      });
+    }
+
+    const latestTradingDate = Array.from(priceByTicker.values())
+      .map((price) => price.tradingDate)
+      .sort()
+      .at(-1) ?? null;
+    const marking: DailyEodMaintenanceResult["marking"] = {
+      checked: markPositions ? predictionsNeedingWork.length : 0,
+      opened: 0,
+      marked: 0,
+      closed: 0,
+      missingPrice: 0,
+      skipped: 0,
+    };
+
+    if (markPositions) {
+      for (const prediction of predictionsNeedingWork) {
+        const price = priceByTicker.get(prediction.ticker);
+        if (!price) {
+          marking.missingPrice += 1;
+          console.warn("[daily-eod-maintenance] Missing EOD price for prediction", {
+            runDate,
+            predictionId: prediction.id,
+            ticker: prediction.ticker,
+            status: prediction.status,
+          });
+          continue;
+        }
+
+        if (dryRun) {
+          if (prediction.status === "OPENING") {
+            marking.opened += 1;
+          } else if (prediction.status === "CLOSING") {
+            marking.marked += 1;
+            marking.closed += 1;
+          } else {
+            marking.marked += 1;
+          }
+          continue;
+        }
+
+        await db.runTransaction(async (tx) => {
+          const predictionSnapshot = await tx.get(prediction.ref);
+
+          if (!predictionSnapshot.exists) {
+            marking.skipped += 1;
+            console.warn("[daily-eod-maintenance] Skipped prediction because prediction doc is missing", {
+              runDate,
+              predictionId: prediction.id,
+            });
+            return;
+          }
+
+          const latest = predictionSnapshot.data() as Record<string, unknown>;
+          const latestStatus = latest.status;
+          if (latestStatus !== prediction.status || !isEodCandidateStatus(latestStatus)) {
+            marking.skipped += 1;
+            console.warn("[daily-eod-maintenance] Skipped prediction because status changed", {
+              runDate,
+              predictionId: prediction.id,
+              status: latestStatus,
+            });
+            return;
+          }
+
+          if (latestStatus === "OPENING") {
+            tx.update(prediction.ref, {
+              updatedAt: nowIso,
+              status: "OPEN",
+              entryPrice: price.close,
+              entryPriceSource: price.source,
+              entryDate: price.tradingDate,
+              entryTime: "16:00:00",
+              entryCapturedAt: price.loadedAt,
+            });
+            tx.update(db.collection("users").doc(prediction.userId), {
+              updatedAt: nowIso,
+              "stats.openingPredictions": FieldValue.increment(-1),
+              "stats.openPredictions": FieldValue.increment(1),
+            });
+            marking.opened += 1;
+            return;
+          }
+
+          const entryPrice = Number(latest.entryPrice);
+          const mark = computeMark(latest.direction, entryPrice, price.close);
+          if (!mark) {
+            marking.skipped += 1;
+            console.warn("[daily-eod-maintenance] Skipped prediction with invalid mark inputs", {
+              runDate,
+              predictionId: prediction.id,
+              ticker: prediction.ticker,
+              direction: latest.direction,
+              entryPrice,
+            });
+            return;
+          }
+
+          const markUpdate = buildMarkUpdate(price, mark, nowIso);
+
+          if (latestStatus === "CLOSING") {
+            const result = buildResult(price, mark);
+            tx.update(prediction.ref, {
+              ...markUpdate,
+              status: "CLOSED",
+              closedAt: nowIso,
+              result,
+            });
+            tx.update(db.collection("users").doc(prediction.userId), {
+              updatedAt: nowIso,
+              "stats.closingPredictions": FieldValue.increment(-1),
+              "stats.closedPredictions": FieldValue.increment(1),
+              "stats.totalScore": FieldValue.increment(result.score),
+            });
+            marking.marked += 1;
+            marking.closed += 1;
+            return;
+          }
+
+          tx.update(prediction.ref, markUpdate);
+          marking.marked += 1;
+        });
       }
     }
-  } else {
-    console.info("[daily-eod-maintenance] EOD price load skipped", {
-      runDate,
-      loadPrices,
-      requestedTickers: requestedTickers.length,
-    });
-  }
 
-  const latestTradingDate = Array.from(priceByTicker.values())
-    .map((price) => price.tradingDate)
-    .sort()
-    .at(-1) ?? null;
-  const marking: DailyEodMaintenanceResult["marking"] = {
-    checked: markPositions ? predictionsNeedingWork.length : 0,
-    marked: 0,
-    missingPrice: 0,
-    skipped: 0,
-  };
-
-  if (!markPositions) {
-    const result = {
+    const result: DailyEodMaintenanceResult = {
       dryRun,
       runDate,
       latestTradingDate,
-      openPredictions: openPredictions.length,
+      candidatePredictions: candidatePredictions.length,
       actionablePredictions: predictionsNeedingWork.length,
-      scannedOpenPredictions,
-      hasMoreOpenPredictions,
+      scannedCandidatePredictions,
+      hasMoreCandidatePredictions,
       priceLoad,
       marking,
     };
+    if (!dryRun) {
+      await runRef.set({
+        market: DEFAULT_MARKET,
+        runDate,
+        status: "COMPLETED",
+        completedAt: new Date().toISOString(),
+        error: null,
+      }, { merge: true });
+    }
     console.info("[daily-eod-maintenance] Completed run", result);
     return result;
-  }
-
-  for (const prediction of predictionsNeedingWork) {
-    const price = priceByTicker.get(prediction.ticker);
-    if (!price) {
-      marking.missingPrice += 1;
-      console.warn("[daily-eod-maintenance] Missing EOD price for prediction", {
+  } catch (error) {
+    if (!dryRun) {
+      await runRef.set({
+        market: DEFAULT_MARKET,
         runDate,
-        predictionId: prediction.id,
-        ticker: prediction.ticker,
-      });
-      continue;
+        status: "FAILED",
+        failedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+      }, { merge: true });
     }
-
-    const mark = computeMark(prediction.direction, prediction.entryPrice, price.close);
-    if (!mark) {
-      marking.skipped += 1;
-      console.warn("[daily-eod-maintenance] Skipped prediction with invalid mark inputs", {
-        runDate,
-        predictionId: prediction.id,
-        ticker: prediction.ticker,
-        direction: prediction.direction,
-      });
-      continue;
-    }
-
-    if (dryRun) {
-      marking.marked += 1;
-      continue;
-    }
-
-    await db.runTransaction(async (tx) => {
-      const predictionSnapshot = await tx.get(prediction.ref);
-
-      if (!predictionSnapshot.exists) {
-        marking.skipped += 1;
-        console.warn("[daily-eod-maintenance] Skipped prediction because prediction doc is missing", {
-          runDate,
-          predictionId: prediction.id,
-        });
-        return;
-      }
-
-      const latest = predictionSnapshot.data() as Record<string, unknown>;
-      if (latest.status !== "OPEN") {
-        marking.skipped += 1;
-        console.warn("[daily-eod-maintenance] Skipped prediction because status changed", {
-          runDate,
-          predictionId: prediction.id,
-          status: latest.status,
-        });
-        return;
-      }
-
-      const markUpdate = {
-        updatedAt: nowIso,
-        markPrice: price.close,
-        markPriceSource: price.source,
-        markPriceDate: price.tradingDate,
-        markPriceCapturedAt: price.loadedAt,
-        markReturnValue: mark.returnValue,
-        markScore: mark.score,
-        markDisplayPercent: mark.displayPercent,
-      };
-
-      tx.update(prediction.ref, markUpdate);
-      marking.marked += 1;
-    });
+    throw error;
   }
-
-  const result = {
-    dryRun,
-    runDate,
-    latestTradingDate,
-    openPredictions: openPredictions.length,
-    actionablePredictions: predictionsNeedingWork.length,
-    scannedOpenPredictions,
-    hasMoreOpenPredictions,
-    priceLoad,
-    marking,
-  };
-  console.info("[daily-eod-maintenance] Completed run", result);
-  return result;
 }

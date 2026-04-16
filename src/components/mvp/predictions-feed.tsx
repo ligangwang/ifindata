@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DirectionBadge, formatScorePercent, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
-import { sanitizePredictionThesis } from "@/lib/predictions/types";
+import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
+
+type PublicStatusFilter = "ALL" | "OPENING" | "OPEN" | "CLOSING" | "CLOSED";
 
 type Prediction = {
   id: string;
@@ -12,10 +14,10 @@ type Prediction = {
   authorNickname: string | null;
   ticker: string;
   direction: "UP" | "DOWN";
-  entryPrice: number;
-  entryDate: string;
+  entryPrice: number | null;
+  entryDate: string | null;
   thesis: string;
-  status: "OPEN" | "CLOSED";
+  status: PredictionStatus;
   createdAt: string;
   markPrice?: number | null;
   markPriceDate?: string | null;
@@ -32,7 +34,7 @@ type FeedResponse = {
 };
 
 export function PredictionsFeed({ title }: { title: string }) {
-  const [status, setStatus] = useState<"ALL" | "OPEN" | "CLOSED">("ALL");
+  const [status, setStatus] = useState<PublicStatusFilter>("ALL");
   const [items, setItems] = useState<Prediction[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,7 +106,7 @@ export function PredictionsFeed({ title }: { title: string }) {
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">{title}</h1>
           <div className="inline-flex rounded-full border border-slate-700 bg-slate-800/70 p-1 text-xs">
-            {(["ALL", "OPEN", "CLOSED"] as const).map((option) => (
+            {(["ALL", "OPENING", "OPEN", "CLOSING", "CLOSED"] as const).map((option) => (
               <button
                 key={option}
                 type="button"

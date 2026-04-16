@@ -1,5 +1,6 @@
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
 import { createPrediction, listPredictions, validateCreatePredictionInput } from "@/lib/predictions/service";
+import { PREDICTION_STATUSES, type PredictionStatus } from "@/lib/predictions/types";
 import { NextRequest, NextResponse } from "next/server";
 
 function parseLimit(raw: string | null): number {
@@ -11,6 +12,10 @@ function parseLimit(raw: string | null): number {
   return Math.max(1, Math.min(50, Math.trunc(parsed)));
 }
 
+function isPredictionStatus(value: string | null): value is PredictionStatus {
+  return typeof value === "string" && (PREDICTION_STATUSES as readonly string[]).includes(value);
+}
+
 export async function GET(request: NextRequest) {
   const statusParam = request.nextUrl.searchParams.get("status");
   const userId = request.nextUrl.searchParams.get("userId")?.trim() ?? "";
@@ -18,8 +23,8 @@ export async function GET(request: NextRequest) {
   const cursorCreatedAt = request.nextUrl.searchParams.get("cursorCreatedAt")?.trim() ?? "";
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
 
-  if (statusParam && statusParam !== "OPEN" && statusParam !== "CLOSED") {
-    return NextResponse.json({ error: "status must be OPEN or CLOSED" }, { status: 400 });
+  if (statusParam && !isPredictionStatus(statusParam)) {
+    return NextResponse.json({ error: "status must be OPENING, OPEN, CLOSING, CLOSED, or CANCELED" }, { status: 400 });
   }
 
   const includePrivate = includePrivateParam === "true";
@@ -32,7 +37,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await listPredictions({
-      status: statusParam === "OPEN" || statusParam === "CLOSED" ? statusParam : undefined,
+      status: isPredictionStatus(statusParam) ? statusParam : undefined,
       userId: userId || undefined,
       includePrivate: includePrivateForQuery,
       cursorCreatedAt: cursorCreatedAt || undefined,

@@ -2,6 +2,8 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeTicker, sanitizePredictionThesis, type Prediction } from "@/lib/predictions/types";
 
+const PUBLIC_PREDICTION_STATUSES = ["OPENING", "OPEN", "CLOSING", "CLOSED"] as const;
+
 function parseLimit(raw: string | null): number {
   const parsed = Number(raw ?? "50");
   if (!Number.isFinite(parsed)) {
@@ -51,7 +53,9 @@ async function listTickerPredictions(
       .limit(limit)
       .get();
 
-    return snapshot.docs.map(mapPredictionDoc);
+    return snapshot.docs
+      .filter((doc) => PUBLIC_PREDICTION_STATUSES.includes(doc.get("status") as (typeof PUBLIC_PREDICTION_STATUSES)[number]))
+      .map(mapPredictionDoc);
   } catch (error) {
     if (!isMissingIndexError(error)) {
       throw error;
@@ -75,7 +79,12 @@ async function listTickerPredictions(
 
       for (const doc of snapshot.docs) {
         const data = doc.data() as Record<string, unknown>;
-        if (data.ticker === ticker && data.visibility === "PUBLIC") {
+        if (
+          data.ticker === ticker &&
+          data.visibility === "PUBLIC" &&
+          typeof data.status === "string" &&
+          (PUBLIC_PREDICTION_STATUSES as readonly string[]).includes(data.status)
+        ) {
           items.push(mapPredictionDoc(doc));
         }
 

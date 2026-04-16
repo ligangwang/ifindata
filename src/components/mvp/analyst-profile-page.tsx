@@ -4,17 +4,19 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { DirectionBadge, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
-import { sanitizePredictionThesis } from "@/lib/predictions/types";
+import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
+
+type ProfileStatusFilter = "ALL" | PredictionStatus;
 
 type Prediction = {
   id: string;
   ticker: string;
   direction: "UP" | "DOWN";
-  entryPrice: number;
-  entryDate: string;
+  entryPrice: number | null;
+  entryDate: string | null;
   thesis: string;
   createdAt: string;
-  status: "OPEN" | "CLOSED";
+  status: PredictionStatus;
   markPrice?: number | null;
   markPriceDate?: string | null;
   markDisplayPercent?: number | null;
@@ -33,8 +35,11 @@ type ProfilePayload = {
     bio: string;
     stats: {
       totalPredictions: number;
+      openingPredictions: number;
       openPredictions: number;
+      closingPredictions: number;
       closedPredictions: number;
+      canceledPredictions: number;
       totalScore: number;
     };
   };
@@ -50,7 +55,7 @@ function scoreText(score: number): string {
 export function AnalystProfilePage({ userId }: { userId: string }) {
   const { user, getIdToken } = useAuth();
   const isOwner = Boolean(user && user.uid === userId);
-  const [status, setStatus] = useState<"ALL" | "OPEN" | "CLOSED">("ALL");
+  const [status, setStatus] = useState<ProfileStatusFilter>("ALL");
   const [payload, setPayload] = useState<ProfilePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -285,7 +290,7 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
         ) : (
           <p className="mt-2 text-sm text-slate-300">{payload.profile.bio || "No bio yet."}</p>
         )}
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-4 lg:grid-cols-6">
           <div className="rounded-xl border border-white/10 p-3">
             <p className="text-slate-400">Total Score</p>
             <p className="font-semibold text-cyan-100">{scoreText(payload.profile.stats.totalScore)}</p>
@@ -295,12 +300,24 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
             <p className="font-semibold text-cyan-100">{payload.profile.stats.totalPredictions}</p>
           </div>
           <div className="rounded-xl border border-white/10 p-3">
+            <p className="text-slate-400">Opening</p>
+            <p className="font-semibold text-cyan-100">{payload.profile.stats.openingPredictions}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 p-3">
             <p className="text-slate-400">Open</p>
             <p className="font-semibold text-cyan-100">{payload.profile.stats.openPredictions}</p>
           </div>
           <div className="rounded-xl border border-white/10 p-3">
+            <p className="text-slate-400">Closing</p>
+            <p className="font-semibold text-cyan-100">{payload.profile.stats.closingPredictions}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 p-3">
             <p className="text-slate-400">Closed</p>
             <p className="font-semibold text-cyan-100">{payload.profile.stats.closedPredictions}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 p-3">
+            <p className="text-slate-400">Canceled</p>
+            <p className="font-semibold text-cyan-100">{payload.profile.stats.canceledPredictions}</p>
           </div>
         </div>
       </section>
@@ -309,7 +326,7 @@ export function AnalystProfilePage({ userId }: { userId: string }) {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Prediction history</h2>
           <div className="inline-flex rounded-full border border-slate-700 bg-slate-800/70 p-1 text-xs">
-            {(["ALL", "OPEN", "CLOSED"] as const).map((option) => (
+            {(["ALL", "OPENING", "OPEN", "CLOSING", "CLOSED", "CANCELED"] as const).map((option) => (
               <button
                 key={option}
                 type="button"

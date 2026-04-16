@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DirectionBadge, formatScorePercent, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
+import { type PredictionStatus } from "@/lib/predictions/types";
 
 type Prediction = {
   id: string;
@@ -10,12 +11,11 @@ type Prediction = {
   authorDisplayName: string | null;
   authorNickname: string | null;
   direction: "UP" | "DOWN";
-  entryPrice: number;
-  entryDate: string;
+  entryPrice: number | null;
+  entryDate: string | null;
   thesis: string;
-  status: "ACTIVE" | "SETTLED";
+  status: PredictionStatus;
   createdAt: string;
-  expiryAt: string;
   markPrice?: number | null;
   markPriceDate?: string | null;
   markDisplayPercent?: number | null;

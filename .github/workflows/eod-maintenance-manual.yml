@@ -29,10 +29,10 @@ on:
         required: true
         default: true
         type: boolean
-      settle:
-        description: Mark and settle predictions
+      mark_predictions:
+        description: Mark open predictions
         required: true
-        default: false
+        default: true
         type: boolean
       dry_run:
         description: Run without Firestore writes
@@ -106,7 +106,7 @@ jobs:
           LIMIT: ${{ inputs.limit }}
           TICKERS: ${{ inputs.tickers }}
           LOAD_PRICES: ${{ inputs.load_prices }}
-          SETTLE: ${{ inputs.settle }}
+          MARK_PREDICTIONS: ${{ inputs.mark_predictions }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
@@ -130,12 +130,12 @@ jobs:
             --arg tickers "$TICKERS" \
             --argjson limit "$LIMIT" \
             --argjson loadPrices "$LOAD_PRICES" \
-            --argjson settle "$SETTLE" \
+            --argjson markPredictions "$MARK_PREDICTIONS" \
             --argjson dryRun "$DRY_RUN" \
             '{
               limit: $limit,
               loadPrices: $loadPrices,
-              settle: $settle,
+              markPredictions: $markPredictions,
               dryRun: $dryRun
             }
             + (if $runDate == "" then {} else { runDate: $runDate } end)

@@ -24,7 +24,8 @@ export async function GET(
         ? prediction.authorDisplayName.trim()
         : null;
 
-    if (visibility !== "PUBLIC") {
+    const isOwnerOnlyStatus = prediction.status === "CANCELED";
+    if (visibility !== "PUBLIC" || isOwnerOnlyStatus) {
       const decoded = await getDecodedUserFromRequest(request);
       if (!decoded || !predictionUserId || decoded.uid !== predictionUserId) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });

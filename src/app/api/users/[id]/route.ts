@@ -5,8 +5,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 type UserStats = {
   totalPredictions: number;
-  activePredictions: number;
-  settledPredictions: number;
+  openingPredictions: number;
+  openPredictions: number;
+  closingPredictions: number;
+  closedPredictions: number;
+  canceledPredictions: number;
   totalScore: number;
 };
 
@@ -15,10 +18,17 @@ function coerceStats(raw: unknown): UserStats {
 
   return {
     totalPredictions: Number(source.totalPredictions ?? 0),
-    activePredictions: Number(source.activePredictions ?? 0),
-    settledPredictions: Number(source.settledPredictions ?? 0),
+    openingPredictions: Number(source.openingPredictions ?? 0),
+    openPredictions: Number(source.openPredictions ?? 0),
+    closingPredictions: Number(source.closingPredictions ?? 0),
+    closedPredictions: Number(source.closedPredictions ?? 0),
+    canceledPredictions: Number(source.canceledPredictions ?? 0),
     totalScore: Number(source.totalScore ?? 0),
   };
+}
+
+function isPredictionStatus(value: string | null): value is "OPENING" | "OPEN" | "CLOSING" | "CLOSED" | "CANCELED" {
+  return value === "OPENING" || value === "OPEN" || value === "CLOSING" || value === "CLOSED" || value === "CANCELED";
 }
 
 export async function GET(
@@ -33,7 +43,7 @@ export async function GET(
     const isOwner = Boolean(decoded && decoded.uid === id);
 
     const statusParam = request.nextUrl.searchParams.get("status");
-    const status = statusParam === "ACTIVE" || statusParam === "SETTLED" ? statusParam : undefined;
+    const status = isPredictionStatus(statusParam) ? statusParam : undefined;
 
     const predictions = await listPredictions({
       userId: id,
@@ -64,8 +74,11 @@ export async function GET(
         nickname: null,
         stats: {
           totalPredictions: 0,
-          activePredictions: 0,
-          settledPredictions: 0,
+          openingPredictions: 0,
+          openPredictions: 0,
+          closingPredictions: 0,
+          closedPredictions: 0,
+          canceledPredictions: 0,
           totalScore: 0,
         },
         settings: {

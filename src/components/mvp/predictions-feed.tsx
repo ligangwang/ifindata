@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DirectionBadge, formatScorePercent, PredictionMarkSummary } from "@/components/mvp/prediction-ui";
-import { sanitizePredictionThesis } from "@/lib/predictions/types";
+import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
+
+type PublicStatusFilter = "ALL" | "OPENING" | "OPEN" | "CLOSING" | "CLOSED";
 
 type Prediction = {
   id: string;
@@ -12,12 +14,11 @@ type Prediction = {
   authorNickname: string | null;
   ticker: string;
   direction: "UP" | "DOWN";
-  entryPrice: number;
-  entryDate: string;
+  entryPrice: number | null;
+  entryDate: string | null;
   thesis: string;
-  status: "ACTIVE" | "SETTLED";
+  status: PredictionStatus;
   createdAt: string;
-  expiryAt: string;
   markPrice?: number | null;
   markPriceDate?: string | null;
   markDisplayPercent?: number | null;
@@ -33,7 +34,7 @@ type FeedResponse = {
 };
 
 export function PredictionsFeed({ title }: { title: string }) {
-  const [status, setStatus] = useState<"ALL" | "ACTIVE" | "SETTLED">("ALL");
+  const [status, setStatus] = useState<PublicStatusFilter>("ALL");
   const [items, setItems] = useState<Prediction[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,7 +106,7 @@ export function PredictionsFeed({ title }: { title: string }) {
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">{title}</h1>
           <div className="inline-flex rounded-full border border-slate-700 bg-slate-800/70 p-1 text-xs">
-            {(["ALL", "ACTIVE", "SETTLED"] as const).map((option) => (
+            {(["ALL", "OPENING", "OPEN", "CLOSING", "CLOSED"] as const).map((option) => (
               <button
                 key={option}
                 type="button"
@@ -171,7 +172,6 @@ export function PredictionsFeed({ title }: { title: string }) {
                   </p>
                 </div>
                 <PredictionMarkSummary prediction={item} />
-                <p className="mt-1 text-xs text-slate-400">Expires {new Date(item.expiryAt).toLocaleDateString()}</p>
               </div>
             );
           })}

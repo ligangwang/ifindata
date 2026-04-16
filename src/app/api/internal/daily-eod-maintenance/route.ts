@@ -8,7 +8,7 @@ type DailyEodMaintenanceRequest = {
   dryRun?: unknown;
   tickers?: unknown;
   loadPrices?: unknown;
-  settle?: unknown;
+  markPredictions?: unknown;
 };
 
 function readString(value: unknown): string | undefined {
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       dryRun: readBoolean(payload.dryRun),
       tickers: readTickers(payload.tickers),
       loadPrices: readBoolean(payload.loadPrices),
-      settle: readBoolean(payload.settle),
+      markPredictions: readBoolean(payload.markPredictions),
     });
 
     return NextResponse.json({

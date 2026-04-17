@@ -9,6 +9,7 @@ type DailyEodMaintenanceRequest = {
   tickers?: unknown;
   loadPrices?: unknown;
   markPredictions?: unknown;
+  rollForward?: unknown;
 };
 
 function readString(value: unknown): string | undefined {
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
       tickers: readTickers(payload.tickers),
       loadPrices: readBoolean(payload.loadPrices),
       markPredictions: readBoolean(payload.markPredictions),
+      rollForward: readBoolean(payload.rollForward),
     });
 
     return NextResponse.json({

@@ -34,6 +34,11 @@ on:
         required: true
         default: true
         type: boolean
+      roll_forward:
+        description: Run selected date forward through latest cached EOD date
+        required: true
+        default: false
+        type: boolean
       dry_run:
         description: Run without Firestore writes
         required: true
@@ -107,6 +112,7 @@ jobs:
           TICKERS: ${{ inputs.tickers }}
           LOAD_PRICES: ${{ inputs.load_prices }}
           MARK_PREDICTIONS: ${{ inputs.mark_predictions }}
+          ROLL_FORWARD: ${{ inputs.roll_forward }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
@@ -131,11 +137,13 @@ jobs:
             --argjson limit "$LIMIT" \
             --argjson loadPrices "$LOAD_PRICES" \
             --argjson markPredictions "$MARK_PREDICTIONS" \
+            --argjson rollForward "$ROLL_FORWARD" \
             --argjson dryRun "$DRY_RUN" \
             '{
               limit: $limit,
               loadPrices: $loadPrices,
               markPredictions: $markPredictions,
+              rollForward: $rollForward,
               dryRun: $dryRun
             }
             + (if $runDate == "" then {} else { runDate: $runDate } end)

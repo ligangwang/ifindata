@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, PredictionMarkSummary } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type ProfileStatusFilter = "ALL" | PredictionStatus;
@@ -602,7 +602,7 @@ export function AnalystProfilePage({
                 {sanitizePredictionThesis(prediction.thesis) || "No thesis provided."}
               </p>
               <p className="mt-1 break-words text-xs text-slate-400">
-                Created {new Date(prediction.createdAt).toLocaleString()}
+                <RelativeTime value={prediction.createdAt} prefix="Created" />
               </p>
               {prediction.result ? (
                 <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>

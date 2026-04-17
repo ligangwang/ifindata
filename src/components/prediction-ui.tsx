@@ -23,6 +23,48 @@ export function formatMarkPercent(markDisplayPercent: number): string {
   return formatSignedPercent(markDisplayPercent);
 }
 
+export function formatAbsoluteDateTime(value: string): string {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return value;
+  }
+  return new Date(timestamp).toLocaleString();
+}
+
+export function formatRelativeDateTime(value: string, now = Date.now()): string {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return value;
+  }
+
+  const elapsedSeconds = Math.max(0, Math.floor((now - timestamp) / 1000));
+  if (elapsedSeconds < 60) {
+    return `${Math.max(1, elapsedSeconds)}s`;
+  }
+  if (elapsedSeconds < 60 * 60) {
+    return `${Math.floor(elapsedSeconds / 60)}m`;
+  }
+  if (elapsedSeconds < 24 * 60 * 60) {
+    return `${Math.floor(elapsedSeconds / (60 * 60))}h`;
+  }
+  if (elapsedSeconds < 30 * 24 * 60 * 60) {
+    return `${Math.floor(elapsedSeconds / (24 * 60 * 60))}d`;
+  }
+  if (elapsedSeconds < 365 * 24 * 60 * 60) {
+    return `${Math.floor(elapsedSeconds / (30 * 24 * 60 * 60))}M`;
+  }
+  return `${Math.floor(elapsedSeconds / (365 * 24 * 60 * 60))}y`;
+}
+
+export function RelativeTime({ value, prefix }: { value: string; prefix?: string }) {
+  return (
+    <time dateTime={value} title={formatAbsoluteDateTime(value)}>
+      {prefix ? `${prefix} ` : ""}
+      {formatRelativeDateTime(value)}
+    </time>
+  );
+}
+
 export function markToneClass(value: number): string {
   if (value > 0) {
     return "text-emerald-300";

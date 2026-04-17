@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type Prediction = {
@@ -127,7 +127,9 @@ export function TickerPage({ ticker }: { ticker: string }) {
                   <span className="text-slate-500">/</span>
                   <span>{formatPredictionStatus(prediction.status)}</span>
                 </p>
-                <p className="text-xs text-slate-400">{new Date(prediction.createdAt).toLocaleString()}</p>
+                <p className="text-xs text-slate-400">
+                  <RelativeTime value={prediction.createdAt} />
+                </p>
               </div>
               <Link href={`/predictions/${prediction.id}`} className="mt-2 block line-clamp-2 text-sm text-slate-100 hover:text-slate-50">
                 {prediction.thesis || "No thesis provided."}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type PredictionDetail = {
@@ -170,7 +170,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="flex flex-wrap items-center gap-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
-            <span>{prediction.ticker}</span>
+            <span>{formatTickerSymbol(prediction.ticker)}</span>
             <span className="text-slate-500">/</span>
             <DirectionBadge direction={prediction.direction} />
           </h1>

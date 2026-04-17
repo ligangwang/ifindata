@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
+import { formatTickerSymbol } from "@/components/prediction-ui";
 
 export type TickerSuggestion = {
   id: string;
@@ -204,7 +205,7 @@ export function TickerSearchInput({ value, onChange, error }: TickerSearchInputP
               }`}
             >
               <span className="font-semibold text-cyan-100">
-                {item.symbol} <span className="font-normal text-slate-300">{item.name}</span>
+                {formatTickerSymbol(item.symbol)} <span className="font-normal text-slate-300">{item.name}</span>
               </span>
               {suggestionMeta(item) ? <span className="text-xs text-slate-500">{suggestionMeta(item)}</span> : null}
             </button>

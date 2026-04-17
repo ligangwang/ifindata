@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type Prediction = {
@@ -35,6 +35,7 @@ export function TickerPage({ ticker }: { ticker: string }) {
   const [payload, setPayload] = useState<TickerResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const displayTicker = formatTickerSymbol(payload?.ticker ?? ticker);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,8 +110,8 @@ export function TickerPage({ ticker }: { ticker: string }) {
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
-        <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">{payload.ticker}</h1>
-        <p className="mt-2 text-sm text-slate-300">All public predictions for {payload.ticker}</p>
+        <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">{displayTicker}</h1>
+        <p className="mt-2 text-sm text-slate-300">All public predictions for {displayTicker}</p>
       </section>
 
       <section className="mt-4 rounded-2xl border border-white/15 bg-slate-950/55 p-5">
@@ -153,7 +154,7 @@ export function TickerPage({ ticker }: { ticker: string }) {
 
           {payload.items.length === 0 ? (
             <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
-              No predictions for {payload.ticker} yet.
+              No predictions for {displayTicker} yet.
             </p>
           ) : null}
         </div>

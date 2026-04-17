@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { formatTickerSymbol } from "@/components/prediction-ui";
 
 type DailyUserGainer = {
   userId: string;
@@ -73,7 +74,7 @@ function shareText(payload: DailyScoresResponse): string {
   const topPrediction = payload.predictionGainers[0];
   const userPart = topUser ? `Top analyst: ${userName(topUser)} ${scoreText(topUser.dailyScoreChange)}.` : "";
   const predictionPart = topPrediction
-    ? ` Top prediction: ${topPrediction.ticker ?? "Prediction"} ${scoreText(topPrediction.scoreChange)}.`
+    ? ` Top prediction: ${formatTickerSymbol(topPrediction.ticker)} ${scoreText(topPrediction.scoreChange)}.`
     : "";
 
   return `YouAnalyst daily moves for ${compactDate(payload.date)}. ${userPart}${predictionPart}`;
@@ -229,7 +230,7 @@ export function DailyScoresPage() {
                 >
                   <span className="text-sm font-semibold text-cyan-200">#{index + 1}</span>
                   <span className="min-w-0 text-sm text-slate-100">
-                    <span className="font-semibold">{prediction.ticker ?? "Prediction"}</span>
+                    <span className="font-semibold">{formatTickerSymbol(prediction.ticker)}</span>
                     <span className="text-slate-500"> / </span>
                     <span>{prediction.direction ?? "N/A"}</span>
                     <span className="text-slate-500"> / </span>

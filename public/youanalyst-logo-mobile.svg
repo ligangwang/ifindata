@@ -12,9 +12,6 @@
       </feMerge>
     </filter>
   </defs>
-
-  <rect width="280" height="64" rx="14" fill="#0B1220"/>
-
   <g filter="url(#softGlow)">
     <text x="20" y="43"
           font-family="Inter, Arial, Helvetica, sans-serif"

@@ -147,6 +147,20 @@
       ]
     },
     {
+      "collectionGroup": "user_daily_scores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dailyScoreChange",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "tickers",
       "queryScope": "COLLECTION",
       "fields": [

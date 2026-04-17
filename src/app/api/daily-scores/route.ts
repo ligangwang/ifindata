@@ -108,6 +108,7 @@ export async function GET(request: NextRequest) {
       query = db
         .collection("user_daily_scores")
         .where("date", "==", date)
+        .orderBy("dailyScoreChange", "desc")
         .limit(limit);
     }
 

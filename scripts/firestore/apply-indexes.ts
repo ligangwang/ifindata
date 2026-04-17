@@ -42,6 +42,22 @@ function buildFieldConfig(field: IndexField): string {
   throw new Error(`Unsupported index field config for ${field.fieldPath}`);
 }
 
+function describeIndex(index: CompositeIndex): string {
+  const fields = index.fields
+    .map((field) => {
+      if (field.order) {
+        return `${field.fieldPath} ${field.order.toLowerCase()}`;
+      }
+      if (field.arrayConfig) {
+        return `${field.fieldPath} ${field.arrayConfig.toLowerCase()}`;
+      }
+      return field.fieldPath;
+    })
+    .join(", ");
+
+  return `${index.collectionGroup} [${fields}]`;
+}
+
 function applyIndex(projectId: string, index: CompositeIndex): void {
   const args = [
     "firestore",
@@ -51,6 +67,7 @@ function applyIndex(projectId: string, index: CompositeIndex): void {
     `--project=${projectId}`,
     `--collection-group=${index.collectionGroup}`,
     `--query-scope=${index.queryScope}`,
+    "--async",
   ];
 
   for (const field of index.fields) {
@@ -59,16 +76,16 @@ function applyIndex(projectId: string, index: CompositeIndex): void {
 
   const result = runCommand("gcloud", args);
   if (result.code === 0) {
-    console.log(`Created index: ${index.collectionGroup} (${index.fields.length} fields)`);
+    console.log(`Submitted index creation: ${describeIndex(index)}`);
     return;
   }
 
   if (/ALREADY_EXISTS|already exists/i.test(result.output)) {
-    console.log(`Index already exists: ${index.collectionGroup}`);
+    console.log(`Index already exists: ${describeIndex(index)}`);
     return;
   }
 
-  throw new Error(result.output.trim() || `Failed to create index for ${index.collectionGroup}`);
+  throw new Error(result.output.trim() || `Failed to create index for ${describeIndex(index)}`);
 }
 
 function main() {

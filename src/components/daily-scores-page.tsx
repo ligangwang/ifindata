@@ -3,27 +3,32 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-type DailyScoreCard = {
+type DailyUserGainer = {
   userId: string;
-  date: string;
   displayName: string | null;
   nickname: string | null;
   photoURL: string | null;
   totalScore: number;
   dailyScoreChange: number;
-  openPredictions: number;
-  closedPredictions: number;
   dailyMarkedPredictions: number;
-  bestPredictionId: string | null;
-  bestPredictionTicker: string | null;
-  bestPredictionScoreChange: number | null;
-  worstPredictionId: string | null;
-  worstPredictionTicker: string | null;
-  worstPredictionScoreChange: number | null;
+};
+
+type DailyPredictionGainer = {
+  predictionId: string;
+  userId: string;
+  displayName: string | null;
+  nickname: string | null;
+  ticker: string | null;
+  direction: string | null;
+  score: number;
+  scoreChange: number;
+  status: string | null;
 };
 
 type DailyScoresResponse = {
-  items: DailyScoreCard[];
+  date: string | null;
+  userGainers: DailyUserGainer[];
+  predictionGainers: DailyPredictionGainer[];
 };
 
 function scoreText(score: number): string {
@@ -31,7 +36,11 @@ function scoreText(score: number): string {
   return `${sign}${Math.round(score)} bp`;
 }
 
-function compactDate(value: string): string {
+function compactDate(value: string | null): string {
+  if (!value) {
+    return "Latest day";
+  }
+
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) {
     return value;
@@ -44,8 +53,8 @@ function compactDate(value: string): string {
   });
 }
 
-function displayName(card: DailyScoreCard): string {
-  return card.nickname ? `@${card.nickname}` : card.displayName ?? "Anonymous";
+function userName(user: { displayName: string | null; nickname: string | null }): string {
+  return user.nickname ? `@${user.nickname}` : user.displayName ?? "Anonymous";
 }
 
 function absoluteUrl(path: string): string {
@@ -55,136 +64,34 @@ function absoluteUrl(path: string): string {
   return `${window.location.origin}${path}`;
 }
 
-function cardPath(card: DailyScoreCard): string {
-  return `/daily?date=${encodeURIComponent(card.date)}&userId=${encodeURIComponent(card.userId)}`;
+function dailyPath(date: string | null): string {
+  return date ? `/daily?date=${encodeURIComponent(date)}` : "/daily";
 }
 
-function shareText(card: DailyScoreCard): string {
-  const best = card.bestPredictionTicker && card.bestPredictionScoreChange !== null
-    ? ` Top call: ${card.bestPredictionTicker} ${scoreText(card.bestPredictionScoreChange)}.`
+function shareText(payload: DailyScoresResponse): string {
+  const topUser = payload.userGainers[0];
+  const topPrediction = payload.predictionGainers[0];
+  const userPart = topUser ? `Top analyst: ${userName(topUser)} ${scoreText(topUser.dailyScoreChange)}.` : "";
+  const predictionPart = topPrediction
+    ? ` Top prediction: ${topPrediction.ticker ?? "Prediction"} ${scoreText(topPrediction.scoreChange)}.`
     : "";
 
-  return `${displayName(card)} moved ${scoreText(card.dailyScoreChange)} on YouAnalyst for ${compactDate(card.date)}.${best} Total score: ${scoreText(card.totalScore)}.`;
-}
-
-function DailyScoreCardView({
-  card,
-  copiedKey,
-  onCopy,
-  onShare,
-}: {
-  card: DailyScoreCard;
-  copiedKey: string | null;
-  onCopy: (card: DailyScoreCard) => void;
-  onShare: (card: DailyScoreCard) => void;
-}) {
-  const name = displayName(card);
-  const key = `${card.userId}_${card.date}`;
-  const positiveMove = card.dailyScoreChange >= 0;
-
-  return (
-    <article className="rounded-xl border border-white/10 bg-slate-950/55 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase text-slate-500">{compactDate(card.date)}</p>
-          <Link href={`/analysts/${card.userId}`} className="mt-1 block truncate text-sm font-semibold text-cyan-200 hover:text-cyan-100">
-            {name}
-          </Link>
-        </div>
-        <p className={`text-right font-[var(--font-sora)] text-2xl font-semibold ${positiveMove ? "text-emerald-300" : "text-rose-300"}`}>
-          {scoreText(card.dailyScoreChange)}
-        </p>
-      </div>
-
-      <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
-        <div className="rounded-lg border border-white/10 p-2">
-          <p className="text-slate-500">Total</p>
-          <p className="mt-1 font-semibold text-slate-100">{scoreText(card.totalScore)}</p>
-        </div>
-        <div className="rounded-lg border border-white/10 p-2">
-          <p className="text-slate-500">Open</p>
-          <p className="mt-1 font-semibold text-slate-100">{card.openPredictions}</p>
-        </div>
-        <div className="rounded-lg border border-white/10 p-2">
-          <p className="text-slate-500">Closed</p>
-          <p className="mt-1 font-semibold text-slate-100">{card.closedPredictions}</p>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-2 text-xs text-slate-300">
-        <p>{card.dailyMarkedPredictions} predictions marked today.</p>
-        {card.bestPredictionTicker && card.bestPredictionScoreChange !== null ? (
-          <p>
-            Best:{" "}
-            {card.bestPredictionId ? (
-              <Link href={`/predictions/${card.bestPredictionId}`} className="text-cyan-300 hover:text-cyan-100">
-                {card.bestPredictionTicker}
-              </Link>
-            ) : (
-              card.bestPredictionTicker
-            )}{" "}
-            <span className="text-emerald-300">{scoreText(card.bestPredictionScoreChange)}</span>
-          </p>
-        ) : null}
-        {card.worstPredictionTicker && card.worstPredictionScoreChange !== null ? (
-          <p>
-            Worst:{" "}
-            {card.worstPredictionId ? (
-              <Link href={`/predictions/${card.worstPredictionId}`} className="text-cyan-300 hover:text-cyan-100">
-                {card.worstPredictionTicker}
-              </Link>
-            ) : (
-              card.worstPredictionTicker
-            )}{" "}
-            <span className="text-rose-300">{scoreText(card.worstPredictionScoreChange)}</span>
-          </p>
-        ) : null}
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onShare(card)}
-          className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
-        >
-          Share
-        </button>
-        <button
-          type="button"
-          onClick={() => onCopy(card)}
-          className="rounded-lg border border-cyan-400/35 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/15"
-        >
-          Copy link
-        </button>
-        {copiedKey === key ? <span className="text-xs text-emerald-300">Copied</span> : null}
-      </div>
-    </article>
-  );
+  return `YouAnalyst daily moves for ${compactDate(payload.date)}. ${userPart}${predictionPart}`;
 }
 
 export function DailyScoresPage() {
-  const [items, setItems] = useState<DailyScoreCard[]>([]);
+  const [payload, setPayload] = useState<DailyScoresResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const apiPath = useMemo(() => {
     if (typeof window === "undefined") {
-      return "/api/daily-scores?limit=60";
+      return "/api/daily-scores";
     }
 
-    const params = new URLSearchParams(window.location.search);
-    const date = params.get("date");
-    const userId = params.get("userId");
-    const apiParams = new URLSearchParams();
-    apiParams.set("limit", "60");
-    if (date) {
-      apiParams.set("date", date);
-    }
-    if (userId) {
-      apiParams.set("userId", userId);
-    }
-    return `/api/daily-scores?${apiParams.toString()}`;
+    const date = new URLSearchParams(window.location.search).get("date");
+    return date ? `/api/daily-scores?date=${encodeURIComponent(date)}` : "/api/daily-scores";
   }, []);
 
   useEffect(() => {
@@ -196,9 +103,9 @@ export function DailyScoresPage() {
           throw new Error("Unable to load daily moves.");
         }
 
-        const payload = (await response.json()) as DailyScoresResponse;
+        const nextPayload = (await response.json()) as DailyScoresResponse;
         if (!cancelled) {
-          setItems(payload.items);
+          setPayload(nextPayload);
         }
       })
       .catch((nextError) => {
@@ -217,26 +124,32 @@ export function DailyScoresPage() {
     };
   }, [apiPath]);
 
-  async function copyCard(card: DailyScoreCard) {
-    const key = `${card.userId}_${card.date}`;
+  async function copyDailyLink() {
+    if (!payload) {
+      return;
+    }
+
     try {
-      await navigator.clipboard.writeText(absoluteUrl(cardPath(card)));
-      setCopiedKey(key);
-      window.setTimeout(() => setCopiedKey(null), 2000);
+      await navigator.clipboard.writeText(absoluteUrl(dailyPath(payload.date)));
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      setCopiedKey(null);
+      setCopied(false);
     }
   }
 
-  async function shareCard(card: DailyScoreCard) {
-    const url = absoluteUrl(cardPath(card));
-    const text = shareText(card);
+  async function shareDaily() {
+    if (!payload) {
+      return;
+    }
+
+    const url = absoluteUrl(dailyPath(payload.date));
 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${displayName(card)} daily move on YouAnalyst`,
-          text,
+          title: `YouAnalyst daily moves for ${compactDate(payload.date)}`,
+          text: shareText(payload),
           url,
         });
         return;
@@ -245,13 +158,8 @@ export function DailyScoresPage() {
       }
     }
 
-    await copyCard(card);
+    await copyDailyLink();
   }
-
-  const grouped = items.reduce<Record<string, DailyScoreCard[]>>((groups, item) => {
-    groups[item.date] = [...(groups[item.date] ?? []), item];
-    return groups;
-  }, {});
 
   if (loading) {
     return <main className="mx-auto w-full max-w-6xl px-4 py-8 text-sm text-slate-300">Loading daily moves...</main>;
@@ -260,38 +168,81 @@ export function DailyScoresPage() {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
       <section className="rounded-xl border border-cyan-500/25 bg-slate-900/70 p-5">
-        <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">Daily Moves</h1>
-        <p className="mt-2 text-sm text-slate-300">
-          Shareable analyst score cards from end-of-day prediction marks.
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-medium uppercase text-slate-500">{compactDate(payload?.date ?? null)}</p>
+            <h1 className="mt-1 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">Daily Moves</h1>
+            <p className="mt-2 text-sm text-slate-300">
+              Sitewide score highlights from the latest end-of-day prediction marks.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void shareDaily()}
+              className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
+            >
+              Share
+            </button>
+            <button
+              type="button"
+              onClick={() => void copyDailyLink()}
+              className="rounded-lg border border-cyan-400/35 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/15"
+            >
+              Copy link
+            </button>
+            {copied ? <span className="self-center text-xs text-emerald-300">Copied</span> : null}
+          </div>
+        </div>
       </section>
 
       {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
 
-      <div className="mt-4 grid gap-5">
-        {Object.entries(grouped).map(([date, cards]) => (
-          <section key={date}>
-            <h2 className="mb-3 font-[var(--font-sora)] text-lg font-semibold text-cyan-100">{compactDate(date)}</h2>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {cards.map((card) => (
-                <DailyScoreCardView
-                  key={`${card.userId}_${card.date}`}
-                  card={card}
-                  copiedKey={copiedKey}
-                  onCopy={(nextCard) => void copyCard(nextCard)}
-                  onShare={(nextCard) => void shareCard(nextCard)}
-                />
+      {payload ? (
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <section className="rounded-xl border border-white/10 bg-slate-950/55 p-4">
+            <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Top Analysts</h2>
+            <div className="mt-3 grid gap-2">
+              {payload.userGainers.map((user, index) => (
+                <Link
+                  key={user.userId}
+                  href={`/analysts/${user.userId}`}
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-white/10 p-3 hover:border-cyan-300/60"
+                >
+                  <span className="text-sm font-semibold text-cyan-200">#{index + 1}</span>
+                  <span className="min-w-0 truncate text-sm text-slate-100">{userName(user)}</span>
+                  <span className="text-sm font-semibold text-emerald-300">{scoreText(user.dailyScoreChange)}</span>
+                </Link>
               ))}
+              {payload.userGainers.length === 0 ? <p className="text-sm text-slate-300">No analyst moves yet.</p> : null}
             </div>
           </section>
-        ))}
 
-        {items.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
-            No daily moves yet. They will appear after the EOD job writes daily score snapshots.
-          </p>
-        ) : null}
-      </div>
+          <section className="rounded-xl border border-white/10 bg-slate-950/55 p-4">
+            <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Top Predictions</h2>
+            <div className="mt-3 grid gap-2">
+              {payload.predictionGainers.map((prediction, index) => (
+                <Link
+                  key={prediction.predictionId}
+                  href={`/predictions/${prediction.predictionId}`}
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-white/10 p-3 hover:border-cyan-300/60"
+                >
+                  <span className="text-sm font-semibold text-cyan-200">#{index + 1}</span>
+                  <span className="min-w-0 text-sm text-slate-100">
+                    <span className="font-semibold">{prediction.ticker ?? "Prediction"}</span>
+                    <span className="text-slate-500"> / </span>
+                    <span>{prediction.direction ?? "N/A"}</span>
+                    <span className="text-slate-500"> / </span>
+                    <span>{userName(prediction)}</span>
+                  </span>
+                  <span className="text-sm font-semibold text-emerald-300">{scoreText(prediction.scoreChange)}</span>
+                </Link>
+              ))}
+              {payload.predictionGainers.length === 0 ? <p className="text-sm text-slate-300">No prediction moves yet.</p> : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

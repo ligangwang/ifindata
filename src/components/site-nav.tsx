@@ -157,6 +157,7 @@ export function SiteNav() {
             <nav className="hidden items-center gap-4 text-sm text-slate-200 md:flex">
               <Link href="/predictions" className="hover:text-cyan-200">Feed</Link>
               <Link href="/predictions/new" className="hover:text-cyan-200">Predict</Link>
+              <Link href="/daily" className="hover:text-cyan-200">Daily</Link>
               <Link href="/leaderboard" className="hover:text-cyan-200">Leaderboard</Link>
               {showAdminLink ? <Link href="/feedback/admin" className="hover:text-cyan-200">Admin</Link> : null}
               <Link href="/how-it-works" className="hover:text-cyan-200">How It Works</Link>
@@ -185,6 +186,9 @@ export function SiteNav() {
           </Link>
           <Link href="/predictions/new" className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 hover:border-cyan-300/60 hover:text-cyan-200">
             Predict
+          </Link>
+          <Link href="/daily" className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 hover:border-cyan-300/60 hover:text-cyan-200">
+            Daily
           </Link>
           <Link href="/leaderboard" className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 hover:border-cyan-300/60 hover:text-cyan-200">
             Leaderboard

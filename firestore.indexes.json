@@ -105,6 +105,48 @@
       ]
     },
     {
+      "collectionGroup": "prediction_daily_marks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "prediction_daily_marks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "predictionId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "user_daily_scores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "tickers",
       "queryScope": "COLLECTION",
       "fields": [

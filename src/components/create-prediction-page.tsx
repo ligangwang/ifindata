@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
+import { PredictionThesisText } from "@/components/prediction-ui";
 import { TickerSearchInput } from "@/components/ticker-search-input";
 
 function isValidTickerFormat(ticker: string): boolean {
@@ -18,6 +19,7 @@ export function CreatePredictionPage() {
   const [ticker, setTicker] = useState("");
   const [direction, setDirection] = useState<"UP" | "DOWN">("UP");
   const [thesis, setThesis] = useState("");
+  const [thesisMode, setThesisMode] = useState<"WRITE" | "PREVIEW">("WRITE");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -124,14 +126,34 @@ export function CreatePredictionPage() {
           </div>
 
           <div className="grid gap-2">
-            <label className="text-sm text-slate-200">Thesis (optional)</label>
-            <textarea
-              value={thesis}
-              onChange={(event) => setThesis(event.target.value)}
-              rows={6}
-              className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
-              placeholder="Why this setup should work"
-            />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-sm text-slate-200">Thesis (optional)</label>
+              <div className="inline-flex rounded-lg border border-white/15 p-1 text-xs">
+                {(["WRITE", "PREVIEW"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setThesisMode(mode)}
+                    className={`rounded-md px-2.5 py-1 ${thesisMode === mode ? "bg-cyan-400 text-slate-900" : "text-slate-300"}`}
+                  >
+                    {mode === "WRITE" ? "Write" : "Preview"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {thesisMode === "WRITE" ? (
+              <textarea
+                value={thesis}
+                onChange={(event) => setThesis(event.target.value)}
+                rows={10}
+                className="min-h-56 rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+                placeholder="Why this setup should work"
+              />
+            ) : (
+              <div className="min-h-56 rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
+                <PredictionThesisText text={thesis} fallback="Nothing to preview yet." />
+              </div>
+            )}
           </div>
 
           <button

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type PredictionDetail = {
@@ -189,7 +189,9 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           </div>
         </div>
 
-        <p className="text-sm text-slate-200">{thesis || "No thesis provided."}</p>
+        <p className="text-sm text-slate-200">
+          <PredictionThesisText text={thesis} />
+        </p>
         <PredictionMarkSummary prediction={prediction} />
 
         <div className="mt-4 grid gap-1 text-sm text-slate-300 md:grid-cols-2">

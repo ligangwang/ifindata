@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type PredictionDetail = {
@@ -203,7 +203,9 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
               prediction.authorNickname ? `@${prediction.authorNickname}` : prediction.authorDisplayName ?? "Anonymous"
             )}
           </p>
-          <p>Created: {new Date(prediction.createdAt).toLocaleString()}</p>
+          <p>
+            Created: <RelativeTime value={prediction.createdAt} />
+          </p>
           <p>Entry: {entryText}</p>
         </div>
 
@@ -222,7 +224,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             <article key={comment.id} className="rounded-xl border border-white/10 p-3">
               <p className="text-sm text-slate-100">{comment.content}</p>
               <p className="mt-2 text-xs text-slate-400">
-                {comment.authorNickname ? `@${comment.authorNickname}` : comment.authorDisplayName ?? "Anonymous"} / {new Date(comment.createdAt).toLocaleString()}
+                {comment.authorNickname ? `@${comment.authorNickname}` : comment.authorDisplayName ?? "Anonymous"} / <RelativeTime value={comment.createdAt} />
               </p>
             </article>
           ))}

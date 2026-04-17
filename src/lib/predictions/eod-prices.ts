@@ -15,6 +15,7 @@ const DEFAULT_MARKET = "US";
 const DEFAULT_LIMIT = 500;
 const MAX_LIMIT = 1000;
 const POSITION_SCAN_PAGE_SIZE = 500;
+const ROLL_FORWARD_PRICE_SCAN_PAGE_SIZE = 1000;
 const TWELVE_DATA_CHUNK_SIZE = 8;
 
 export type DailyEodMaintenanceInput = {
@@ -370,20 +371,41 @@ function isEodCandidateStatus(value: unknown): value is "OPENING" | "OPEN" | "CL
 }
 
 async function readRollForwardDates(db: FirebaseFirestore.Firestore, startDate: string): Promise<string[]> {
-  const snapshot = await db
-    .collection("eod_prices")
-    .where("tradingDate", ">=", startDate)
-    .orderBy("tradingDate", "asc")
-    .limit(5000)
-    .get();
+  const dates = new Set<string>();
+  let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
 
-  const dates = Array.from(new Set(
-    snapshot.docs
-      .map((doc) => (typeof doc.get("tradingDate") === "string" ? doc.get("tradingDate") as string : ""))
-      .filter((date) => isIsoDate(date)),
-  )).sort();
+  while (true) {
+    let query = db
+      .collection("eod_prices")
+      .where("tradingDate", ">=", startDate)
+      .orderBy("tradingDate", "asc")
+      .limit(ROLL_FORWARD_PRICE_SCAN_PAGE_SIZE);
 
-  return dates.includes(startDate) ? dates : [startDate, ...dates];
+    if (lastDoc) {
+      query = query.startAfter(lastDoc);
+    }
+
+    const snapshot = await query.get();
+    if (snapshot.empty) {
+      break;
+    }
+
+    snapshot.docs.forEach((doc) => {
+      const tradingDate = doc.get("tradingDate");
+      if (typeof tradingDate === "string" && isIsoDate(tradingDate)) {
+        dates.add(tradingDate);
+      }
+    });
+
+    lastDoc = snapshot.docs[snapshot.docs.length - 1] ?? null;
+    if (snapshot.size < ROLL_FORWARD_PRICE_SCAN_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  const sortedDates = Array.from(dates).sort();
+
+  return sortedDates.includes(startDate) ? sortedDates : [startDate, ...sortedDates];
 }
 
 function isProcessableStatus(value: unknown): value is PredictionStatus {

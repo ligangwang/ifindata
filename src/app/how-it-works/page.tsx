@@ -81,7 +81,7 @@ export default function HowItWorksPage() {
           <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">How Scores Work</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
             Score is based on the return from entry price to mark or final price. One basis point of return equals one
-            score point. Up predictions score when the price rises. Down predictions score when the price falls.
+            score point. Up predictions earn positive scores when the price rises. Down predictions earn positive scores when the price falls.
           </p>
         </div>
         <div>

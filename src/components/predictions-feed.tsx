@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type PublicStatusFilter = "ALL" | "ACTIVE" | "CLOSED";
@@ -153,7 +153,9 @@ export function PredictionsFeed() {
                     <span className="text-slate-500">/</span>
                     <DirectionBadge direction={item.direction} />
                   </Link>
-                  <p className="text-xs text-slate-400 sm:text-sm">{new Date(item.createdAt).toLocaleString()}</p>
+                  <p className="text-xs text-slate-400 sm:text-sm">
+                    <RelativeTime value={item.createdAt} />
+                  </p>
                 </div>
                 <Link
                   href={`/predictions/${item.id}`}

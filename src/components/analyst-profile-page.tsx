@@ -372,12 +372,12 @@ export function AnalystProfilePage({
                 {payload.profile.nickname ? `@${payload.profile.nickname}` : preferredName}
               </h1>
               <nav className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400" aria-label="Profile follow lists">
-                <Link href={`/analysts/${userId}/followers`} className="hover:text-cyan-200">
-                  {countText(payload.profile.stats.followersCount, "follower")}
-                </Link>
-                <span aria-hidden="true">/</span>
                 <Link href={`/analysts/${userId}/following`} className="hover:text-cyan-200">
                   {countText(payload.profile.stats.followingCount, "following", "following")}
+                </Link>
+                <span aria-hidden="true">/</span>
+                <Link href={`/analysts/${userId}/followers`} className="hover:text-cyan-200">
+                  {countText(payload.profile.stats.followersCount, "follower")}
                 </Link>
               </nav>
             </div>

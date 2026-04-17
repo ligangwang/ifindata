@@ -181,8 +181,8 @@ export function FollowListPage({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-100">{name}</p>
                   <p className="mt-1 text-xs text-slate-400">
-                    {scoreText(item.totalScore)} / {countText(item.followersCount, "follower")} /{" "}
-                    {countText(item.followingCount, "following", "following")}
+                    {scoreText(item.totalScore)} / {countText(item.followingCount, "following", "following")} /{" "}
+                    {countText(item.followersCount, "follower")}
                   </p>
                 </div>
                 <p className="col-span-2 text-xs text-slate-500 sm:col-span-1 sm:self-center sm:text-right">

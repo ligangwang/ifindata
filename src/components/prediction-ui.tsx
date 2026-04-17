@@ -118,6 +118,24 @@ export function RelativeTime({ value, prefix }: { value: string; prefix?: string
   );
 }
 
+export function PredictionThesisText({
+  text,
+  fallback = "No thesis provided.",
+  className = "",
+}: {
+  text: string;
+  fallback?: string;
+  className?: string;
+}) {
+  const content = text.trim() || fallback;
+
+  return (
+    <span className={`whitespace-pre-wrap break-words ${className}`}>
+      {content}
+    </span>
+  );
+}
+
 export function markToneClass(value: number): string {
   if (value > 0) {
     return "text-emerald-300";

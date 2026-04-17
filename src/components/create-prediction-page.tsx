@@ -128,8 +128,8 @@ export function CreatePredictionPage() {
             <textarea
               value={thesis}
               onChange={(event) => setThesis(event.target.value)}
-              rows={6}
-              className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+              rows={10}
+              className="min-h-56 rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
               placeholder="Why this setup should work"
             />
           </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type PublicStatusFilter = "ALL" | "ACTIVE" | "CLOSED";
@@ -161,7 +161,7 @@ export function PredictionsFeed() {
                   href={`/predictions/${item.id}`}
                   className="line-clamp-2 text-sm text-slate-100 hover:text-slate-50"
                 >
-                  {thesis || "No thesis provided."}
+                  <PredictionThesisText text={thesis} />
                 </Link>
                 <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
                   <p>

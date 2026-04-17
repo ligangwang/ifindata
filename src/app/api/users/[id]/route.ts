@@ -15,6 +15,12 @@ type UserStats = {
   followingCount: number;
 };
 
+type LatestDailyScore = {
+  date: string;
+  dailyScoreChange: number;
+  dailyMarkedPredictions: number;
+} | null;
+
 function coerceStats(raw: unknown): UserStats {
   const source = (raw ?? {}) as Record<string, unknown>;
 
@@ -33,6 +39,31 @@ function coerceStats(raw: unknown): UserStats {
 
 function isPredictionStatus(value: string | null): value is "OPENING" | "OPEN" | "CLOSING" | "CLOSED" | "CANCELED" {
   return value === "OPENING" || value === "OPEN" || value === "CLOSING" || value === "CLOSED" || value === "CANCELED";
+}
+
+async function readLatestDailyScore(userId: string): Promise<LatestDailyScore> {
+  const snapshot = await getAdminFirestore()
+    .collection("user_daily_scores")
+    .where("userId", "==", userId)
+    .orderBy("date", "desc")
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) {
+    return null;
+  }
+
+  const data = snapshot.docs[0].data() as Record<string, unknown>;
+  const date = typeof data.date === "string" ? data.date : null;
+  if (!date) {
+    return null;
+  }
+
+  return {
+    date,
+    dailyScoreChange: Number(data.dailyScoreChange ?? 0),
+    dailyMarkedPredictions: Number(data.dailyMarkedPredictions ?? 0),
+  };
 }
 
 export async function GET(
@@ -66,6 +97,7 @@ export async function GET(
     });
 
     const userSnapshot = await db.collection("users").doc(id).get();
+    const latestDailyScore = await readLatestDailyScore(id);
 
     if (!userSnapshot.exists) {
       // If user document doesn't exist, check if they have predictions
@@ -115,6 +147,7 @@ export async function GET(
           nickname: profileData.nickname,
           bio: profileData.bio,
           stats: profileData.stats,
+          latestDailyScore,
           settings: profileData.settings,
         },
         relationship,
@@ -140,6 +173,7 @@ export async function GET(
         nickname: typeof userData.nickname === "string" ? userData.nickname : null,
         bio: userData.bio ?? "",
         stats: coerceStats(userData.stats),
+        latestDailyScore,
         settings: {
           isPublic,
         },

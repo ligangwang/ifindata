@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type ProfileStatusFilter = "ALL" | PredictionStatus;
@@ -618,7 +618,7 @@ export function AnalystProfilePage({
               className="rounded-xl border border-white/10 p-3 hover:border-cyan-300/60"
             >
               <p className="flex flex-wrap items-center gap-1 text-sm text-slate-100">
-                <span>{prediction.ticker}</span>
+                <span>{formatTickerSymbol(prediction.ticker)}</span>
                 <span className="text-slate-500">/</span>
                 <DirectionBadge direction={prediction.direction} />
                 <span className="text-slate-500">/</span>

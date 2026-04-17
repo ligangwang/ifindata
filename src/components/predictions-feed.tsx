@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { DirectionBadge, formatPredictionStatus, formatScorePercent, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type PublicStatusFilter = "ALL" | "ACTIVE" | "CLOSED";
@@ -149,7 +149,7 @@ export function PredictionsFeed() {
                     href={`/ticker/${item.ticker}`}
                     className="flex w-fit items-center gap-1 font-semibold text-cyan-200 hover:text-cyan-100"
                   >
-                    <span>{item.ticker}</span>
+                    <span>{formatTickerSymbol(item.ticker)}</span>
                     <span className="text-slate-500">/</span>
                     <DirectionBadge direction={item.direction} />
                   </Link>

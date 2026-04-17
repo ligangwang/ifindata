@@ -146,12 +146,20 @@ export function SiteNav() {
           <div className="flex items-center gap-5">
             <Link href="/" className="inline-flex shrink-0 items-center">
               <Image
+                src="/youanalyst-logo-mobile.svg"
+                alt="YouAnalyst"
+                width={140}
+                height={32}
+                priority
+                className="h-8 w-auto md:hidden"
+              />
+              <Image
                 src="/youanalyst-logo.svg"
                 alt="YouAnalyst"
                 width={140}
                 height={32}
                 priority
-                className="h-8 w-auto"
+                className="hidden h-8 w-auto md:block"
               />
             </Link>
             <nav className="hidden items-center gap-4 text-sm text-slate-200 md:flex">

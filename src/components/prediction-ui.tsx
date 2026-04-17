@@ -22,6 +22,14 @@ export function formatScorePercent(score: number): string {
   return formatSignedPercent(score / 100);
 }
 
+export function formatTickerSymbol(ticker: string | null | undefined): string {
+  const symbol = ticker?.trim();
+  if (!symbol) {
+    return "Prediction";
+  }
+  return symbol.startsWith("$") ? symbol : `$${symbol}`;
+}
+
 export function formatMarkPercent(markDisplayPercent: number): string {
   return formatSignedPercent(markDisplayPercent);
 }

@@ -529,6 +529,7 @@ function existingDailyPreviousScore(
 function markSummaryFromDoc(doc: FirebaseFirestore.QueryDocumentSnapshot): {
   predictionId: string;
   ticker: string | null;
+  status: PredictionStatus | null;
   score: number;
   scoreChange: number;
 } | null {
@@ -544,13 +545,17 @@ function markSummaryFromDoc(doc: FirebaseFirestore.QueryDocumentSnapshot): {
   return {
     predictionId,
     ticker: typeof data.ticker === "string" ? data.ticker : null,
+    status: isProcessableStatus(data.status) ? data.status : null,
     score,
     scoreChange,
   };
 }
 
-function statsNumber(stats: Record<string, unknown>, field: string): number {
-  return finiteNumberOrNull(stats[field]) ?? 0;
+function countMarksByStatus(
+  marks: Array<{ status: PredictionStatus | null }>,
+  statuses: PredictionStatus[],
+): number {
+  return marks.filter((mark) => mark.status && statuses.includes(mark.status)).length;
 }
 
 async function readPreviousPredictionDailyScore(
@@ -604,8 +609,6 @@ async function writeUserDailyScoreSnapshots(
       continue;
     }
 
-    const userData = userSnapshot.data() as Record<string, unknown>;
-    const stats = (userData.stats ?? {}) as Record<string, unknown>;
     const previousTotalScore = previousDailySnapshot.empty
       ? null
       : finiteNumberOrNull(previousDailySnapshot.docs[0].get("totalScore"));
@@ -622,6 +625,10 @@ async function writeUserDailyScoreSnapshots(
       (worst, mark) => (!worst || mark.scoreChange < worst.scoreChange ? mark : worst),
       null,
     );
+    const openingPredictions = countMarksByStatus(marks, ["OPENING"]);
+    const openPredictions = countMarksByStatus(marks, ["OPEN"]);
+    const closingPredictions = countMarksByStatus(marks, ["CLOSING"]);
+    const closedPredictions = countMarksByStatus(marks, ["CLOSED"]);
 
     await userDailyRef.set({
       userId,
@@ -629,12 +636,12 @@ async function writeUserDailyScoreSnapshots(
       totalScore,
       previousTotalScore,
       dailyScoreChange,
-      totalPredictions: statsNumber(stats, "totalPredictions"),
-      openingPredictions: statsNumber(stats, "openingPredictions"),
-      openPredictions: statsNumber(stats, "openPredictions"),
-      closingPredictions: statsNumber(stats, "closingPredictions"),
-      closedPredictions: statsNumber(stats, "closedPredictions"),
-      canceledPredictions: statsNumber(stats, "canceledPredictions"),
+      totalPredictions: marks.length,
+      openingPredictions,
+      openPredictions,
+      closingPredictions,
+      closedPredictions,
+      canceledPredictions: 0,
       dailyMarkedPredictions: marks.length,
       bestPredictionId: bestMark?.predictionId ?? null,
       bestPredictionTicker: bestMark?.ticker ?? null,
@@ -1004,6 +1011,11 @@ export async function runDailyEodMaintenance(
 
           const shouldMutatePrediction = shouldMutateLivePrediction(prediction, runDate, manualTickers);
           if (latestStatus === "OPENING") {
+            const dailyMarkRef = db
+              .collection("prediction_daily_marks")
+              .doc(predictionDailyMarkDocId(prediction.id, price.tradingDate));
+            const dailyMarkSnapshot = await tx.get(dailyMarkRef);
+
             tx.update(prediction.ref, {
               updatedAt: nowIso,
               status: "OPEN",
@@ -1018,7 +1030,31 @@ export async function runDailyEodMaintenance(
               "stats.openingPredictions": FieldValue.increment(-1),
               "stats.openPredictions": FieldValue.increment(1),
             });
+            tx.set(dailyMarkRef, {
+              predictionId: prediction.id,
+              userId: prediction.userId,
+              ticker: prediction.ticker,
+              direction: latest.direction,
+              date: price.tradingDate,
+              runDate,
+              status: "OPEN",
+              entryPrice: price.close,
+              markPrice: price.close,
+              markPriceSource: price.source,
+              markPriceDate: price.tradingDate,
+              markPriceCapturedAt: price.loadedAt,
+              markReturnValue: 0,
+              markScore: 0,
+              markDisplayPercent: 0,
+              score: 0,
+              previousScore: 0,
+              scoreChange: 0,
+              isClosed: false,
+              createdAt: dailyMarkSnapshot.get("createdAt") ?? nowIso,
+              updatedAt: nowIso,
+            }, { merge: true });
             marking.opened += 1;
+            dailySnapshots.predictionMarks += 1;
             usersNeedingDailyScores.add(prediction.userId);
             return;
           }

@@ -1,0 +1,27 @@
+<svg width="280" height="64" viewBox="0 0 280 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="yaGreen" x1="118" y1="12" x2="240" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#34D399"/>
+      <stop offset="1" stop-color="#10B981"/>
+    </linearGradient>
+    <filter id="softGlow" x="0" y="0" width="280" height="64" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="1.2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="280" height="64" rx="14" fill="#0B1220"/>
+
+  <g filter="url(#softGlow)">
+    <text x="20" y="43"
+          font-family="Inter, Arial, Helvetica, sans-serif"
+          font-size="31"
+          font-weight="800"
+          letter-spacing="-0.9">
+      <tspan fill="#FFFFFF">You</tspan><tspan fill="url(#yaGreen)">Analyst</tspan>
+    </text>
+  </g>
+</svg>

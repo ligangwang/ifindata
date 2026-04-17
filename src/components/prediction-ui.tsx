@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import type { PredictionDirection, PredictionStatus } from "@/lib/predictions/types";
 
 export type PredictionMarkFields = {
@@ -77,11 +80,40 @@ export function formatRelativeDateTime(value: string, now = Date.now()): string 
   return `${Math.max(1, wholeCalendarYearsBetween(date, nowDate))}y`;
 }
 
+function relativeTimeRefreshDelay(value: string, now = Date.now()): number {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return 60 * 1000;
+  }
+
+  const elapsedSeconds = Math.max(0, Math.floor((now - timestamp) / 1000));
+  if (elapsedSeconds < 60) {
+    return 1000;
+  }
+  if (elapsedSeconds < 60 * 60) {
+    return (60 - (elapsedSeconds % 60)) * 1000;
+  }
+  if (elapsedSeconds < 24 * 60 * 60) {
+    return (60 * 60 - (elapsedSeconds % (60 * 60))) * 1000;
+  }
+  return (24 * 60 * 60 - (elapsedSeconds % (24 * 60 * 60))) * 1000;
+}
+
 export function RelativeTime({ value, prefix }: { value: string; prefix?: string }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setNow(Date.now());
+    }, relativeTimeRefreshDelay(value, now));
+
+    return () => window.clearTimeout(timeout);
+  }, [value, now]);
+
   return (
-    <time dateTime={value} title={formatAbsoluteDateTime(value)}>
+    <time dateTime={value} title={formatAbsoluteDateTime(value)} suppressHydrationWarning>
       {prefix ? `${prefix} ` : ""}
-      {formatRelativeDateTime(value)}
+      {formatRelativeDateTime(value, now)}
     </time>
   );
 }

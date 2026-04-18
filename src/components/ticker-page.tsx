@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatScorePercent, formatTickerSymbol, PredictionReturnSummary, RelativeTime } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type Prediction = {
@@ -133,9 +133,6 @@ export function TickerPage({ ticker }: { ticker: string }) {
                   <RelativeTime value={prediction.createdAt} />
                 </p>
               </div>
-              <Link href={`/predictions/${prediction.id}`} className="mt-2 block text-sm font-semibold text-slate-100 hover:text-slate-50">
-                {formatPredictionThesisTitle(prediction.thesisTitle)}
-              </Link>
               <div className="mt-2 flex flex-col gap-1 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                 <p>
                   by{" "}
@@ -149,7 +146,7 @@ export function TickerPage({ ticker }: { ticker: string }) {
                 </p>
                 {prediction.result ? <p className="text-emerald-200">Result {formatScorePercent(prediction.result.score)}</p> : null}
               </div>
-              <PredictionMarkSummary prediction={prediction} />
+              <PredictionReturnSummary prediction={prediction} />
             </article>
           ))}
 

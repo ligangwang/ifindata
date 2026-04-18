@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
+import { formatPredictionStatus, formatScorePercent, formatTickerSymbol, PredictionReturnSummary, RelativeTime } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type PublicStatusFilter = "ALL" | "ACTIVE" | "CLOSED";
@@ -138,46 +138,40 @@ export function PredictionsFeed() {
 
         <div className="grid gap-3">
           {items.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition"
-              >
-                <div className="mb-2 flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
-                  <Link
-                    href={`/ticker/${item.ticker}`}
-                    className="flex w-fit items-center gap-1 font-semibold text-cyan-200 hover:text-cyan-100"
-                  >
-                    <span>{formatTickerSymbol(item.ticker)}</span>
-                    <span className="text-slate-500">/</span>
-                    <DirectionBadge direction={item.direction} />
-                  </Link>
-                  <p className="text-xs text-slate-400 sm:text-sm">
-                    <RelativeTime value={item.createdAt} />
-                  </p>
-                </div>
+            <div
+              key={item.id}
+              className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition"
+            >
+              <div className="mb-2 flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <Link
-                  href={`/predictions/${item.id}`}
-                  className="block text-sm font-semibold text-slate-100 hover:text-slate-50"
+                  href={`/ticker/${item.ticker}`}
+                  className="flex w-fit items-center gap-1 font-semibold text-cyan-200 hover:text-cyan-100"
+                  aria-label={`${item.direction === "UP" ? "Up" : "Down"} prediction for ${item.ticker}`}
                 >
-                  {formatPredictionThesisTitle(item.thesisTitle)}
+                  <span aria-hidden="true">{item.direction === "UP" ? "\u2191" : "\u2193"}</span>
+                  <span>{formatTickerSymbol(item.ticker)}</span>
                 </Link>
-                <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-                  <p>
-                    by{" "}
-                    <Link
-                      href={`/analysts/${item.userId}`}
-                      className="text-cyan-300 hover:text-cyan-100"
-                    >
-                      {item.authorNickname ? `@${item.authorNickname}` : item.authorDisplayName ?? "Anonymous"}
-                    </Link>
-                  </p>
-                  <p>
-                    {formatPredictionStatus(item.status)}
-                    {item.result ? ` / ${formatScorePercent(item.result.score)}` : ""}
-                  </p>
-                </div>
-                <PredictionMarkSummary prediction={item} />
+                <p className="text-xs text-slate-400 sm:text-sm">
+                  <RelativeTime value={item.createdAt} />
+                </p>
               </div>
+              <PredictionReturnSummary prediction={item} />
+              <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+                <p>
+                  by{" "}
+                  <Link
+                    href={`/analysts/${item.userId}`}
+                    className="text-cyan-300 hover:text-cyan-100"
+                  >
+                    {item.authorNickname ? `@${item.authorNickname}` : item.authorDisplayName ?? "Anonymous"}
+                  </Link>
+                </p>
+                <p>
+                  {formatPredictionStatus(item.status)}
+                  {item.result ? ` / ${formatScorePercent(item.result.score)}` : ""}
+                </p>
+              </div>
+            </div>
           ))}
 
           {!loading && items.length === 0 ? (

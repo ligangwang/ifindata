@@ -191,11 +191,11 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
       (Number.isInteger(horizonValue) && horizonValue > 0);
 
     if (!trimmedTitle) {
-      setError("Thesis title is required.");
+      setError("Title is required.");
       return;
     }
     if (trimmedTitle.length > MAX_PREDICTION_THESIS_TITLE_LENGTH) {
-      setError(`Thesis title must be ${MAX_PREDICTION_THESIS_TITLE_LENGTH} characters or fewer.`);
+      setError(`Title must be ${MAX_PREDICTION_THESIS_TITLE_LENGTH} characters or fewer.`);
       return;
     }
     if (trimmedThesis.length < MIN_PREDICTION_THESIS_LENGTH) {
@@ -207,7 +207,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
       return;
     }
     if (!validHorizon) {
-      setError("Time horizon must be a positive whole number.");
+      setError("Open until must be a positive whole number.");
       return;
     }
 
@@ -319,7 +319,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
         {editing ? (
           <div className="grid gap-3">
             <div className="grid gap-1">
-              <label className="text-xs text-slate-400" htmlFor="edit-thesis-title">Thesis title</label>
+              <label className="text-xs text-slate-400" htmlFor="edit-thesis-title">Title</label>
               <input
                 id="edit-thesis-title"
                 value={editTitle}
@@ -344,7 +344,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
               </p>
             </div>
             <div className="grid gap-1">
-              <label className="text-xs text-slate-400" htmlFor="edit-horizon-unit">Time horizon</label>
+              <label className="text-xs text-slate-400" htmlFor="edit-horizon-unit">Open until</label>
               <div className="grid gap-2 sm:grid-cols-[1fr_160px]">
                 <select
                   id="edit-horizon-unit"

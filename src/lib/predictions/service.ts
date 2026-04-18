@@ -236,11 +236,11 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
 
 function validatePredictionText(thesisTitle: string, thesis: string): void {
   if (!thesisTitle) {
-    throw new Error("thesis title is required");
+    throw new Error("title is required");
   }
 
   if (thesisTitle.length > MAX_PREDICTION_THESIS_TITLE_LENGTH) {
-    throw new Error(`thesis title must be <= ${MAX_PREDICTION_THESIS_TITLE_LENGTH} chars`);
+    throw new Error(`title must be <= ${MAX_PREDICTION_THESIS_TITLE_LENGTH} chars`);
   }
 
   if (thesis.length < MIN_PREDICTION_THESIS_LENGTH) {
@@ -258,7 +258,7 @@ function validateTimeHorizonInput(raw: unknown, baseDate: string): PredictionTim
   }
 
   if (typeof raw !== "object") {
-    throw new Error("time horizon must be an object or null");
+    throw new Error("open until must be an object or null");
   }
 
   const input = raw as Record<string, unknown>;
@@ -266,11 +266,11 @@ function validateTimeHorizonInput(raw: unknown, baseDate: string): PredictionTim
   const value = Number(input.value);
 
   if (!isPredictionTimeHorizonUnit(unit)) {
-    throw new Error("time horizon unit must be DAYS, MONTHS, or YEARS");
+    throw new Error("open until unit must be DAYS, MONTHS, or YEARS");
   }
 
   if (!Number.isInteger(value) || value < 1 || value > TIME_HORIZON_LIMITS[unit]) {
-    throw new Error(`time horizon value must be 1-${TIME_HORIZON_LIMITS[unit]} for ${unit}`);
+    throw new Error(`open until value must be 1-${TIME_HORIZON_LIMITS[unit]} for ${unit}`);
   }
 
   return {
@@ -278,6 +278,37 @@ function validateTimeHorizonInput(raw: unknown, baseDate: string): PredictionTim
     unit,
     targetDate: computeTimeHorizonTargetDate(baseDate, value, unit),
   };
+}
+
+async function readLatestEodTradingDateForTicker(ticker: string): Promise<string | null> {
+  const snapshot = await getAdminFirestore()
+    .collection("eod_prices")
+    .where("ticker", "==", ticker)
+    .orderBy("tradingDate", "desc")
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) {
+    return null;
+  }
+
+  const tradingDate = snapshot.docs[0].get("tradingDate");
+  return typeof tradingDate === "string" && tradingDate ? tradingDate : null;
+}
+
+async function assertOpenUntilAfterLatestEod(ticker: string, timeHorizon: PredictionTimeHorizon | null): Promise<void> {
+  if (!timeHorizon) {
+    return;
+  }
+
+  const latestTradingDate = await readLatestEodTradingDateForTicker(ticker);
+  if (!latestTradingDate || timeHorizon.targetDate > latestTradingDate) {
+    return;
+  }
+
+  throw new Error(
+    `Open until date must be after the latest market date for this ticker. Current open-until date is ${timeHorizon.targetDate}; latest market date is ${latestTradingDate}. Choose a longer period or select No limit.`,
+  );
 }
 
 export function validateUpdatePredictionInput(raw: unknown, baseDate: string): UpdatePredictionInput {
@@ -328,6 +359,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
           targetDate: computeTimeHorizonTargetDate(entryTargetDate, input.timeHorizon.value, input.timeHorizon.unit),
         }
       : null;
+    await assertOpenUntilAfterLatestEod(input.ticker, timeHorizon);
     const prediction: Prediction = {
       userId: user.uid,
       authorDisplayName:
@@ -473,6 +505,7 @@ export async function updatePredictionDetails(predictionId: string, input: Updat
           targetDate: computeTimeHorizonTargetDate(baseDate, input.timeHorizon.value, input.timeHorizon.unit),
         }
       : null;
+    await assertOpenUntilAfterLatestEod(prediction.ticker, timeHorizon);
 
     tx.update(predictionRef, {
       thesisTitle: sanitizePredictionThesisTitle(input.thesisTitle),

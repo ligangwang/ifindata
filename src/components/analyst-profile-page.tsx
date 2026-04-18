@@ -613,9 +613,8 @@ export function AnalystProfilePage({
         </div>
         <div className="grid gap-2">
           {payload.predictions.map((prediction) => (
-            <Link
+            <article
               key={prediction.id}
-              href={`/predictions/${prediction.id}`}
               className="rounded-xl border border-white/10 p-3 hover:border-cyan-300/60"
             >
               <p className="flex flex-wrap items-center gap-1 text-sm text-slate-100">
@@ -626,7 +625,9 @@ export function AnalystProfilePage({
                 <span>{formatPredictionStatus(prediction.status)}</span>
               </p>
               <div className="mt-1 line-clamp-2 break-words text-xs text-slate-300">
-                <span className="block font-semibold text-slate-100">{formatPredictionThesisTitle(prediction.thesisTitle)}</span>
+                <Link href={`/predictions/${prediction.id}`} className="block font-semibold text-slate-100 hover:text-slate-50">
+                  {formatPredictionThesisTitle(prediction.thesisTitle)}
+                </Link>
                 <PredictionThesisText text={sanitizePredictionThesis(prediction.thesis)} className="mt-1 block" />
               </div>
               <p className="mt-1 break-words text-xs text-slate-400">
@@ -636,7 +637,7 @@ export function AnalystProfilePage({
                 <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>
               ) : null}
               <PredictionMarkSummary prediction={prediction} />
-            </Link>
+            </article>
           ))}
 
           {payload.predictions.length === 0 ? <p className="text-sm text-slate-300">No predictions yet.</p> : null}

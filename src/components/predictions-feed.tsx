@@ -160,11 +160,11 @@ export function PredictionsFeed() {
                 </div>
                 <Link
                   href={`/predictions/${item.id}`}
-                  className="block text-sm hover:text-slate-50"
+                  className="block text-sm font-semibold text-slate-100 hover:text-slate-50"
                 >
-                  <span className="block font-semibold text-slate-100">{formatPredictionThesisTitle(item.thesisTitle)}</span>
-                  <PredictionThesisText text={thesis} className="mt-1 line-clamp-2 block text-slate-300" />
+                  {formatPredictionThesisTitle(item.thesisTitle)}
                 </Link>
+                <PredictionThesisText text={thesis} className="mt-1 line-clamp-2 block text-sm text-slate-300" />
                 <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
                   <p>
                     by{" "}

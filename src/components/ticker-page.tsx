@@ -133,10 +133,10 @@ export function TickerPage({ ticker }: { ticker: string }) {
                   <RelativeTime value={prediction.createdAt} />
                 </p>
               </div>
-              <Link href={`/predictions/${prediction.id}`} className="mt-2 block line-clamp-2 text-sm text-slate-100 hover:text-slate-50">
-                <span className="block font-semibold">{formatPredictionThesisTitle(prediction.thesisTitle)}</span>
-                <PredictionThesisText text={prediction.thesis} className="mt-1 block text-slate-300" />
+              <Link href={`/predictions/${prediction.id}`} className="mt-2 block text-sm font-semibold text-slate-100 hover:text-slate-50">
+                {formatPredictionThesisTitle(prediction.thesisTitle)}
               </Link>
+              <PredictionThesisText text={prediction.thesis} className="mt-1 line-clamp-2 block text-sm text-slate-300" />
               <div className="mt-2 flex flex-col gap-1 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                 <p>
                   by{" "}

@@ -242,7 +242,7 @@ export function PredictionReturnSummary({
   const entryPrice = typeof prediction.entryPrice === "number" ? prediction.entryPrice : null;
   const sinceCallDays = daysSinceCall(prediction.entryDate, prediction.markPriceDate);
   const isAwaitingEntry = status === "OPENING";
-  const isAwaitingFirstMark = status === "OPEN" && entryPrice !== null && markDisplayPercent === null;
+  const isAwaitingFirstMark = (status === "OPEN" || status === "CLOSING") && entryPrice !== null && markDisplayPercent === null;
   const hasReturn = !isAwaitingEntry && markDisplayPercent !== null && sinceCallDays !== null;
   const statusLabel = status ? formatPredictionStatus(status).toLowerCase() : null;
 

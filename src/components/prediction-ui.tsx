@@ -239,12 +239,14 @@ export function PredictionReturnSummary({
   status?: PredictionStatus;
 }) {
   const markDisplayPercent = typeof prediction.markDisplayPercent === "number" ? prediction.markDisplayPercent : null;
+  const entryPrice = typeof prediction.entryPrice === "number" ? prediction.entryPrice : null;
   const sinceCallDays = daysSinceCall(prediction.entryDate, prediction.markPriceDate);
   const isAwaitingEntry = status === "OPENING";
+  const isAwaitingFirstMark = status === "OPEN" && entryPrice !== null && markDisplayPercent === null;
   const hasReturn = !isAwaitingEntry && markDisplayPercent !== null && sinceCallDays !== null;
   const statusLabel = status ? formatPredictionStatus(status).toLowerCase() : null;
 
-  if (!hasReturn && !statusLabel) {
+  if (!hasReturn && !statusLabel && !isAwaitingFirstMark) {
     return null;
   }
 
@@ -259,8 +261,15 @@ export function PredictionReturnSummary({
         </>
       ) : null}
       {isAwaitingEntry ? <span className="text-slate-400">Awaiting entry price</span> : null}
+      {isAwaitingFirstMark ? (
+        <>
+          <span className="text-slate-400">Entry: ${entryPrice.toFixed(2)}</span>
+          <span className="text-slate-500"> &middot; </span>
+          <span className="text-slate-400">awaiting first mark</span>
+        </>
+      ) : null}
       {(hasReturn || isAwaitingEntry) && statusLabel ? <span className="text-slate-500"> &middot; </span> : null}
-      {statusLabel ? <span className="text-slate-400">{statusLabel}</span> : null}
+      {!isAwaitingFirstMark && statusLabel ? <span className="text-slate-400">{statusLabel}</span> : null}
     </>
   );
 

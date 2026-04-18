@@ -7,7 +7,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatTickerSymbol, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
-type ProfileStatusFilter = "ALL" | PredictionStatus;
+type ProfileStatusFilter = "ALL" | Exclude<PredictionStatus, "CANCELED">;
 
 type Prediction = {
   id: string;
@@ -519,10 +519,6 @@ export function AnalystProfilePage({
             <p className="text-slate-400">Closed</p>
             <p className="font-semibold text-cyan-100">{payload.profile.stats.closedPredictions}</p>
           </div>
-          <div className="rounded-xl border border-white/10 p-3">
-            <p className="text-slate-400">Canceled</p>
-            <p className="font-semibold text-cyan-100">{payload.profile.stats.canceledPredictions}</p>
-          </div>
         </div>
       </section>
 
@@ -597,7 +593,7 @@ export function AnalystProfilePage({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Prediction history</h2>
           <div className="inline-flex rounded-full border border-slate-700 bg-slate-800/70 p-1 text-xs">
-            {(["ALL", "OPENING", "OPEN", "CLOSING", "CLOSED", "CANCELED"] as const).map((option) => (
+            {(["ALL", "OPENING", "OPEN", "CLOSING", "CLOSED"] as const).map((option) => (
               <button
                 key={option}
                 type="button"

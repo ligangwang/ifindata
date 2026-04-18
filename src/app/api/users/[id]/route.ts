@@ -37,8 +37,8 @@ function coerceStats(raw: unknown): UserStats {
   };
 }
 
-function isPredictionStatus(value: string | null): value is "OPENING" | "OPEN" | "CLOSING" | "CLOSED" | "CANCELED" {
-  return value === "OPENING" || value === "OPEN" || value === "CLOSING" || value === "CLOSED" || value === "CANCELED";
+function isPredictionStatus(value: string | null): value is "OPENING" | "OPEN" | "CLOSING" | "CLOSED" {
+  return value === "OPENING" || value === "OPEN" || value === "CLOSING" || value === "CLOSED";
 }
 
 async function readLatestDailyScore(userId: string): Promise<LatestDailyScore> {

@@ -148,7 +148,7 @@ export function CreatePredictionPage() {
     <main className="mx-auto w-full max-w-3xl px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-6 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
         <h1 className="mb-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">Create prediction</h1>
-        <p className="mb-6 text-sm text-slate-300">Open your thesis with a direction. Entry price is captured server-side.</p>
+        <p className="mb-6 text-sm text-slate-300">Open your thesis with a direction. Entry price will be captured at next end of day (EOD) job.</p>
 
         <div className="grid gap-4">
           <div className="grid gap-2">

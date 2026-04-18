@@ -1,6 +1,6 @@
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
 import { getAdminFirestore } from "@/lib/firebase/admin";
-import { sanitizePredictionThesis } from "@/lib/predictions/types";
+import { sanitizePredictionThesis, sanitizePredictionThesisTitle } from "@/lib/predictions/types";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
@@ -45,6 +45,7 @@ export async function GET(
       ...prediction,
       authorDisplayName,
       authorNickname,
+      thesisTitle: sanitizePredictionThesisTitle(typeof prediction.thesisTitle === "string" ? prediction.thesisTitle : ""),
       thesis: sanitizePredictionThesis(typeof prediction.thesis === "string" ? prediction.thesis : ""),
     });
   } catch (error) {

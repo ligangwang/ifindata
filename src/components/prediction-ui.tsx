@@ -144,6 +144,10 @@ export function PredictionThesisText({
   );
 }
 
+export function formatPredictionThesisTitle(value: string | null | undefined): string {
+  return value?.trim() || "Untitled thesis";
+}
+
 export function markToneClass(value: number): string {
   if (value > 0) {
     return "text-emerald-300";

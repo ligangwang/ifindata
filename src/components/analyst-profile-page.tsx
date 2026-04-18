@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type ProfileStatusFilter = "ALL" | PredictionStatus;
@@ -15,6 +15,7 @@ type Prediction = {
   direction: "UP" | "DOWN";
   entryPrice: number | null;
   entryDate: string | null;
+  thesisTitle: string;
   thesis: string;
   createdAt: string;
   status: PredictionStatus;
@@ -624,9 +625,10 @@ export function AnalystProfilePage({
                 <span className="text-slate-500">/</span>
                 <span>{formatPredictionStatus(prediction.status)}</span>
               </p>
-              <p className="mt-1 line-clamp-2 break-words text-xs text-slate-300">
-                <PredictionThesisText text={sanitizePredictionThesis(prediction.thesis)} />
-              </p>
+              <div className="mt-1 line-clamp-2 break-words text-xs text-slate-300">
+                <span className="block font-semibold text-slate-100">{formatPredictionThesisTitle(prediction.thesisTitle)}</span>
+                <PredictionThesisText text={sanitizePredictionThesis(prediction.thesis)} className="mt-1 block" />
+              </div>
               <p className="mt-1 break-words text-xs text-slate-400">
                 <RelativeTime value={prediction.createdAt} prefix="Created" />
               </p>

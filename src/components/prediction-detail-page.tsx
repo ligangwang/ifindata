@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type PredictionDetail = {
@@ -15,6 +15,7 @@ type PredictionDetail = {
   direction: "UP" | "DOWN";
   entryPrice: number | null;
   entryDate: string | null;
+  thesisTitle: string;
   thesis: string;
   status: PredictionStatus;
   createdAt: string;
@@ -189,6 +190,9 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           </div>
         </div>
 
+        <h2 className="mb-2 font-[var(--font-sora)] text-xl font-semibold text-slate-100">
+          {formatPredictionThesisTitle(prediction.thesisTitle)}
+        </h2>
         <p className="text-sm text-slate-200">
           <PredictionThesisText text={thesis} />
         </p>

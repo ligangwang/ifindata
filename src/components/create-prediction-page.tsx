@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { TickerSearchInput } from "@/components/ticker-search-input";
-import { MAX_PREDICTION_THESIS_LENGTH, MIN_PREDICTION_THESIS_LENGTH } from "@/lib/predictions/types";
+import { MAX_PREDICTION_THESIS_LENGTH, MAX_PREDICTION_THESIS_TITLE_LENGTH, MIN_PREDICTION_THESIS_LENGTH } from "@/lib/predictions/types";
 
 function isValidTickerFormat(ticker: string): boolean {
   if (!ticker || ticker.length === 0 || ticker.length > 12) {
@@ -18,12 +18,17 @@ export function CreatePredictionPage() {
   const { user, loading, getIdToken } = useAuth();
   const [ticker, setTicker] = useState("");
   const [direction, setDirection] = useState<"UP" | "DOWN">("UP");
+  const [thesisTitle, setThesisTitle] = useState("");
   const [thesis, setThesis] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isValidTicker = isValidTickerFormat(ticker);
+  const trimmedThesisTitleLength = thesisTitle.trim().length;
   const trimmedThesisLength = thesis.trim().length;
+  const isValidThesisTitle =
+    trimmedThesisTitleLength > 0 &&
+    trimmedThesisTitleLength <= MAX_PREDICTION_THESIS_TITLE_LENGTH;
   const isValidThesis =
     trimmedThesisLength >= MIN_PREDICTION_THESIS_LENGTH &&
     trimmedThesisLength <= MAX_PREDICTION_THESIS_LENGTH;
@@ -36,6 +41,10 @@ export function CreatePredictionPage() {
       : trimmedThesisLength > MAX_PREDICTION_THESIS_LENGTH
         ? `Thesis must be ${MAX_PREDICTION_THESIS_LENGTH} characters or fewer.`
         : null;
+  const thesisTitleErrorMessage =
+    thesisTitle && trimmedThesisTitleLength > MAX_PREDICTION_THESIS_TITLE_LENGTH
+      ? `Title must be ${MAX_PREDICTION_THESIS_TITLE_LENGTH} characters or fewer.`
+      : null;
 
   if (loading) {
     return <main className="mx-auto w-full max-w-3xl px-4 py-8 text-sm text-slate-300">Loading...</main>;
@@ -67,6 +76,11 @@ export function CreatePredictionPage() {
       return;
     }
 
+    if (!isValidThesisTitle) {
+      setError(thesisTitleErrorMessage ?? "Thesis title is required.");
+      return;
+    }
+
     if (!isValidThesis) {
       setError(thesisErrorMessage ?? `Thesis must be at least ${MIN_PREDICTION_THESIS_LENGTH} characters.`);
       return;
@@ -90,6 +104,7 @@ export function CreatePredictionPage() {
         body: JSON.stringify({
           ticker,
           direction,
+          thesisTitle,
           thesis,
           visibility: "PUBLIC",
         }),
@@ -140,6 +155,29 @@ export function CreatePredictionPage() {
           </div>
 
           <div className="grid gap-2">
+            <label className="text-sm text-slate-200" htmlFor="thesis-title">Thesis title</label>
+            <input
+              id="thesis-title"
+              type="text"
+              value={thesisTitle}
+              onChange={(event) => setThesisTitle(event.target.value)}
+              maxLength={MAX_PREDICTION_THESIS_TITLE_LENGTH}
+              required
+              className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+              placeholder="Summarize the prediction"
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <p className={thesisTitleErrorMessage ? "text-rose-300" : "text-slate-400"}>
+                Required.
+              </p>
+              <p className={trimmedThesisTitleLength > MAX_PREDICTION_THESIS_TITLE_LENGTH ? "text-rose-300" : "text-slate-400"}>
+                {trimmedThesisTitleLength}/{MAX_PREDICTION_THESIS_TITLE_LENGTH}
+              </p>
+            </div>
+            {thesisTitleErrorMessage ? <p className="text-xs text-rose-300">{thesisTitleErrorMessage}</p> : null}
+          </div>
+
+          <div className="grid gap-2">
             <label className="text-sm text-slate-200" htmlFor="prediction-thesis">Thesis</label>
             <textarea
               id="prediction-thesis"
@@ -166,7 +204,7 @@ export function CreatePredictionPage() {
           <button
             type="button"
             onClick={() => void submit()}
-            disabled={submitting || !isValidTicker || !isValidThesis}
+            disabled={submitting || !isValidTicker || !isValidThesisTitle || !isValidThesis}
             className="w-full rounded-full bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-slate-900 disabled:opacity-60 sm:w-fit"
           >
             {submitting ? "Publishing..." : "Publish prediction"}

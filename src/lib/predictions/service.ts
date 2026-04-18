@@ -3,10 +3,12 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
   isPredictionDirection,
   isPredictionVisibility,
+  MAX_PREDICTION_THESIS_TITLE_LENGTH,
   MAX_PREDICTION_THESIS_LENGTH,
   MIN_PREDICTION_THESIS_LENGTH,
   normalizeTicker,
   sanitizePredictionThesis,
+  sanitizePredictionThesisTitle,
   type CreatePredictionInput,
   type Prediction,
   type PredictionComment,
@@ -128,6 +130,7 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
     return {
       id: doc.id,
       ...prediction,
+      thesisTitle: sanitizePredictionThesisTitle(prediction.thesisTitle),
       thesis: sanitizePredictionThesis(prediction.thesis),
     };
   });
@@ -164,6 +167,7 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
   const input = raw as Record<string, unknown>;
   const ticker = typeof input.ticker === "string" ? normalizeTicker(input.ticker) : "";
   const direction = input.direction;
+  const thesisTitle = typeof input.thesisTitle === "string" ? sanitizePredictionThesisTitle(input.thesisTitle) : "";
   const thesis = typeof input.thesis === "string" ? sanitizePredictionThesis(input.thesis) : "";
   const visibility = input.visibility;
 
@@ -173,6 +177,14 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
 
   if (!isPredictionDirection(direction)) {
     throw new Error("direction must be UP or DOWN");
+  }
+
+  if (!thesisTitle) {
+    throw new Error("thesis title is required");
+  }
+
+  if (thesisTitle.length > MAX_PREDICTION_THESIS_TITLE_LENGTH) {
+    throw new Error(`thesis title must be <= ${MAX_PREDICTION_THESIS_TITLE_LENGTH} chars`);
   }
 
   if (thesis.length < MIN_PREDICTION_THESIS_LENGTH) {
@@ -188,6 +200,7 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
   return {
     ticker,
     direction,
+    thesisTitle,
     thesis,
     visibility: resolvedVisibility,
   };
@@ -231,6 +244,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       entryDate: null,
       entryTime: null,
       entryCapturedAt: null,
+      thesisTitle: sanitizePredictionThesisTitle(input.thesisTitle),
       thesis: sanitizePredictionThesis(input.thesis),
       status: "OPENING",
       visibility: input.visibility ?? "PUBLIC",

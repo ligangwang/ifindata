@@ -1,6 +1,7 @@
 export const PREDICTION_DIRECTIONS = ["UP", "DOWN"] as const;
 export const PREDICTION_STATUSES = ["OPENING", "OPEN", "CLOSING", "CLOSED", "CANCELED"] as const;
 export const PREDICTION_VISIBILITIES = ["PUBLIC", "PRIVATE"] as const;
+export const MAX_PREDICTION_THESIS_TITLE_LENGTH = 120;
 export const MIN_PREDICTION_THESIS_LENGTH = 100;
 export const MAX_PREDICTION_THESIS_LENGTH = 2000;
 
@@ -48,6 +49,7 @@ export type Prediction = {
   authorPhotoURL: string | null;
   ticker: string;
   direction: PredictionDirection;
+  thesisTitle?: string;
   entryRequestedAt: string;
   entryTargetDate: string;
   entryPrice: number | null;
@@ -90,6 +92,7 @@ export type PredictionComment = {
 export type CreatePredictionInput = {
   ticker: string;
   direction: PredictionDirection;
+  thesisTitle: string;
   thesis: string;
   visibility?: PredictionVisibility;
 };
@@ -119,6 +122,10 @@ export function sanitizePredictionThesis(raw: string | null | undefined): string
   }
 
   return trimmed;
+}
+
+export function sanitizePredictionThesisTitle(raw: string | null | undefined): string {
+  return raw?.trim() ?? "";
 }
 
 export function splitIsoDateTime(isoTimestamp: string): { entryDate: string; entryTime: string } {

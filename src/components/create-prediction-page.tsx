@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { TickerSearchInput } from "@/components/ticker-search-input";
-import { MAX_PREDICTION_THESIS_LENGTH, MAX_PREDICTION_THESIS_TITLE_LENGTH, MIN_PREDICTION_THESIS_LENGTH } from "@/lib/predictions/types";
+import { MAX_PREDICTION_THESIS_LENGTH, MAX_PREDICTION_THESIS_TITLE_LENGTH, MIN_PREDICTION_THESIS_LENGTH, type PredictionTimeHorizonUnit } from "@/lib/predictions/types";
 
 function isValidTickerFormat(ticker: string): boolean {
   if (!ticker || ticker.length === 0 || ticker.length > 12) {
@@ -20,6 +20,8 @@ export function CreatePredictionPage() {
   const [direction, setDirection] = useState<"UP" | "DOWN">("UP");
   const [thesisTitle, setThesisTitle] = useState("");
   const [thesis, setThesis] = useState("");
+  const [timeHorizonUnit, setTimeHorizonUnit] = useState<"NONE" | PredictionTimeHorizonUnit>("NONE");
+  const [timeHorizonValue, setTimeHorizonValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +34,10 @@ export function CreatePredictionPage() {
   const isValidThesis =
     trimmedThesisLength >= MIN_PREDICTION_THESIS_LENGTH &&
     trimmedThesisLength <= MAX_PREDICTION_THESIS_LENGTH;
+  const parsedTimeHorizonValue = Number(timeHorizonValue);
+  const isValidTimeHorizon =
+    timeHorizonUnit === "NONE" ||
+    (Number.isInteger(parsedTimeHorizonValue) && parsedTimeHorizonValue > 0);
   const tickerErrorMessage = ticker && !isValidTicker
     ? "Ticker must be 1-12 letters, numbers, dots, or hyphens."
     : null;
@@ -44,6 +50,10 @@ export function CreatePredictionPage() {
   const thesisTitleErrorMessage =
     thesisTitle && trimmedThesisTitleLength > MAX_PREDICTION_THESIS_TITLE_LENGTH
       ? `Title must be ${MAX_PREDICTION_THESIS_TITLE_LENGTH} characters or fewer.`
+      : null;
+  const timeHorizonErrorMessage =
+    timeHorizonUnit !== "NONE" && !isValidTimeHorizon
+      ? "Time horizon must be a positive whole number."
       : null;
 
   if (loading) {
@@ -86,6 +96,11 @@ export function CreatePredictionPage() {
       return;
     }
 
+    if (!isValidTimeHorizon) {
+      setError(timeHorizonErrorMessage ?? "Invalid time horizon.");
+      return;
+    }
+
     const token = await getIdToken();
     if (!token) {
       setError("Authentication required.");
@@ -106,6 +121,12 @@ export function CreatePredictionPage() {
           direction,
           thesisTitle,
           thesis,
+          timeHorizon: timeHorizonUnit === "NONE"
+            ? null
+            : {
+                value: parsedTimeHorizonValue,
+                unit: timeHorizonUnit,
+              },
           visibility: "PUBLIC",
         }),
       });
@@ -152,6 +173,42 @@ export function CreatePredictionPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-sm text-slate-200" htmlFor="time-horizon-unit">Time horizon (optional)</label>
+            <div className="grid gap-2 sm:grid-cols-[1fr_160px]">
+              <select
+                id="time-horizon-unit"
+                value={timeHorizonUnit}
+                onChange={(event) => {
+                  const nextUnit = event.target.value as "NONE" | PredictionTimeHorizonUnit;
+                  setTimeHorizonUnit(nextUnit);
+                  if (nextUnit === "NONE") {
+                    setTimeHorizonValue("");
+                  }
+                }}
+                className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+              >
+                <option value="NONE">No limit</option>
+                <option value="DAYS">Days</option>
+                <option value="MONTHS">Months</option>
+                <option value="YEARS">Years</option>
+              </select>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={timeHorizonValue}
+                onChange={(event) => setTimeHorizonValue(event.target.value)}
+                disabled={timeHorizonUnit === "NONE"}
+                placeholder="Value"
+                className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring disabled:opacity-50"
+              />
+            </div>
+            <p className={`text-xs ${timeHorizonErrorMessage ? "text-rose-300" : "text-slate-400"}`}>
+              Optional open-until window for this prediction.
+            </p>
           </div>
 
           <div className="grid gap-2">
@@ -204,7 +261,7 @@ export function CreatePredictionPage() {
           <button
             type="button"
             onClick={() => void submit()}
-            disabled={submitting || !isValidTicker || !isValidThesisTitle || !isValidThesis}
+            disabled={submitting || !isValidTicker || !isValidThesisTitle || !isValidThesis || !isValidTimeHorizon}
             className="w-full rounded-full bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-slate-900 disabled:opacity-60 sm:w-fit"
           >
             {submitting ? "Publishing..." : "Publish prediction"}

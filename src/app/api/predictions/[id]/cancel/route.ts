@@ -11,7 +11,7 @@ function statusFromError(message: string): number {
     return 403;
   }
 
-  if (/can only cancel/i.test(message)) {
+  if (/can only cancel|window expired/i.test(message)) {
     return 400;
   }
 

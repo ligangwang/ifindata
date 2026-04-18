@@ -1,7 +1,21 @@
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { sanitizePredictionThesis, sanitizePredictionThesisTitle } from "@/lib/predictions/types";
+import { updatePredictionDetails, validateUpdatePredictionInput } from "@/lib/predictions/service";
 import { NextRequest, NextResponse } from "next/server";
+
+function statusFromError(message: string): number {
+  if (/not found/i.test(message)) {
+    return 404;
+  }
+  if (/forbidden/i.test(message)) {
+    return 403;
+  }
+  if (/required|must|invalid|only open/i.test(message)) {
+    return 400;
+  }
+  return 500;
+}
 
 export async function GET(
   request: NextRequest,
@@ -51,5 +65,44 @@ export async function GET(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch prediction";
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const decoded = await getDecodedUserFromRequest(request);
+  if (!decoded) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await context.params;
+  const db = getAdminFirestore();
+
+  try {
+    const snapshot = await db.collection("predictions").doc(id).get();
+    if (!snapshot.exists) {
+      return NextResponse.json({ error: "Prediction not found" }, { status: 404 });
+    }
+
+    const prediction = snapshot.data() as Record<string, unknown>;
+    const baseDate =
+      typeof prediction.entryTargetDate === "string" && prediction.entryTargetDate
+        ? prediction.entryTargetDate
+        : typeof prediction.createdAt === "string"
+          ? prediction.createdAt.slice(0, 10)
+          : new Date().toISOString().slice(0, 10);
+    const input = validateUpdatePredictionInput(await request.json(), baseDate);
+    const result = await updatePredictionDetails(id, input, {
+      uid: decoded.uid,
+      displayName: decoded.name,
+      photoURL: decoded.picture,
+    });
+
+    return NextResponse.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update prediction";
+    return NextResponse.json({ error: message }, { status: statusFromError(message) });
   }
 }

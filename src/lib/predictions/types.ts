@@ -1,6 +1,7 @@
 export const PREDICTION_DIRECTIONS = ["UP", "DOWN"] as const;
 export const PREDICTION_STATUSES = ["OPENING", "OPEN", "CLOSING", "CLOSED", "CANCELED"] as const;
 export const PREDICTION_VISIBILITIES = ["PUBLIC", "PRIVATE"] as const;
+export const PREDICTION_TIME_HORIZON_UNITS = ["DAYS", "MONTHS", "YEARS"] as const;
 export const MAX_PREDICTION_THESIS_TITLE_LENGTH = 120;
 export const MIN_PREDICTION_THESIS_LENGTH = 50;
 export const MAX_PREDICTION_THESIS_LENGTH = 10000;
@@ -8,6 +9,13 @@ export const MAX_PREDICTION_THESIS_LENGTH = 10000;
 export type PredictionDirection = (typeof PREDICTION_DIRECTIONS)[number];
 export type PredictionStatus = (typeof PREDICTION_STATUSES)[number];
 export type PredictionVisibility = (typeof PREDICTION_VISIBILITIES)[number];
+export type PredictionTimeHorizonUnit = (typeof PREDICTION_TIME_HORIZON_UNITS)[number];
+
+export type PredictionTimeHorizon = {
+  value: number;
+  unit: PredictionTimeHorizonUnit;
+  targetDate: string;
+};
 
 export type UserStats = {
   totalPredictions: number;
@@ -58,6 +66,7 @@ export type Prediction = {
   entryTime: string | null;
   entryCapturedAt: string | null;
   thesis: string;
+  timeHorizon?: PredictionTimeHorizon | null;
   status: PredictionStatus;
   visibility: PredictionVisibility;
   commentCount: number;
@@ -94,7 +103,14 @@ export type CreatePredictionInput = {
   direction: PredictionDirection;
   thesisTitle: string;
   thesis: string;
+  timeHorizon?: PredictionTimeHorizon | null;
   visibility?: PredictionVisibility;
+};
+
+export type UpdatePredictionInput = {
+  thesisTitle: string;
+  thesis: string;
+  timeHorizon?: PredictionTimeHorizon | null;
 };
 
 export function isPredictionDirection(value: unknown): value is PredictionDirection {
@@ -105,6 +121,10 @@ export function isPredictionVisibility(value: unknown): value is PredictionVisib
   return (
     typeof value === "string" && (PREDICTION_VISIBILITIES as readonly string[]).includes(value)
   );
+}
+
+export function isPredictionTimeHorizonUnit(value: unknown): value is PredictionTimeHorizonUnit {
+  return typeof value === "string" && (PREDICTION_TIME_HORIZON_UNITS as readonly string[]).includes(value);
 }
 
 export function normalizeTicker(raw: string): string {

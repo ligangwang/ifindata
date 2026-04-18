@@ -2,6 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
   isPredictionDirection,
+  isPredictionTimeHorizonUnit,
   isPredictionVisibility,
   MAX_PREDICTION_THESIS_TITLE_LENGTH,
   MAX_PREDICTION_THESIS_LENGTH,
@@ -13,6 +14,9 @@ import {
   type Prediction,
   type PredictionComment,
   type PredictionStatus,
+  type PredictionTimeHorizon,
+  type PredictionTimeHorizonUnit,
+  type UpdatePredictionInput,
 } from "@/lib/predictions/types";
 
 type AuthedUser = {
@@ -36,6 +40,12 @@ type ListPredictionsResult = {
 
 const PUBLIC_PREDICTION_STATUSES: PredictionStatus[] = ["OPENING", "OPEN", "CLOSING", "CLOSED"];
 const ACTIVE_PREDICTION_STATUSES: PredictionStatus[] = ["OPENING", "OPEN", "CLOSING"];
+const CANCEL_WINDOW_MS = 5 * 60 * 1000;
+const TIME_HORIZON_LIMITS: Record<PredictionTimeHorizonUnit, number> = {
+  DAYS: 3650,
+  MONTHS: 120,
+  YEARS: 10,
+};
 
 function getCurrentEasternDate(): string {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -59,6 +69,37 @@ function addDays(date: string, days: number): string {
   const parsed = new Date(`${date}T00:00:00.000Z`);
   parsed.setUTCDate(parsed.getUTCDate() + days);
   return parsed.toISOString().slice(0, 10);
+}
+
+function addMonths(date: string, months: number): string {
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  parsed.setUTCMonth(parsed.getUTCMonth() + months);
+  return parsed.toISOString().slice(0, 10);
+}
+
+function addYears(date: string, years: number): string {
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  parsed.setUTCFullYear(parsed.getUTCFullYear() + years);
+  return parsed.toISOString().slice(0, 10);
+}
+
+function hasCancelWindow(timestamp: string | null | undefined, now = Date.now()): boolean {
+  const parsed = Date.parse(timestamp ?? "");
+  return !Number.isNaN(parsed) && now - parsed <= CANCEL_WINDOW_MS;
+}
+
+function hasCreateCancelWindowExpired(prediction: Prediction, now = Date.now()): boolean {
+  return !hasCancelWindow(prediction.createdAt, now);
+}
+
+function computeTimeHorizonTargetDate(baseDate: string, value: number, unit: PredictionTimeHorizonUnit): string {
+  if (unit === "DAYS") {
+    return addDays(baseDate, value);
+  }
+  if (unit === "MONTHS") {
+    return addMonths(baseDate, value);
+  }
+  return addYears(baseDate, value);
 }
 
 function eodRunDocId(runDate: string, market = "US"): string {
@@ -179,6 +220,21 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
     throw new Error("direction must be UP or DOWN");
   }
 
+  validatePredictionText(thesisTitle, thesis);
+
+  const resolvedVisibility = isPredictionVisibility(visibility) ? visibility : "PUBLIC";
+
+  return {
+    ticker,
+    direction,
+    thesisTitle,
+    thesis,
+    timeHorizon: validateTimeHorizonInput(input.timeHorizon, getCurrentEasternDate()),
+    visibility: resolvedVisibility,
+  };
+}
+
+function validatePredictionText(thesisTitle: string, thesis: string): void {
   if (!thesisTitle) {
     throw new Error("thesis title is required");
   }
@@ -194,15 +250,51 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
   if (thesis.length > MAX_PREDICTION_THESIS_LENGTH) {
     throw new Error(`thesis must be <= ${MAX_PREDICTION_THESIS_LENGTH} chars`);
   }
+}
 
-  const resolvedVisibility = isPredictionVisibility(visibility) ? visibility : "PUBLIC";
+function validateTimeHorizonInput(raw: unknown, baseDate: string): PredictionTimeHorizon | null {
+  if (raw === null || raw === undefined || raw === "") {
+    return null;
+  }
+
+  if (typeof raw !== "object") {
+    throw new Error("time horizon must be an object or null");
+  }
+
+  const input = raw as Record<string, unknown>;
+  const unit = input.unit;
+  const value = Number(input.value);
+
+  if (!isPredictionTimeHorizonUnit(unit)) {
+    throw new Error("time horizon unit must be DAYS, MONTHS, or YEARS");
+  }
+
+  if (!Number.isInteger(value) || value < 1 || value > TIME_HORIZON_LIMITS[unit]) {
+    throw new Error(`time horizon value must be 1-${TIME_HORIZON_LIMITS[unit]} for ${unit}`);
+  }
 
   return {
-    ticker,
-    direction,
+    value,
+    unit,
+    targetDate: computeTimeHorizonTargetDate(baseDate, value, unit),
+  };
+}
+
+export function validateUpdatePredictionInput(raw: unknown, baseDate: string): UpdatePredictionInput {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Invalid request body");
+  }
+
+  const input = raw as Record<string, unknown>;
+  const thesisTitle = typeof input.thesisTitle === "string" ? sanitizePredictionThesisTitle(input.thesisTitle) : "";
+  const thesis = typeof input.thesis === "string" ? sanitizePredictionThesis(input.thesis) : "";
+
+  validatePredictionText(thesisTitle, thesis);
+
+  return {
     thesisTitle,
     thesis,
-    visibility: resolvedVisibility,
+    timeHorizon: validateTimeHorizonInput(input.timeHorizon, baseDate),
   };
 }
 
@@ -230,6 +322,12 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
     }
 
     const userData = userSnapshot.data() ?? {};
+    const timeHorizon = input.timeHorizon
+      ? {
+          ...input.timeHorizon,
+          targetDate: computeTimeHorizonTargetDate(entryTargetDate, input.timeHorizon.value, input.timeHorizon.unit),
+        }
+      : null;
     const prediction: Prediction = {
       userId: user.uid,
       authorDisplayName:
@@ -246,6 +344,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       entryCapturedAt: null,
       thesisTitle: sanitizePredictionThesisTitle(input.thesisTitle),
       thesis: sanitizePredictionThesis(input.thesis),
+      timeHorizon,
       status: "OPENING",
       visibility: input.visibility ?? "PUBLIC",
       commentCount: 0,
@@ -339,6 +438,53 @@ export async function closePrediction(predictionId: string, user: AuthedUser) {
   return { closed: false, status: "CLOSING" as const };
 }
 
+export async function updatePredictionDetails(predictionId: string, input: UpdatePredictionInput, user: AuthedUser) {
+  const db = getAdminFirestore();
+  const nowIso = new Date().toISOString();
+  const predictionRef = db.collection("predictions").doc(predictionId);
+
+  await db.runTransaction(async (tx) => {
+    const predictionSnapshot = await tx.get(predictionRef);
+
+    if (!predictionSnapshot.exists) {
+      throw new Error("Prediction not found");
+    }
+
+    const prediction = predictionSnapshot.data() as Prediction;
+    if (prediction.userId !== user.uid) {
+      throw new Error("Forbidden");
+    }
+
+    const canEdit =
+      prediction.status === "OPEN" ||
+      (prediction.status === "OPENING" && hasCreateCancelWindowExpired(prediction));
+
+    if (!canEdit) {
+      throw new Error("Only OPEN predictions or OPENING predictions after the cancel window can be edited.");
+    }
+
+    const baseDate =
+      typeof prediction.entryTargetDate === "string" && prediction.entryTargetDate
+        ? prediction.entryTargetDate
+        : prediction.createdAt.slice(0, 10);
+    const timeHorizon = input.timeHorizon
+      ? {
+          ...input.timeHorizon,
+          targetDate: computeTimeHorizonTargetDate(baseDate, input.timeHorizon.value, input.timeHorizon.unit),
+        }
+      : null;
+
+    tx.update(predictionRef, {
+      thesisTitle: sanitizePredictionThesisTitle(input.thesisTitle),
+      thesis: sanitizePredictionThesis(input.thesis),
+      timeHorizon,
+      updatedAt: nowIso,
+    });
+  });
+
+  return { updated: true };
+}
+
 export async function cancelPrediction(predictionId: string, user: AuthedUser) {
   const db = getAdminFirestore();
   const nowIso = new Date().toISOString();
@@ -366,6 +512,10 @@ export async function cancelPrediction(predictionId: string, user: AuthedUser) {
     }
 
     if (prediction.status === "OPENING") {
+      if (!hasCancelWindow(prediction.createdAt)) {
+        throw new Error("Create cancel window expired.");
+      }
+
       nextStatus = "CANCELED";
       tx.update(predictionRef, {
         status: "CANCELED",
@@ -381,6 +531,10 @@ export async function cancelPrediction(predictionId: string, user: AuthedUser) {
     }
 
     if (prediction.status === "CLOSING") {
+      if (!hasCancelWindow(prediction.closeRequestedAt)) {
+        throw new Error("Close cancel window expired.");
+      }
+
       nextStatus = "OPEN";
       tx.update(predictionRef, {
         status: "OPEN",

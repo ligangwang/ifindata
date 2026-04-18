@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { DirectionBadge, formatPredictionStatus, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
-import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
+import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
+import { type PredictionStatus } from "@/lib/predictions/types";
 
 type PublicStatusFilter = "ALL" | "ACTIVE" | "CLOSED";
 
@@ -16,6 +16,7 @@ type Prediction = {
   direction: "UP" | "DOWN";
   entryPrice: number | null;
   entryDate: string | null;
+  thesisTitle: string;
   thesis: string;
   status: PredictionStatus;
   createdAt: string;
@@ -136,10 +137,7 @@ export function PredictionsFeed() {
         {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 
         <div className="grid gap-3">
-          {items.map((item) => {
-            const thesis = sanitizePredictionThesis(item.thesis);
-
-            return (
+          {items.map((item) => (
               <div
                 key={item.id}
                 className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition"
@@ -159,9 +157,9 @@ export function PredictionsFeed() {
                 </div>
                 <Link
                   href={`/predictions/${item.id}`}
-                  className="line-clamp-2 text-sm text-slate-100 hover:text-slate-50"
+                  className="block text-sm font-semibold text-slate-100 hover:text-slate-50"
                 >
-                  <PredictionThesisText text={thesis} />
+                  {formatPredictionThesisTitle(item.thesisTitle)}
                 </Link>
                 <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
                   <p>
@@ -180,8 +178,7 @@ export function PredictionsFeed() {
                 </div>
                 <PredictionMarkSummary prediction={item} />
               </div>
-            );
-          })}
+          ))}
 
           {!loading && items.length === 0 ? (
             <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">

@@ -38,8 +38,11 @@ export async function GET(
         ? prediction.authorDisplayName.trim()
         : null;
 
-    const isOwnerOnlyStatus = prediction.status === "CANCELED";
-    if (visibility !== "PUBLIC" || isOwnerOnlyStatus) {
+    if (prediction.status === "CANCELED") {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    if (visibility !== "PUBLIC") {
       const decoded = await getDecodedUserFromRequest(request);
       if (!decoded || !predictionUserId || decoded.uid !== predictionUserId) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });

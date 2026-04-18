@@ -191,13 +191,11 @@ function daysSinceCall(entryDate: string | null | undefined, markPriceDate: stri
 export function formatPredictionStatus(status: PredictionStatus): string {
   switch (status) {
     case "OPENING":
-      return "Opening";
     case "OPEN":
-      return "Open";
     case "CLOSING":
-      return "Closing";
+      return "Live";
     case "CLOSED":
-      return "Closed";
+      return "Final";
     case "CANCELED":
       return "Canceled";
   }

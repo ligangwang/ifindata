@@ -8,24 +8,12 @@ export const metadata: Metadata = {
 
 const lifecycle = [
   {
-    status: "Opening",
-    description: "Your prediction is waiting for the next eligible end-of-day entry price.",
+    status: "Live",
+    description: "The prediction is waiting for entry, tracking daily marks, or waiting for a requested close to settle.",
   },
   {
-    status: "Open",
-    description: "The entry price is set and the prediction is marked daily with end-of-day prices.",
-  },
-  {
-    status: "Closing",
-    description: "You requested a close and the final result is waiting for the next eligible end-of-day price.",
-  },
-  {
-    status: "Closed",
+    status: "Final",
     description: "The final price, result, and score are locked.",
-  },
-  {
-    status: "Canceled",
-    description: "The prediction was canceled before entry.",
   },
 ];
 
@@ -47,7 +35,7 @@ export default function HowItWorksPage() {
         <div>
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Make a prediction</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Pick a ticker, choose up or down, and write your thesis. The prediction starts as Opening.
+            Pick a ticker, choose up or down, and write your thesis. The prediction starts as Live.
           </p>
         </div>
         <div>

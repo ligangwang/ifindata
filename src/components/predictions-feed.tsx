@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatPredictionStatus, formatScorePercent, formatTickerSymbol, PredictionReturnSummary, RelativeTime } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
-type PublicStatusFilter = "ALL" | "ACTIVE" | "CLOSED";
+type PublicStatusFilter = "ALL" | "LIVE" | "FINAL";
 
 type Prediction = {
   id: string;
@@ -36,8 +36,8 @@ type FeedResponse = {
 
 const FILTERS: Array<{ label: string; value: PublicStatusFilter }> = [
   { label: "All", value: "ALL" },
-  { label: "Active", value: "ACTIVE" },
-  { label: "Closed", value: "CLOSED" },
+  { label: "Live", value: "LIVE" },
+  { label: "Final", value: "FINAL" },
 ];
 
 export function PredictionsFeed() {

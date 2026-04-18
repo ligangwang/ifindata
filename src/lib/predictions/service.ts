@@ -27,7 +27,7 @@ type AuthedUser = {
 
 type ListPredictionsInput = {
   limit?: number;
-  status?: PredictionStatus | "ACTIVE";
+  status?: PredictionStatus | "ACTIVE" | "LIVE" | "FINAL";
   userId?: string;
   cursorCreatedAt?: string;
   includePrivate?: boolean;
@@ -143,8 +143,10 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
     return { items: [], nextCursor: null };
   }
 
-  if (status === "ACTIVE") {
+  if (status === "ACTIVE" || status === "LIVE") {
     query = query.where("status", "in", ACTIVE_PREDICTION_STATUSES);
+  } else if (status === "FINAL") {
+    query = query.where("status", "==", "CLOSED");
   } else if (status) {
     query = query.where("status", "==", status);
   }

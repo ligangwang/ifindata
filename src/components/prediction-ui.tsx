@@ -284,8 +284,9 @@ export function PredictionAuthorSummary({ author }: { author: PredictionAuthorFi
   const displayName = author.authorDisplayName?.trim();
   const label = nickname ? `@${nickname}` : displayName || "Anonymous";
   const avatarLabel = nickname?.slice(0, 1) ?? displayName?.slice(0, 1) ?? "?";
-  const totalScore = author.authorStats?.totalScore ?? 0;
-  const totalPredictions = author.authorStats?.totalPredictions ?? 0;
+  const totalScore = author.authorStats?.totalScore;
+  const totalPredictions = author.authorStats?.totalPredictions;
+  const hasStats = typeof totalScore === "number" && typeof totalPredictions === "number";
 
   return (
     <Link
@@ -305,10 +306,14 @@ export function PredictionAuthorSummary({ author }: { author: PredictionAuthorFi
         </span>
       )}
       <span className="font-medium text-cyan-200">{label}</span>
-      <span className="text-slate-500">&middot;</span>
-      <span>{formatBasisPoints(totalScore)}</span>
-      <span className="text-slate-500">&middot;</span>
-      <span>{totalPredictions.toLocaleString()} calls</span>
+      {hasStats ? (
+        <>
+          <span className="text-slate-500">&middot;</span>
+          <span>{formatBasisPoints(totalScore)}</span>
+          <span className="text-slate-500">&middot;</span>
+          <span>{totalPredictions.toLocaleString()} calls</span>
+        </>
+      ) : null}
     </Link>
   );
 }

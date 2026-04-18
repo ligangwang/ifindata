@@ -168,6 +168,26 @@ export function markToneClass(value: number): string {
   return "text-slate-300";
 }
 
+function parseDateOnly(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const [dateOnly] = value.split("T");
+  const timestamp = Date.parse(`${dateOnly}T00:00:00.000Z`);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function daysSinceCall(entryDate: string | null | undefined, markPriceDate: string | null | undefined): number | null {
+  const entryTimestamp = parseDateOnly(entryDate);
+  const markTimestamp = parseDateOnly(markPriceDate);
+  if (entryTimestamp === null || markTimestamp === null) {
+    return null;
+  }
+
+  return Math.max(0, Math.floor((markTimestamp - entryTimestamp) / (24 * 60 * 60 * 1000)));
+}
+
 export function formatPredictionStatus(status: PredictionStatus): string {
   switch (status) {
     case "OPENING":
@@ -191,6 +211,23 @@ export function DirectionBadge({ direction }: { direction: PredictionDirection }
       <span aria-hidden="true">{isUp ? "\u2191" : "\u2193"}</span>
       {direction}
     </span>
+  );
+}
+
+export function PredictionReturnSummary({ prediction }: { prediction: PredictionMarkFields }) {
+  const markDisplayPercent = prediction.markDisplayPercent;
+  const sinceCallDays = daysSinceCall(prediction.entryDate, prediction.markPriceDate);
+  if (typeof markDisplayPercent !== "number" || sinceCallDays === null) {
+    return null;
+  }
+
+  return (
+    <p className="mt-1 text-xs">
+      <span className={`font-semibold ${markToneClass(markDisplayPercent)}`}>
+        {formatMarkPercent(markDisplayPercent)}
+      </span>
+      <span className="text-slate-400"> since call ({sinceCallDays}d)</span>
+    </p>
   );
 }
 

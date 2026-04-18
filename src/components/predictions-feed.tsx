@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { formatMarkPercent, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, markToneClass, RelativeTime } from "@/components/prediction-ui";
+import { formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionReturnSummary, RelativeTime } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type PublicStatusFilter = "ALL" | "ACTIVE" | "CLOSED";
@@ -39,26 +39,6 @@ const FILTERS: Array<{ label: string; value: PublicStatusFilter }> = [
   { label: "Active", value: "ACTIVE" },
   { label: "Closed", value: "CLOSED" },
 ];
-
-function parseDateOnly(value: string | null | undefined): number | null {
-  if (!value) {
-    return null;
-  }
-
-  const [dateOnly] = value.split("T");
-  const timestamp = Date.parse(`${dateOnly}T00:00:00.000Z`);
-  return Number.isNaN(timestamp) ? null : timestamp;
-}
-
-function daysSinceCall(entryDate: string | null, markPriceDate: string | null | undefined): number | null {
-  const entryTimestamp = parseDateOnly(entryDate);
-  const markTimestamp = parseDateOnly(markPriceDate);
-  if (entryTimestamp === null || markTimestamp === null) {
-    return null;
-  }
-
-  return Math.max(0, Math.floor((markTimestamp - entryTimestamp) / (24 * 60 * 60 * 1000)));
-}
 
 export function PredictionsFeed() {
   const [status, setStatus] = useState<PublicStatusFilter>("ALL");
@@ -157,61 +137,48 @@ export function PredictionsFeed() {
         {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 
         <div className="grid gap-3">
-          {items.map((item) => {
-            const sinceCallDays = daysSinceCall(item.entryDate, item.markPriceDate);
-            const markDisplayPercent = item.markDisplayPercent;
-            const showReturnLine = typeof markDisplayPercent === "number" && sinceCallDays !== null;
-
-            return (
-              <div
-                key={item.id}
-                className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition"
-              >
-                <div className="mb-2 flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
-                  <Link
-                    href={`/ticker/${item.ticker}`}
-                    className="flex w-fit items-center gap-1 font-semibold text-cyan-200 hover:text-cyan-100"
-                    aria-label={`${item.direction === "UP" ? "Up" : "Down"} prediction for ${item.ticker}`}
-                  >
-                    <span aria-hidden="true">{item.direction === "UP" ? "\u2191" : "\u2193"}</span>
-                    <span>{formatTickerSymbol(item.ticker)}</span>
-                  </Link>
-                  <p className="text-xs text-slate-400 sm:text-sm">
-                    <RelativeTime value={item.createdAt} />
-                  </p>
-                </div>
+          {items.map((item) => (
+            <div
+              key={item.id}
+              className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition"
+            >
+              <div className="mb-2 flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <Link
-                  href={`/predictions/${item.id}`}
-                  className="block text-sm font-semibold text-slate-100 hover:text-slate-50"
+                  href={`/ticker/${item.ticker}`}
+                  className="flex w-fit items-center gap-1 font-semibold text-cyan-200 hover:text-cyan-100"
+                  aria-label={`${item.direction === "UP" ? "Up" : "Down"} prediction for ${item.ticker}`}
                 >
-                  {formatPredictionThesisTitle(item.thesisTitle)}
+                  <span aria-hidden="true">{item.direction === "UP" ? "\u2191" : "\u2193"}</span>
+                  <span>{formatTickerSymbol(item.ticker)}</span>
                 </Link>
-                {showReturnLine ? (
-                  <p className="mt-1 text-xs">
-                    <span className={`font-semibold ${markToneClass(markDisplayPercent)}`}>
-                      {formatMarkPercent(markDisplayPercent)}
-                    </span>
-                    <span className="text-slate-400"> since call ({sinceCallDays}d)</span>
-                  </p>
-                ) : null}
-                <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-                  <p>
-                    by{" "}
-                    <Link
-                      href={`/analysts/${item.userId}`}
-                      className="text-cyan-300 hover:text-cyan-100"
-                    >
-                      {item.authorNickname ? `@${item.authorNickname}` : item.authorDisplayName ?? "Anonymous"}
-                    </Link>
-                  </p>
-                  <p>
-                    {formatPredictionStatus(item.status)}
-                    {item.result ? ` / ${formatScorePercent(item.result.score)}` : ""}
-                  </p>
-                </div>
+                <p className="text-xs text-slate-400 sm:text-sm">
+                  <RelativeTime value={item.createdAt} />
+                </p>
               </div>
-            );
-          })}
+              <Link
+                href={`/predictions/${item.id}`}
+                className="block text-sm font-semibold text-slate-100 hover:text-slate-50"
+              >
+                {formatPredictionThesisTitle(item.thesisTitle)}
+              </Link>
+              <PredictionReturnSummary prediction={item} />
+              <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+                <p>
+                  by{" "}
+                  <Link
+                    href={`/analysts/${item.userId}`}
+                    className="text-cyan-300 hover:text-cyan-100"
+                  >
+                    {item.authorNickname ? `@${item.authorNickname}` : item.authorDisplayName ?? "Anonymous"}
+                  </Link>
+                </p>
+                <p>
+                  {formatPredictionStatus(item.status)}
+                  {item.result ? ` / ${formatScorePercent(item.result.score)}` : ""}
+                </p>
+              </div>
+            </div>
+          ))}
 
           {!loading && items.length === 0 ? (
             <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">

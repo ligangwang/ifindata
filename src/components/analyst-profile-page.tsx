@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatTickerSymbol, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatTickerSymbol, PredictionReturnSummary, RelativeTime } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type ProfileStatusFilter = "ALL" | Exclude<PredictionStatus, "CANCELED">;
@@ -631,7 +631,7 @@ export function AnalystProfilePage({
               {prediction.result ? (
                 <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>
               ) : null}
-              <PredictionMarkSummary prediction={prediction} />
+              <PredictionReturnSummary prediction={prediction} />
             </article>
           ))}
 

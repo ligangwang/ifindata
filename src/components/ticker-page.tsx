@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionReturnSummary, RelativeTime } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type Prediction = {
@@ -149,7 +149,7 @@ export function TickerPage({ ticker }: { ticker: string }) {
                 </p>
                 {prediction.result ? <p className="text-emerald-200">Result {formatScorePercent(prediction.result.score)}</p> : null}
               </div>
-              <PredictionMarkSummary prediction={prediction} />
+              <PredictionReturnSummary prediction={prediction} />
             </article>
           ))}
 

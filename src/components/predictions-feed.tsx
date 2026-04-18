@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { DirectionBadge, formatPredictionStatus, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type PublicStatusFilter = "ALL" | "ACTIVE" | "CLOSED";
@@ -16,6 +16,7 @@ type Prediction = {
   direction: "UP" | "DOWN";
   entryPrice: number | null;
   entryDate: string | null;
+  thesisTitle: string;
   thesis: string;
   status: PredictionStatus;
   createdAt: string;
@@ -159,10 +160,11 @@ export function PredictionsFeed() {
                 </div>
                 <Link
                   href={`/predictions/${item.id}`}
-                  className="line-clamp-2 text-sm text-slate-100 hover:text-slate-50"
+                  className="block text-sm font-semibold text-slate-100 hover:text-slate-50"
                 >
-                  <PredictionThesisText text={thesis} />
+                  {formatPredictionThesisTitle(item.thesisTitle)}
                 </Link>
+                <PredictionThesisText text={thesis} className="mt-1 line-clamp-2 block text-sm text-slate-300" />
                 <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
                   <p>
                     by{" "}

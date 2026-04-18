@@ -3,8 +3,16 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
-import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
+import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import {
+  MAX_PREDICTION_THESIS_LENGTH,
+  MAX_PREDICTION_THESIS_TITLE_LENGTH,
+  MIN_PREDICTION_THESIS_LENGTH,
+  sanitizePredictionThesis,
+  type PredictionStatus,
+  type PredictionTimeHorizon,
+  type PredictionTimeHorizonUnit,
+} from "@/lib/predictions/types";
 
 type PredictionDetail = {
   id: string;
@@ -15,9 +23,12 @@ type PredictionDetail = {
   direction: "UP" | "DOWN";
   entryPrice: number | null;
   entryDate: string | null;
+  thesisTitle: string;
   thesis: string;
+  timeHorizon: PredictionTimeHorizon | null;
   status: PredictionStatus;
   createdAt: string;
+  closeRequestedAt?: string | null;
   markPrice?: number | null;
   markPriceDate?: string | null;
   markDisplayPercent?: number | null;
@@ -45,6 +56,13 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<"close" | "cancel" | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editThesis, setEditThesis] = useState("");
+  const [editHorizonUnit, setEditHorizonUnit] = useState<"NONE" | PredictionTimeHorizonUnit>("NONE");
+  const [editHorizonValue, setEditHorizonValue] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
   async function loadAll() {
     setLoading(true);
@@ -80,6 +98,11 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
     void loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [predictionId]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 30 * 1000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   async function submitComment() {
     if (!commentText.trim()) {
@@ -142,6 +165,94 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
     }
   }
 
+  function startEditing() {
+    if (!prediction) {
+      return;
+    }
+
+    setEditTitle(prediction.thesisTitle ?? "");
+    setEditThesis(prediction.thesis ?? "");
+    setEditHorizonUnit(prediction.timeHorizon?.unit ?? "NONE");
+    setEditHorizonValue(prediction.timeHorizon ? String(prediction.timeHorizon.value) : "");
+    setEditing(true);
+    setError(null);
+  }
+
+  async function saveEdits() {
+    if (!prediction) {
+      return;
+    }
+
+    const trimmedTitle = editTitle.trim();
+    const trimmedThesis = editThesis.trim();
+    const horizonValue = Number(editHorizonValue);
+    const validHorizon =
+      editHorizonUnit === "NONE" ||
+      (Number.isInteger(horizonValue) && horizonValue > 0);
+
+    if (!trimmedTitle) {
+      setError("Thesis title is required.");
+      return;
+    }
+    if (trimmedTitle.length > MAX_PREDICTION_THESIS_TITLE_LENGTH) {
+      setError(`Thesis title must be ${MAX_PREDICTION_THESIS_TITLE_LENGTH} characters or fewer.`);
+      return;
+    }
+    if (trimmedThesis.length < MIN_PREDICTION_THESIS_LENGTH) {
+      setError(`Thesis must be at least ${MIN_PREDICTION_THESIS_LENGTH} characters.`);
+      return;
+    }
+    if (trimmedThesis.length > MAX_PREDICTION_THESIS_LENGTH) {
+      setError(`Thesis must be ${MAX_PREDICTION_THESIS_LENGTH} characters or fewer.`);
+      return;
+    }
+    if (!validHorizon) {
+      setError("Time horizon must be a positive whole number.");
+      return;
+    }
+
+    const token = await getIdToken();
+    if (!token) {
+      setError("Sign in to edit this prediction.");
+      return;
+    }
+
+    setEditSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/predictions/${predictionId}`, {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          thesisTitle: trimmedTitle,
+          thesis: trimmedThesis,
+          timeHorizon: editHorizonUnit === "NONE"
+            ? null
+            : {
+                value: horizonValue,
+                unit: editHorizonUnit,
+              },
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error ?? "Unable to edit prediction.");
+      }
+
+      setEditing(false);
+      await loadAll();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to edit prediction.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   if (loading) {
     return <main className="mx-auto w-full max-w-4xl px-4 py-8 text-sm text-slate-300">Loading prediction...</main>;
   }
@@ -152,16 +263,23 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
 
   const thesis = sanitizePredictionThesis(prediction.thesis);
   const isOwner = Boolean(user && user.uid === prediction.userId);
+  const createdAtMs = Date.parse(prediction.createdAt);
+  const closeRequestedAtMs = Date.parse(prediction.closeRequestedAt ?? "");
+  const createCancelWindowOpen = !Number.isNaN(createdAtMs) && now - createdAtMs <= 5 * 60 * 1000;
+  const closeCancelWindowOpen = !Number.isNaN(closeRequestedAtMs) && now - closeRequestedAtMs <= 5 * 60 * 1000;
+  const canEdit =
+    isOwner &&
+    (prediction.status === "OPEN" || (prediction.status === "OPENING" && !createCancelWindowOpen));
   const entryText =
     typeof prediction.entryPrice === "number" && prediction.entryDate
       ? `${prediction.entryPrice.toFixed(2)} @ ${prediction.entryDate}`
       : "Pending";
   const ownerAction =
-    isOwner && prediction.status === "OPENING"
+    isOwner && prediction.status === "OPENING" && createCancelWindowOpen
       ? { action: "cancel" as const, label: "Cancel" }
       : isOwner && prediction.status === "OPEN"
         ? { action: "close" as const, label: "Close" }
-        : isOwner && prediction.status === "CLOSING"
+        : isOwner && prediction.status === "CLOSING" && closeCancelWindowOpen
           ? { action: "cancel" as const, label: "Cancel close" }
           : null;
 
@@ -186,12 +304,106 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
                 {actionPending === ownerAction.action ? "Working..." : ownerAction.label}
               </button>
             ) : null}
+            {canEdit && !editing ? (
+              <button
+                type="button"
+                onClick={startEditing}
+                className="rounded-lg border border-cyan-400/35 px-3 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/15"
+              >
+                Edit
+              </button>
+            ) : null}
           </div>
         </div>
 
-        <p className="text-sm text-slate-200">
-          <PredictionThesisText text={thesis} />
-        </p>
+        {editing ? (
+          <div className="grid gap-3">
+            <div className="grid gap-1">
+              <label className="text-xs text-slate-400" htmlFor="edit-thesis-title">Thesis title</label>
+              <input
+                id="edit-thesis-title"
+                value={editTitle}
+                onChange={(event) => setEditTitle(event.target.value)}
+                maxLength={MAX_PREDICTION_THESIS_TITLE_LENGTH}
+                className="rounded-lg border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+              />
+            </div>
+            <div className="grid gap-1">
+              <label className="text-xs text-slate-400" htmlFor="edit-thesis">Thesis</label>
+              <textarea
+                id="edit-thesis"
+                value={editThesis}
+                onChange={(event) => setEditThesis(event.target.value)}
+                minLength={MIN_PREDICTION_THESIS_LENGTH}
+                maxLength={MAX_PREDICTION_THESIS_LENGTH}
+                rows={8}
+                className="min-h-48 rounded-lg border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+              />
+              <p className="text-xs text-slate-400">
+                {editThesis.trim().length}/{MIN_PREDICTION_THESIS_LENGTH} minimum
+              </p>
+            </div>
+            <div className="grid gap-1">
+              <label className="text-xs text-slate-400" htmlFor="edit-horizon-unit">Time horizon</label>
+              <div className="grid gap-2 sm:grid-cols-[1fr_160px]">
+                <select
+                  id="edit-horizon-unit"
+                  value={editHorizonUnit}
+                  onChange={(event) => {
+                    const nextUnit = event.target.value as "NONE" | PredictionTimeHorizonUnit;
+                    setEditHorizonUnit(nextUnit);
+                    if (nextUnit === "NONE") {
+                      setEditHorizonValue("");
+                    }
+                  }}
+                  className="rounded-lg border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+                >
+                  <option value="NONE">No limit</option>
+                  <option value="DAYS">Days</option>
+                  <option value="MONTHS">Months</option>
+                  <option value="YEARS">Years</option>
+                </select>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={editHorizonValue}
+                  onChange={(event) => setEditHorizonValue(event.target.value)}
+                  disabled={editHorizonUnit === "NONE"}
+                  placeholder="Value"
+                  className="rounded-lg border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring disabled:opacity-50"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void saveEdits()}
+                disabled={editSaving}
+                className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-50"
+              >
+                {editSaving ? "Saving..." : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                disabled={editSaving}
+                className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-slate-200 hover:border-white/30 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <h2 className="mb-2 font-[var(--font-sora)] text-xl font-semibold text-slate-100">
+              {formatPredictionThesisTitle(prediction.thesisTitle)}
+            </h2>
+            <p className="text-sm text-slate-200">
+              <PredictionThesisText text={thesis} />
+            </p>
+          </>
+        )}
         <PredictionMarkSummary prediction={prediction} />
 
         <div className="mt-4 grid gap-1 text-sm text-slate-300 md:grid-cols-2">

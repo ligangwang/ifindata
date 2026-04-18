@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import { sanitizePredictionThesis, type PredictionStatus } from "@/lib/predictions/types";
 
 type ProfileStatusFilter = "ALL" | PredictionStatus;
@@ -15,6 +15,7 @@ type Prediction = {
   direction: "UP" | "DOWN";
   entryPrice: number | null;
   entryDate: string | null;
+  thesisTitle: string;
   thesis: string;
   createdAt: string;
   status: PredictionStatus;
@@ -372,12 +373,12 @@ export function AnalystProfilePage({
                 {payload.profile.nickname ? `@${payload.profile.nickname}` : preferredName}
               </h1>
               <nav className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400" aria-label="Profile follow lists">
-                <Link href={`/analysts/${userId}/followers`} className="hover:text-cyan-200">
-                  {countText(payload.profile.stats.followersCount, "follower")}
-                </Link>
-                <span aria-hidden="true">/</span>
                 <Link href={`/analysts/${userId}/following`} className="hover:text-cyan-200">
                   {countText(payload.profile.stats.followingCount, "following", "following")}
+                </Link>
+                <span aria-hidden="true">/</span>
+                <Link href={`/analysts/${userId}/followers`} className="hover:text-cyan-200">
+                  {countText(payload.profile.stats.followersCount, "follower")}
                 </Link>
               </nav>
             </div>
@@ -612,9 +613,8 @@ export function AnalystProfilePage({
         </div>
         <div className="grid gap-2">
           {payload.predictions.map((prediction) => (
-            <Link
+            <article
               key={prediction.id}
-              href={`/predictions/${prediction.id}`}
               className="rounded-xl border border-white/10 p-3 hover:border-cyan-300/60"
             >
               <p className="flex flex-wrap items-center gap-1 text-sm text-slate-100">
@@ -624,9 +624,12 @@ export function AnalystProfilePage({
                 <span className="text-slate-500">/</span>
                 <span>{formatPredictionStatus(prediction.status)}</span>
               </p>
-              <p className="mt-1 line-clamp-2 break-words text-xs text-slate-300">
-                <PredictionThesisText text={sanitizePredictionThesis(prediction.thesis)} />
-              </p>
+              <div className="mt-1 line-clamp-2 break-words text-xs text-slate-300">
+                <Link href={`/predictions/${prediction.id}`} className="block font-semibold text-slate-100 hover:text-slate-50">
+                  {formatPredictionThesisTitle(prediction.thesisTitle)}
+                </Link>
+                <PredictionThesisText text={sanitizePredictionThesis(prediction.thesis)} className="mt-1 block" />
+              </div>
               <p className="mt-1 break-words text-xs text-slate-400">
                 <RelativeTime value={prediction.createdAt} prefix="Created" />
               </p>
@@ -634,7 +637,7 @@ export function AnalystProfilePage({
                 <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>
               ) : null}
               <PredictionMarkSummary prediction={prediction} />
-            </Link>
+            </article>
           ))}
 
           {payload.predictions.length === 0 ? <p className="text-sm text-slate-300">No predictions yet.</p> : null}

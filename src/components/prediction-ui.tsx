@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { PredictionDirection, PredictionStatus } from "@/lib/predictions/types";
+import type { PredictionDirection, PredictionStatus, PredictionTimeHorizon } from "@/lib/predictions/types";
 
 export type PredictionMarkFields = {
   direction: PredictionDirection;
@@ -10,6 +10,7 @@ export type PredictionMarkFields = {
   markPrice?: number | null;
   markPriceDate?: string | null;
   markDisplayPercent?: number | null;
+  timeHorizon?: PredictionTimeHorizon | null;
   commentCount?: number | null;
 };
 
@@ -144,6 +145,19 @@ export function PredictionThesisText({
   );
 }
 
+export function formatPredictionThesisTitle(value: string | null | undefined): string {
+  return value?.trim() || "Untitled thesis";
+}
+
+export function formatTimeHorizon(value: PredictionTimeHorizon | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const unit = value.value === 1 ? value.unit.slice(0, -1).toLowerCase() : value.unit.toLowerCase();
+  return `${value.value} ${unit}, until ${value.targetDate}`;
+}
+
 export function markToneClass(value: number): string {
   if (value > 0) {
     return "text-emerald-300";
@@ -186,6 +200,7 @@ export function PredictionMarkSummary({ prediction }: { prediction: PredictionMa
   const markPrice = prediction.markPrice;
   const markPriceDate = prediction.markPriceDate;
   const markDisplayPercent = prediction.markDisplayPercent;
+  const timeHorizon = formatTimeHorizon(prediction.timeHorizon);
   const hasEntryData =
     typeof entryPrice === "number" &&
     typeof entryDate === "string" &&
@@ -209,6 +224,7 @@ export function PredictionMarkSummary({ prediction }: { prediction: PredictionMa
           </span>
         </>
       ) : null}
+      {timeHorizon ? <span>Horizon {timeHorizon}</span> : null}
       <span>{prediction.commentCount ?? 0} comments</span>
     </div>
   );

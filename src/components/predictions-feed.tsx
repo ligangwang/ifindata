@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionReturnSummary, RelativeTime } from "@/components/prediction-ui";
+import { formatPredictionStatus, formatScorePercent, formatTickerSymbol, PredictionReturnSummary, RelativeTime } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type PublicStatusFilter = "ALL" | "ACTIVE" | "CLOSED";
@@ -155,12 +155,6 @@ export function PredictionsFeed() {
                   <RelativeTime value={item.createdAt} />
                 </p>
               </div>
-              <Link
-                href={`/predictions/${item.id}`}
-                className="block text-sm font-semibold text-slate-100 hover:text-slate-50"
-              >
-                {formatPredictionThesisTitle(item.thesisTitle)}
-              </Link>
               <PredictionReturnSummary prediction={item} />
               <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
                 <p>

@@ -146,7 +146,7 @@ export function TickerPage({ ticker }: { ticker: string }) {
                 </p>
                 {prediction.result ? <p className="text-emerald-200">Result {formatScorePercent(prediction.result.score)}</p> : null}
               </div>
-              <PredictionReturnSummary prediction={prediction} />
+              <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} />
             </article>
           ))}
 

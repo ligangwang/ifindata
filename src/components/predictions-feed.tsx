@@ -155,7 +155,7 @@ export function PredictionsFeed() {
                   <RelativeTime value={item.createdAt} />
                 </p>
               </div>
-              <PredictionReturnSummary prediction={item} />
+              <PredictionReturnSummary prediction={item} href={`/predictions/${item.id}`} />
               <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
                 <p>
                   by{" "}

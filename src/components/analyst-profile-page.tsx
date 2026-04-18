@@ -627,7 +627,7 @@ export function AnalystProfilePage({
               {prediction.result ? (
                 <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>
               ) : null}
-              <PredictionReturnSummary prediction={prediction} />
+              <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} />
             </article>
           ))}
 

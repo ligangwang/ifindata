@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { PredictionDirection, PredictionStatus, PredictionTimeHorizon } from "@/lib/predictions/types";
 
@@ -212,19 +213,33 @@ export function DirectionBadge({ direction }: { direction: PredictionDirection }
   );
 }
 
-export function PredictionReturnSummary({ prediction }: { prediction: PredictionMarkFields }) {
+export function PredictionReturnSummary({ prediction, href }: { prediction: PredictionMarkFields; href?: string }) {
   const markDisplayPercent = prediction.markDisplayPercent;
   const sinceCallDays = daysSinceCall(prediction.entryDate, prediction.markPriceDate);
   if (typeof markDisplayPercent !== "number" || sinceCallDays === null) {
     return null;
   }
 
-  return (
-    <p className="mt-1 text-xs">
+  const content = (
+    <>
       <span className={`font-semibold ${markToneClass(markDisplayPercent)}`}>
         {formatMarkPercent(markDisplayPercent)}
       </span>
       <span className="text-slate-400"> since call ({sinceCallDays}d)</span>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className="mt-1 block w-fit text-xs hover:opacity-85" aria-label="View prediction details">
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <p className="mt-1 text-xs">
+      {content}
     </p>
   );
 }

@@ -3,6 +3,8 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
   isPredictionDirection,
   isPredictionVisibility,
+  MAX_PREDICTION_THESIS_LENGTH,
+  MIN_PREDICTION_THESIS_LENGTH,
   normalizeTicker,
   sanitizePredictionThesis,
   type CreatePredictionInput,
@@ -173,8 +175,12 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
     throw new Error("direction must be UP or DOWN");
   }
 
-  if (thesis.length > 2000) {
-    throw new Error("thesis must be <= 2000 chars");
+  if (thesis.length < MIN_PREDICTION_THESIS_LENGTH) {
+    throw new Error(`thesis must be at least ${MIN_PREDICTION_THESIS_LENGTH} chars`);
+  }
+
+  if (thesis.length > MAX_PREDICTION_THESIS_LENGTH) {
+    throw new Error(`thesis must be <= ${MAX_PREDICTION_THESIS_LENGTH} chars`);
   }
 
   const resolvedVisibility = isPredictionVisibility(visibility) ? visibility : "PUBLIC";

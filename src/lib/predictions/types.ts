@@ -1,6 +1,8 @@
 export const PREDICTION_DIRECTIONS = ["UP", "DOWN"] as const;
 export const PREDICTION_STATUSES = ["OPENING", "OPEN", "CLOSING", "CLOSED", "CANCELED"] as const;
 export const PREDICTION_VISIBILITIES = ["PUBLIC", "PRIVATE"] as const;
+export const MIN_PREDICTION_THESIS_LENGTH = 100;
+export const MAX_PREDICTION_THESIS_LENGTH = 2000;
 
 export type PredictionDirection = (typeof PREDICTION_DIRECTIONS)[number];
 export type PredictionStatus = (typeof PREDICTION_STATUSES)[number];
@@ -88,7 +90,7 @@ export type PredictionComment = {
 export type CreatePredictionInput = {
   ticker: string;
   direction: PredictionDirection;
-  thesis?: string;
+  thesis: string;
   visibility?: PredictionVisibility;
 };
 

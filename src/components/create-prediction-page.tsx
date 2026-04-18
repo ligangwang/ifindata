@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { TickerSearchInput } from "@/components/ticker-search-input";
+import { MAX_PREDICTION_THESIS_LENGTH, MIN_PREDICTION_THESIS_LENGTH } from "@/lib/predictions/types";
 
 function isValidTickerFormat(ticker: string): boolean {
   if (!ticker || ticker.length === 0 || ticker.length > 12) {
@@ -22,9 +23,19 @@ export function CreatePredictionPage() {
   const [error, setError] = useState<string | null>(null);
 
   const isValidTicker = isValidTickerFormat(ticker);
+  const trimmedThesisLength = thesis.trim().length;
+  const isValidThesis =
+    trimmedThesisLength >= MIN_PREDICTION_THESIS_LENGTH &&
+    trimmedThesisLength <= MAX_PREDICTION_THESIS_LENGTH;
   const tickerErrorMessage = ticker && !isValidTicker
     ? "Ticker must be 1-12 letters, numbers, dots, or hyphens."
     : null;
+  const thesisErrorMessage =
+    thesis && trimmedThesisLength < MIN_PREDICTION_THESIS_LENGTH
+      ? `Thesis must be at least ${MIN_PREDICTION_THESIS_LENGTH} characters.`
+      : trimmedThesisLength > MAX_PREDICTION_THESIS_LENGTH
+        ? `Thesis must be ${MAX_PREDICTION_THESIS_LENGTH} characters or fewer.`
+        : null;
 
   if (loading) {
     return <main className="mx-auto w-full max-w-3xl px-4 py-8 text-sm text-slate-300">Loading...</main>;
@@ -53,6 +64,11 @@ export function CreatePredictionPage() {
 
     if (!isValidTicker) {
       setError("Invalid ticker format.");
+      return;
+    }
+
+    if (!isValidThesis) {
+      setError(thesisErrorMessage ?? `Thesis must be at least ${MIN_PREDICTION_THESIS_LENGTH} characters.`);
       return;
     }
 
@@ -124,20 +140,33 @@ export function CreatePredictionPage() {
           </div>
 
           <div className="grid gap-2">
-            <label className="text-sm text-slate-200">Thesis (optional)</label>
+            <label className="text-sm text-slate-200" htmlFor="prediction-thesis">Thesis</label>
             <textarea
+              id="prediction-thesis"
               value={thesis}
               onChange={(event) => setThesis(event.target.value)}
               rows={10}
+              minLength={MIN_PREDICTION_THESIS_LENGTH}
+              maxLength={MAX_PREDICTION_THESIS_LENGTH}
+              required
               className="min-h-56 rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
-              placeholder="Why this setup should work"
+              placeholder="Explain why this setup should work"
             />
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <p className={thesisErrorMessage ? "text-rose-300" : "text-slate-400"}>
+                Minimum {MIN_PREDICTION_THESIS_LENGTH} characters.
+              </p>
+              <p className={trimmedThesisLength < MIN_PREDICTION_THESIS_LENGTH ? "text-slate-400" : "text-emerald-300"}>
+                {trimmedThesisLength}/{MIN_PREDICTION_THESIS_LENGTH}
+              </p>
+            </div>
+            {thesisErrorMessage ? <p className="text-xs text-rose-300">{thesisErrorMessage}</p> : null}
           </div>
 
           <button
             type="button"
             onClick={() => void submit()}
-            disabled={submitting || !isValidTicker}
+            disabled={submitting || !isValidTicker || !isValidThesis}
             className="w-full rounded-full bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-slate-900 disabled:opacity-60 sm:w-fit"
           >
             {submitting ? "Publishing..." : "Publish prediction"}

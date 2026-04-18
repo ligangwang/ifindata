@@ -148,7 +148,7 @@ export function PredictionsFeed() {
                     className="flex w-fit items-center gap-1 font-semibold text-cyan-200 hover:text-cyan-100"
                     aria-label={`${item.direction === "UP" ? "Up" : "Down"} prediction for ${item.ticker}`}
                   >
-                    <span className="text-white" aria-hidden="true">{item.direction === "UP" ? "\u2191" : "\u2193"}</span>
+                    <span aria-hidden="true">{item.direction === "UP" ? "\u2191" : "\u2193"}</span>
                     <span>{formatTickerSymbol(item.ticker)}</span>
                   </Link>
                   <p className="text-xs text-slate-400 sm:text-sm">

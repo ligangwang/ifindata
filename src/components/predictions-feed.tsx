@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { formatScorePercent, formatTickerSymbol, PredictionReturnSummary } from "@/components/prediction-ui";
+import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type PublicStatusFilter = "ALL" | "LIVE" | "FINAL";
@@ -12,6 +12,11 @@ type Prediction = {
   userId: string;
   authorDisplayName: string | null;
   authorNickname: string | null;
+  authorPhotoURL: string | null;
+  authorStats?: {
+    totalScore?: number | null;
+    totalPredictions?: number | null;
+  } | null;
   ticker: string;
   direction: "UP" | "DOWN";
   entryPrice: number | null;
@@ -153,18 +158,7 @@ export function PredictionsFeed() {
                 </Link>
               </div>
               <PredictionReturnSummary prediction={item} href={`/predictions/${item.id}`} status={item.status} />
-              <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-                <p>
-                  by{" "}
-                  <Link
-                    href={`/analysts/${item.userId}`}
-                    className="text-cyan-300 hover:text-cyan-100"
-                  >
-                    {item.authorNickname ? `@${item.authorNickname}` : item.authorDisplayName ?? "Anonymous"}
-                  </Link>
-                </p>
-                {item.result ? <p>{formatScorePercent(item.result.score)}</p> : null}
-              </div>
+              <PredictionAuthorSummary author={item} />
             </div>
           ))}
 

@@ -15,6 +15,17 @@ export type PredictionMarkFields = {
   commentCount?: number | null;
 };
 
+export type PredictionAuthorFields = {
+  userId: string;
+  authorDisplayName?: string | null;
+  authorNickname?: string | null;
+  authorPhotoURL?: string | null;
+  authorStats?: {
+    totalScore?: number | null;
+    totalPredictions?: number | null;
+  } | null;
+};
+
 function formatSignedPercent(value: number): string {
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
@@ -22,6 +33,11 @@ function formatSignedPercent(value: number): string {
 
 export function formatScorePercent(score: number): string {
   return formatSignedPercent(score / 100);
+}
+
+function formatBasisPoints(score: number): string {
+  const sign = score > 0 ? "+" : "";
+  return `${sign}${Math.round(score).toLocaleString()} bp`;
 }
 
 export function formatTickerSymbol(ticker: string | null | undefined): string {
@@ -258,6 +274,40 @@ export function PredictionReturnSummary({
     <p className="mt-1 text-xs">
       {content}
     </p>
+  );
+}
+
+export function PredictionAuthorSummary({ author }: { author: PredictionAuthorFields }) {
+  const nickname = author.authorNickname?.trim();
+  const displayName = author.authorDisplayName?.trim();
+  const label = nickname ? `@${nickname}` : displayName || "Anonymous";
+  const avatarLabel = nickname?.slice(0, 1) ?? displayName?.slice(0, 1) ?? "?";
+  const totalScore = author.authorStats?.totalScore ?? 0;
+  const totalPredictions = author.authorStats?.totalPredictions ?? 0;
+
+  return (
+    <Link
+      href={`/analysts/${author.userId}`}
+      className="mt-3 flex w-fit items-center gap-2 text-xs text-slate-300 hover:text-slate-100"
+    >
+      {author.authorPhotoURL ? (
+        <img
+          src={author.authorPhotoURL}
+          alt=""
+          className="h-5 w-5 rounded-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span className="grid h-5 w-5 place-items-center rounded-full bg-cyan-500/20 text-[10px] font-semibold uppercase text-cyan-100">
+          {avatarLabel}
+        </span>
+      )}
+      <span className="font-medium text-cyan-200">{label}</span>
+      <span className="text-slate-500">&middot;</span>
+      <span>{formatBasisPoints(totalScore)}</span>
+      <span className="text-slate-500">&middot;</span>
+      <span>{totalPredictions.toLocaleString()} calls</span>
+    </Link>
   );
 }
 

@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DirectionBadge, formatScorePercent, formatTickerSymbol, PredictionReturnSummary } from "@/components/prediction-ui";
+import { DirectionBadge, formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type Prediction = {
@@ -10,6 +9,11 @@ type Prediction = {
   userId: string;
   authorDisplayName: string | null;
   authorNickname: string | null;
+  authorPhotoURL: string | null;
+  authorStats?: {
+    totalScore?: number | null;
+    totalPredictions?: number | null;
+  } | null;
   direction: "UP" | "DOWN";
   entryPrice: number | null;
   entryDate: string | null;
@@ -128,20 +132,8 @@ export function TickerPage({ ticker }: { ticker: string }) {
                   <DirectionBadge direction={prediction.direction} />
                 </p>
               </div>
-              <div className="mt-2 flex flex-col gap-1 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-                <p>
-                  by{" "}
-                  {prediction.userId ? (
-                    <Link href={`/analysts/${prediction.userId}`} className="text-cyan-300 hover:text-cyan-100">
-                      {prediction.authorNickname ? `@${prediction.authorNickname}` : prediction.authorDisplayName ?? "Anonymous"}
-                    </Link>
-                  ) : (
-                    prediction.authorNickname ? `@${prediction.authorNickname}` : prediction.authorDisplayName ?? "Anonymous"
-                  )}
-                </p>
-                {prediction.result ? <p className="text-emerald-200">Result {formatScorePercent(prediction.result.score)}</p> : null}
-              </div>
               <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} status={prediction.status} />
+              <PredictionAuthorSummary author={prediction} />
             </article>
           ))}
 

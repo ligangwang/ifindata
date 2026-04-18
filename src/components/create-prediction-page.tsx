@@ -53,7 +53,7 @@ export function CreatePredictionPage() {
       : null;
   const timeHorizonErrorMessage =
     timeHorizonUnit !== "NONE" && !isValidTimeHorizon
-      ? "Time horizon must be a positive whole number."
+      ? "Open until must be a positive whole number."
       : null;
 
   if (loading) {
@@ -97,7 +97,7 @@ export function CreatePredictionPage() {
     }
 
     if (!isValidTimeHorizon) {
-      setError(timeHorizonErrorMessage ?? "Invalid time horizon.");
+      setError(timeHorizonErrorMessage ?? "Invalid open until period.");
       return;
     }
 
@@ -176,7 +176,7 @@ export function CreatePredictionPage() {
           </div>
 
           <div className="grid gap-2">
-            <label className="text-sm text-slate-200" htmlFor="time-horizon-unit">Time horizon (optional)</label>
+            <label className="text-sm text-slate-200" htmlFor="time-horizon-unit">Open until (optional)</label>
             <div className="grid gap-2 sm:grid-cols-[1fr_160px]">
               <select
                 id="time-horizon-unit"
@@ -207,7 +207,7 @@ export function CreatePredictionPage() {
               />
             </div>
             <p className={`text-xs ${timeHorizonErrorMessage ? "text-rose-300" : "text-slate-400"}`}>
-              Optional open-until window for this prediction.
+              Optional open window for this prediction.
             </p>
           </div>
 

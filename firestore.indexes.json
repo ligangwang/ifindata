@@ -175,6 +175,20 @@
       ]
     },
     {
+      "collectionGroup": "eod_prices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "ticker",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tradingDate",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "tickers",
       "queryScope": "COLLECTION",
       "fields": [

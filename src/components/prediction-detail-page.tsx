@@ -207,7 +207,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
       return;
     }
     if (!validHorizon) {
-      setError("Time horizon must be a positive whole number.");
+      setError("Open until must be a positive whole number.");
       return;
     }
 
@@ -344,7 +344,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
               </p>
             </div>
             <div className="grid gap-1">
-              <label className="text-xs text-slate-400" htmlFor="edit-horizon-unit">Time horizon</label>
+              <label className="text-xs text-slate-400" htmlFor="edit-horizon-unit">Open until</label>
               <div className="grid gap-2 sm:grid-cols-[1fr_160px]">
                 <select
                   id="edit-horizon-unit"

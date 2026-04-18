@@ -155,7 +155,7 @@ export function formatTimeHorizon(value: PredictionTimeHorizon | null | undefine
   }
 
   const unit = value.value === 1 ? value.unit.slice(0, -1).toLowerCase() : value.unit.toLowerCase();
-  return `${value.value} ${unit}, until ${value.targetDate}`;
+  return `${value.targetDate} (${value.value} ${unit})`;
 }
 
 export function markToneClass(value: number): string {
@@ -224,7 +224,7 @@ export function PredictionMarkSummary({ prediction }: { prediction: PredictionMa
           </span>
         </>
       ) : null}
-      {timeHorizon ? <span>Horizon {timeHorizon}</span> : null}
+      {timeHorizon ? <span>Open until {timeHorizon}</span> : null}
       <span>{prediction.commentCount ?? 0} comments</span>
     </div>
   );

@@ -139,12 +139,13 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
     query = query.where("visibility", "==", "PUBLIC");
   }
 
+  if (status === "CANCELED") {
+    return { items: [], nextCursor: null };
+  }
+
   if (status === "ACTIVE") {
     query = query.where("status", "in", ACTIVE_PREDICTION_STATUSES);
   } else if (status) {
-    if (status === "CANCELED" && !includePrivate) {
-      return { items: [], nextCursor: null };
-    }
     query = query.where("status", "==", status);
   }
 
@@ -162,9 +163,7 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
   const docs = snapshot.docs;
   const hasMore = docs.length > clampedLimit;
   const selected = hasMore ? docs.slice(0, clampedLimit) : docs;
-  const visibleSelected = includePrivate
-    ? selected
-    : selected.filter((doc) => PUBLIC_PREDICTION_STATUSES.includes(doc.get("status") as PredictionStatus));
+  const visibleSelected = selected.filter((doc) => PUBLIC_PREDICTION_STATUSES.includes(doc.get("status") as PredictionStatus));
   const items = visibleSelected.map((doc) => {
     const prediction = doc.data() as Prediction;
 
@@ -557,6 +556,7 @@ export async function cancelPrediction(predictionId: string, user: AuthedUser) {
       });
       tx.update(userRef, {
         updatedAt: nowIso,
+        "stats.totalPredictions": FieldValue.increment(-1),
         "stats.openingPredictions": FieldValue.increment(-1),
         "stats.canceledPredictions": FieldValue.increment(1),
       });

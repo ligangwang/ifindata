@@ -1,6 +1,6 @@
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
 import { createPrediction, listPredictions, validateCreatePredictionInput } from "@/lib/predictions/service";
-import { PREDICTION_STATUSES, type PredictionStatus } from "@/lib/predictions/types";
+import { type PredictionStatus } from "@/lib/predictions/types";
 import { NextRequest, NextResponse } from "next/server";
 
 function parseLimit(raw: string | null): number {
@@ -12,8 +12,8 @@ function parseLimit(raw: string | null): number {
   return Math.max(1, Math.min(50, Math.trunc(parsed)));
 }
 
-function isPredictionStatus(value: string | null): value is PredictionStatus | "ACTIVE" {
-  return value === "ACTIVE" || (typeof value === "string" && (PREDICTION_STATUSES as readonly string[]).includes(value));
+function isPredictionStatus(value: string | null): value is Exclude<PredictionStatus, "CANCELED"> | "ACTIVE" {
+  return value === "ACTIVE" || value === "OPENING" || value === "OPEN" || value === "CLOSING" || value === "CLOSED";
 }
 
 export async function GET(request: NextRequest) {
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
 
   if (statusParam && !isPredictionStatus(statusParam)) {
-    return NextResponse.json({ error: "status must be ACTIVE, OPENING, OPEN, CLOSING, CLOSED, or CANCELED" }, { status: 400 });
+    return NextResponse.json({ error: "status must be ACTIVE, OPENING, OPEN, CLOSING, or CLOSED" }, { status: 400 });
   }
 
   const includePrivate = includePrivateParam === "true";

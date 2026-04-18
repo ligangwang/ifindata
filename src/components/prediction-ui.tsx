@@ -288,7 +288,7 @@ export function PredictionReturnSummary({
   );
 }
 
-export function PredictionAuthorSummary({ author }: { author: PredictionAuthorFields }) {
+export function PredictionAuthorSummary({ author, className = "" }: { author: PredictionAuthorFields; className?: string }) {
   const nickname = author.authorNickname?.trim();
   const displayName = author.authorDisplayName?.trim();
   const label = nickname ? `@${nickname}` : displayName || "Anonymous";
@@ -300,7 +300,7 @@ export function PredictionAuthorSummary({ author }: { author: PredictionAuthorFi
   return (
     <Link
       href={`/analysts/${author.userId}`}
-      className="mt-3 flex w-fit items-center gap-2 text-xs text-slate-300 hover:text-slate-100"
+      className={`mt-3 flex w-fit items-center gap-2 text-xs text-slate-300 hover:text-slate-100 ${className}`}
     >
       {author.authorPhotoURL ? (
         <img

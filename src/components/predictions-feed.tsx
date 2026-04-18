@@ -119,7 +119,7 @@ export function PredictionsFeed() {
                 </Link>
               </div>
               <PredictionReturnSummary prediction={item} href={`/predictions/${item.id}`} status={item.status} />
-              <PredictionAuthorSummary author={item} />
+              <PredictionAuthorSummary author={item} className="mt-5" />
             </div>
           ))}
 

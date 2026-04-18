@@ -1,11 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
-
-type PublicStatusFilter = "ALL" | "LIVE" | "FINAL";
 
 type Prediction = {
   id: string;
@@ -39,32 +37,18 @@ type FeedResponse = {
   nextCursor: string | null;
 };
 
-const FILTERS: Array<{ label: string; value: PublicStatusFilter }> = [
-  { label: "All", value: "ALL" },
-  { label: "Live", value: "LIVE" },
-  { label: "Final", value: "FINAL" },
-];
+const FEED_QUERY = "limit=20";
 
 export function PredictionsFeed() {
-  const [status, setStatus] = useState<PublicStatusFilter>("ALL");
   const [items, setItems] = useState<Prediction[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const query = useMemo(() => {
-    const params = new URLSearchParams();
-    params.set("limit", "20");
-    if (status !== "ALL") {
-      params.set("status", status);
-    }
-    return params.toString();
-  }, [status]);
-
   useEffect(() => {
     let cancelled = false;
 
-    void fetch(`/api/predictions?${query}`)
+    void fetch(`/api/predictions?${FEED_QUERY}`)
       .then(async (response) => {
         if (!response.ok) {
           throw new Error("Unable to load predictions.");
@@ -92,14 +76,14 @@ export function PredictionsFeed() {
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, []);
 
   async function loadMore() {
     if (!nextCursor) {
       return;
     }
 
-    const params = new URLSearchParams(query);
+    const params = new URLSearchParams(FEED_QUERY);
     params.set("cursorCreatedAt", nextCursor);
 
     const response = await fetch(`/api/predictions?${params.toString()}`);
@@ -115,29 +99,6 @@ export function PredictionsFeed() {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-5">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-4 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
-        <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
-          <div className="inline-flex rounded-full border border-slate-700 bg-slate-800/70 p-1 text-xs">
-            {FILTERS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => {
-                  setStatus(option.value);
-                  setLoading(true);
-                  setError(null);
-                  setItems([]);
-                  setNextCursor(null);
-                }}
-                className={`rounded-full px-3 py-1.5 transition ${
-                  status === option.value ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {loading ? <p className="text-sm text-slate-300">Loading feed...</p> : null}
         {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 
@@ -164,7 +125,7 @@ export function PredictionsFeed() {
 
           {!loading && items.length === 0 ? (
             <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
-              No predictions found for this filter.
+              No predictions yet.
             </p>
           ) : null}
         </div>

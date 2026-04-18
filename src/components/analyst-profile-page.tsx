@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
@@ -147,7 +147,7 @@ export function AnalystProfilePage({
       }
     : null;
 
-  async function fetchProfile(cursorCreatedAt?: string): Promise<ProfilePayload> {
+  const fetchProfile = useCallback(async (cursorCreatedAt?: string): Promise<ProfilePayload> => {
     const params = new URLSearchParams();
     if (status !== "ALL") {
       params.set("status", status);
@@ -166,7 +166,7 @@ export function AnalystProfilePage({
     }
 
     return (await response.json()) as ProfilePayload;
-  }
+  }, [getIdToken, status, userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,7 +191,7 @@ export function AnalystProfilePage({
     return () => {
       cancelled = true;
     };
-  }, [getIdToken, status, userId]);
+  }, [fetchProfile]);
 
   async function loadMorePredictions() {
     if (!payload?.nextCursor || loadingMore) {
@@ -379,10 +379,13 @@ export function AnalystProfilePage({
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             {payload.profile.photoURL ? (
-              <img
+              <Image
                 src={payload.profile.photoURL}
                 alt={`${preferredName} avatar`}
+                width={48}
+                height={48}
                 className="h-12 w-12 rounded-full border border-white/15 object-cover"
+                referrerPolicy="no-referrer"
               />
             ) : (
               <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-slate-800 text-sm text-cyan-200">

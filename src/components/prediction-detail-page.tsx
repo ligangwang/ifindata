@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { formatMarkPercent, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, markToneClass, PredictionAuthorSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import {
   MAX_PREDICTION_THESIS_LENGTH,
   MAX_PREDICTION_THESIS_TITLE_LENGTH,
@@ -19,6 +19,11 @@ type PredictionDetail = {
   userId: string;
   authorDisplayName: string | null;
   authorNickname: string | null;
+  authorPhotoURL?: string | null;
+  authorStats?: {
+    totalScore?: number | null;
+    totalPredictions?: number | null;
+  } | null;
   ticker: string;
   direction: "UP" | "DOWN";
   entryPrice: number | null;
@@ -47,6 +52,40 @@ type PredictionComment = {
   content: string;
   createdAt: string;
 };
+
+const DETAIL_CURRENCY_FORMATTER = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
+const DETAIL_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+function formatDetailCurrency(value: number | null | undefined): string {
+  return typeof value === "number" ? DETAIL_CURRENCY_FORMATTER.format(value) : "Pending";
+}
+
+function formatDetailDate(value: string | null | undefined): string {
+  if (!value) {
+    return "Pending";
+  }
+
+  const [dateOnly] = value.split("T");
+  const parts = dateOnly.split("-").map(Number);
+  const date =
+    parts.length === 3 && parts.every(Number.isFinite)
+      ? new Date(parts[0], parts[1] - 1, parts[2])
+      : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return DETAIL_DATE_FORMATTER.format(date);
+}
 
 export function PredictionDetailPage({ predictionId }: { predictionId: string }) {
   const { getIdToken, user } = useAuth();
@@ -270,9 +309,9 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   const canEdit =
     isOwner &&
     (prediction.status === "OPEN" || (prediction.status === "OPENING" && !createCancelWindowOpen));
-  const entryText =
-    typeof prediction.entryPrice === "number" && prediction.entryDate
-      ? `${prediction.entryPrice.toFixed(2)} @ ${prediction.entryDate}`
+  const returnText =
+    typeof prediction.markDisplayPercent === "number"
+      ? formatMarkPercent(prediction.markDisplayPercent)
       : "Pending";
   const ownerAction =
     isOwner && prediction.status === "OPENING" && createCancelWindowOpen
@@ -287,13 +326,20 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
     <main className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="flex flex-wrap items-center gap-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
-            <span>{formatTickerSymbol(prediction.ticker)}</span>
-            <span className="text-slate-500">/</span>
-            <DirectionBadge direction={prediction.direction} />
+          <h1 className="font-[var(--font-sora)] text-2xl font-semibold">
+            <Link
+              href={`/ticker/${prediction.ticker}`}
+              className="flex w-fit items-center gap-1 text-cyan-200 hover:text-cyan-100"
+              aria-label={`${prediction.direction === "UP" ? "Up" : "Down"} prediction for ${prediction.ticker}`}
+            >
+              <span aria-hidden="true">{prediction.direction === "UP" ? "\u2191" : "\u2193"}</span>
+              <span>{formatTickerSymbol(prediction.ticker)}</span>
+            </Link>
           </h1>
           <div className="flex items-center gap-3">
-            <p className="text-sm text-slate-300">{formatPredictionStatus(prediction.status)}</p>
+            <span className="rounded-lg border border-cyan-400/30 px-2.5 py-1 text-xs font-medium text-cyan-100">
+              {formatPredictionStatus(prediction.status)}
+            </span>
             {ownerAction ? (
               <button
                 type="button"
@@ -404,24 +450,37 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             </p>
           </>
         )}
-        <PredictionMarkSummary prediction={prediction} />
+        <div className="mt-4 grid gap-6 text-sm text-slate-300 sm:grid-cols-2">
+          <dl className="grid gap-1">
+            <div className="grid grid-cols-[110px_1fr] gap-3">
+              <dt className="text-slate-400">Entry Price:</dt>
+              <dd className="text-slate-100">{formatDetailCurrency(prediction.entryPrice)}</dd>
+            </div>
+            <div className="grid grid-cols-[110px_1fr] gap-3">
+              <dt className="text-slate-400">Last Price:</dt>
+              <dd className="text-slate-100">{formatDetailCurrency(prediction.markPrice)}</dd>
+            </div>
+            <div className="grid grid-cols-[110px_1fr] gap-3">
+              <dt className="text-slate-400">Return:</dt>
+              <dd className={typeof prediction.markDisplayPercent === "number" ? markToneClass(prediction.markDisplayPercent) : "text-slate-100"}>
+                {returnText}
+              </dd>
+            </div>
+          </dl>
 
-        <div className="mt-4 grid gap-1 text-sm text-slate-300 md:grid-cols-2">
-          <p>
-            Author:{" "}
-            {prediction.userId ? (
-              <Link href={`/analysts/${prediction.userId}`} className="text-cyan-300 hover:text-cyan-100">
-                {prediction.authorNickname ? `@${prediction.authorNickname}` : prediction.authorDisplayName ?? "Anonymous"}
-              </Link>
-            ) : (
-              prediction.authorNickname ? `@${prediction.authorNickname}` : prediction.authorDisplayName ?? "Anonymous"
-            )}
-          </p>
-          <p>
-            Created: <RelativeTime value={prediction.createdAt} />
-          </p>
-          <p>Entry: {entryText}</p>
+          <dl className="grid gap-1">
+            <div className="grid grid-cols-[110px_1fr] gap-3">
+              <dt className="text-slate-400">Opened:</dt>
+              <dd className="text-slate-100">{formatDetailDate(prediction.entryDate)}</dd>
+            </div>
+            <div className="grid grid-cols-[110px_1fr] gap-3">
+              <dt className="text-slate-400">Last Updated:</dt>
+              <dd className="text-slate-100">{formatDetailDate(prediction.markPriceDate)}</dd>
+            </div>
+          </dl>
         </div>
+
+        {!isOwner ? <PredictionAuthorSummary author={prediction} className="mt-5" /> : null}
 
         {prediction.result ? (
           <div className="mt-4 rounded-xl border border-emerald-400/35 bg-emerald-900/20 p-3 text-sm text-emerald-50">

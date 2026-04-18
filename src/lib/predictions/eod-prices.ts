@@ -367,10 +367,6 @@ async function fetchTwelveDataEodPrices(
   return { prices, failures };
 }
 
-function isEodCandidateStatus(value: unknown): value is "OPENING" | "OPEN" | "CLOSING" {
-  return value === "OPENING" || value === "OPEN" || value === "CLOSING";
-}
-
 async function readRollForwardDates(db: FirebaseFirestore.Firestore, startDate: string): Promise<string[]> {
   const dates = new Set<string>();
   let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;

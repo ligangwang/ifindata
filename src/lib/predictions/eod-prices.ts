@@ -116,6 +116,7 @@ type EodPredictionRecord = {
   entryPrice: number | null;
   entryDate: string | null;
   entryTargetDate: string | null;
+  timeHorizonTargetDate: string | null;
   closeTargetDate: string | null;
   markPriceDate: string | null;
   status: PredictionStatus;
@@ -412,6 +413,26 @@ function isProcessableStatus(value: unknown): value is PredictionStatus {
   return value === "OPENING" || value === "OPEN" || value === "CLOSING" || value === "CLOSED";
 }
 
+function timeHorizonTargetDateFromValue(value: unknown): string | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const targetDate = (value as Record<string, unknown>).targetDate;
+  return typeof targetDate === "string" && isIsoDate(targetDate) ? targetDate : null;
+}
+
+function isOpenUntilDue(prediction: EodPredictionRecord, runDate: string): boolean {
+  return prediction.status === "OPEN" &&
+    typeof prediction.timeHorizonTargetDate === "string" &&
+    prediction.timeHorizonTargetDate <= runDate;
+}
+
+function isLatestOpenUntilDue(latest: Record<string, unknown>, runDate: string): boolean {
+  const targetDate = timeHorizonTargetDateFromValue(latest.timeHorizon);
+  return latest.status === "OPEN" && typeof targetDate === "string" && targetDate <= runDate;
+}
+
 function toEodPredictionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapshot): EodPredictionRecord | null {
   const data = snapshot.data() as Record<string, unknown>;
   const ticker = typeof data.ticker === "string" ? normalizeTicker(data.ticker) : "";
@@ -419,6 +440,7 @@ function toEodPredictionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapshot
   const markPriceDate = typeof data.markPriceDate === "string" ? data.markPriceDate : null;
   const entryDate = typeof data.entryDate === "string" ? data.entryDate : null;
   const entryTargetDate = typeof data.entryTargetDate === "string" ? data.entryTargetDate : null;
+  const timeHorizonTargetDate = timeHorizonTargetDateFromValue(data.timeHorizon);
   const closeTargetDate = typeof data.closeTargetDate === "string" ? data.closeTargetDate : null;
   const entryPrice = data.entryPrice === null || data.entryPrice === undefined ? null : Number(data.entryPrice);
 
@@ -439,6 +461,7 @@ function toEodPredictionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapshot
     entryPrice,
     entryDate,
     entryTargetDate,
+    timeHorizonTargetDate,
     closeTargetDate,
     markPriceDate,
     status: data.status,
@@ -499,6 +522,10 @@ function buildResult(price: EodPrice, mark: { returnValue: number; score: number
 function dailySnapshotStatus(prediction: EodPredictionRecord, tradingDate: string): PredictionStatus {
   if (prediction.status === "CLOSED" && prediction.markPriceDate !== tradingDate) {
     return "OPEN";
+  }
+
+  if (isOpenUntilDue(prediction, tradingDate)) {
+    return "CLOSED";
   }
 
   if (prediction.status === "CLOSING" && prediction.closeTargetDate && prediction.closeTargetDate <= tradingDate) {
@@ -678,6 +705,10 @@ function isActionablePrediction(prediction: EodPredictionRecord, runDate: string
     return false;
   }
 
+  if (isOpenUntilDue(prediction, runDate)) {
+    return true;
+  }
+
   return prediction.markPriceDate !== runDate && (!prediction.markPriceDate || prediction.markPriceDate < runDate);
 }
 
@@ -698,7 +729,7 @@ function shouldMutateLivePrediction(prediction: EodPredictionRecord, runDate: st
     return prediction.markPriceDate === runDate;
   }
 
-  return !prediction.markPriceDate || prediction.markPriceDate <= runDate;
+  return isOpenUntilDue(prediction, runDate) || !prediction.markPriceDate || prediction.markPriceDate <= runDate;
 }
 
 function isDailySnapshotCandidate(prediction: EodPredictionRecord, runDate: string, manualTickers: string[]): boolean {
@@ -976,7 +1007,7 @@ export async function runDailyEodMaintenance(
             dailySnapshots.predictionMarks += 1;
           } else if (prediction.status === "OPENING") {
             marking.opened += 1;
-          } else if (prediction.status === "CLOSING") {
+          } else if (prediction.status === "CLOSING" || isOpenUntilDue(prediction, runDate)) {
             marking.marked += 1;
             marking.closed += 1;
           } else {
@@ -1010,6 +1041,7 @@ export async function runDailyEodMaintenance(
           }
 
           const shouldMutatePrediction = shouldMutateLivePrediction(prediction, runDate, manualTickers);
+          const shouldCloseForOpenUntil = shouldMutatePrediction && isLatestOpenUntilDue(latest, runDate);
           if (latestStatus === "OPENING") {
             const dailyMarkRef = db
               .collection("prediction_daily_marks")
@@ -1093,7 +1125,7 @@ export async function runDailyEodMaintenance(
             previousDailyScore,
           );
           const snapshotStatus = dailySnapshotStatus(prediction, price.tradingDate);
-          const nextStatus = latestStatus === "CLOSING" && shouldMutatePrediction
+          const nextStatus = (latestStatus === "CLOSING" && shouldMutatePrediction) || shouldCloseForOpenUntil
             ? "CLOSED"
             : snapshotStatus;
           tx.set(dailyMarkRef, {
@@ -1144,6 +1176,29 @@ export async function runDailyEodMaintenance(
             tx.update(db.collection("users").doc(prediction.userId), {
               updatedAt: nowIso,
               "stats.closingPredictions": FieldValue.increment(-1),
+              "stats.closedPredictions": FieldValue.increment(1),
+              "stats.totalScore": FieldValue.increment(scoreDelta),
+            });
+            marking.marked += 1;
+            marking.closed += 1;
+            dailySnapshots.predictionMarks += 1;
+            usersNeedingDailyScores.add(prediction.userId);
+            return;
+          }
+
+          if (shouldCloseForOpenUntil) {
+            const result = buildResult(price, mark);
+            tx.update(prediction.ref, {
+              ...markUpdate,
+              ...entryUpdate,
+              status: "CLOSED",
+              closeTargetDate: price.tradingDate,
+              closedAt: nowIso,
+              result,
+            });
+            tx.update(db.collection("users").doc(prediction.userId), {
+              updatedAt: nowIso,
+              "stats.openPredictions": FieldValue.increment(-1),
               "stats.closedPredictions": FieldValue.increment(1),
               "stats.totalScore": FieldValue.increment(scoreDelta),
             });

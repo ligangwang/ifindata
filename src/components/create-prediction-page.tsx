@@ -87,7 +87,7 @@ export function CreatePredictionPage() {
     }
 
     if (!isValidThesisTitle) {
-      setError(thesisTitleErrorMessage ?? "Thesis title is required.");
+      setError(thesisTitleErrorMessage ?? "Title is required.");
       return;
     }
 
@@ -212,7 +212,7 @@ export function CreatePredictionPage() {
           </div>
 
           <div className="grid gap-2">
-            <label className="text-sm text-slate-200" htmlFor="thesis-title">Thesis title</label>
+            <label className="text-sm text-slate-200" htmlFor="thesis-title">Title</label>
             <input
               id="thesis-title"
               type="text"

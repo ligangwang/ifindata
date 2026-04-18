@@ -236,11 +236,11 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
 
 function validatePredictionText(thesisTitle: string, thesis: string): void {
   if (!thesisTitle) {
-    throw new Error("thesis title is required");
+    throw new Error("title is required");
   }
 
   if (thesisTitle.length > MAX_PREDICTION_THESIS_TITLE_LENGTH) {
-    throw new Error(`thesis title must be <= ${MAX_PREDICTION_THESIS_TITLE_LENGTH} chars`);
+    throw new Error(`title must be <= ${MAX_PREDICTION_THESIS_TITLE_LENGTH} chars`);
   }
 
   if (thesis.length < MIN_PREDICTION_THESIS_LENGTH) {

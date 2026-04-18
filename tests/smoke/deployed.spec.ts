@@ -21,7 +21,7 @@ test("homepage renders predictions feed", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Live", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Final", exact: true })).toHaveCount(0);
   await expect(
-    page.getByRole("link", { name: /prediction for/i }).or(page.getByText("No predictions yet.")),
+    page.getByRole("link", { name: /prediction for/i }).or(page.getByText("No predictions yet.")).first(),
   ).toBeVisible();
 });
 

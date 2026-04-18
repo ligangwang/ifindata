@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, formatTickerSymbol, PredictionReturnSummary, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type ProfileStatusFilter = "ALL" | "LIVE" | "FINAL";
@@ -134,6 +134,18 @@ export function AnalystProfilePage({
   const livePredictions = payload
     ? payload.profile.stats.openingPredictions + payload.profile.stats.openPredictions + payload.profile.stats.closingPredictions
     : 0;
+  const profileAuthor = payload
+    ? {
+        userId,
+        authorDisplayName: payload.profile.displayName,
+        authorNickname: payload.profile.nickname,
+        authorPhotoURL: payload.profile.photoURL,
+        authorStats: {
+          totalScore: payload.profile.stats.totalScore,
+          totalPredictions: payload.profile.stats.totalPredictions,
+        },
+      }
+    : null;
 
   async function fetchProfile(cursorCreatedAt?: string): Promise<ProfilePayload> {
     const params = new URLSearchParams();
@@ -618,16 +630,12 @@ export function AnalystProfilePage({
                 <span>{formatTickerSymbol(prediction.ticker)}</span>
                 <span className="text-slate-500">/</span>
                 <DirectionBadge direction={prediction.direction} />
-                <span className="text-slate-500">/</span>
-                <span>{formatPredictionStatus(prediction.status)}</span>
-              </p>
-              <p className="mt-1 break-words text-xs text-slate-400">
-                <RelativeTime value={prediction.createdAt} prefix="Created" />
               </p>
               {prediction.result ? (
                 <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>
               ) : null}
-              <PredictionReturnSummary prediction={prediction} />
+              <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} status={prediction.status} />
+              {profileAuthor ? <PredictionAuthorSummary author={profileAuthor} /> : null}
             </article>
           ))}
 

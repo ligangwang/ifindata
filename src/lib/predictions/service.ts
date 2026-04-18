@@ -34,7 +34,14 @@ type ListPredictionsInput = {
 };
 
 type ListPredictionsResult = {
-  items: Array<Prediction & { id: string; authorNickname: string | null }>;
+  items: Array<Prediction & {
+    id: string;
+    authorNickname: string | null;
+    authorStats: {
+      totalScore: number;
+      totalPredictions: number;
+    };
+  }>;
   nextCursor: string | null;
 };
 
@@ -46,6 +53,11 @@ const TIME_HORIZON_LIMITS: Record<PredictionTimeHorizonUnit, number> = {
   MONTHS: 120,
   YEARS: 10,
 };
+
+function numberFromStats(stats: Record<string, unknown> | undefined, key: string): number {
+  const value = stats?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
 
 function getCurrentEasternDate(): string {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -178,19 +190,28 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
   });
 
   const uniqueUserIds = Array.from(new Set(items.map((item) => item.userId).filter(Boolean)));
-  const nicknameEntries = await Promise.all(
+  const authorEntries = await Promise.all(
     uniqueUserIds.map(async (id) => {
       const userSnapshot = await db.collection("users").doc(id).get();
       const userData = userSnapshot.data() as Record<string, unknown> | undefined;
       const nickname = typeof userData?.nickname === "string" ? userData.nickname : null;
-      return [id, nickname] as const;
+      const stats = userData?.stats as Record<string, unknown> | undefined;
+      return [id, {
+        nickname,
+        totalScore: numberFromStats(stats, "totalScore"),
+        totalPredictions: numberFromStats(stats, "totalPredictions"),
+      }] as const;
     }),
   );
-  const nicknameByUserId = new Map<string, string | null>(nicknameEntries);
+  const authorByUserId = new Map(authorEntries);
 
   const itemsWithNickname = items.map((item) => ({
     ...item,
-    authorNickname: nicknameByUserId.get(item.userId) ?? null,
+    authorNickname: authorByUserId.get(item.userId)?.nickname ?? null,
+    authorStats: {
+      totalScore: authorByUserId.get(item.userId)?.totalScore ?? 0,
+      totalPredictions: authorByUserId.get(item.userId)?.totalPredictions ?? 0,
+    },
   }));
 
   const nextCursor = hasMore && selected.length > 0 ? selected[selected.length - 1].get("createdAt") : null;

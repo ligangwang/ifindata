@@ -40,7 +40,7 @@ type ListPredictionsResult = {
     authorStats: {
       totalScore: number;
       totalPredictions: number;
-    };
+    } | null;
   }>;
   nextCursor: string | null;
 };

@@ -264,7 +264,7 @@ export function PredictionReturnSummary({
 
   if (href) {
     return (
-      <Link href={href} className="mt-1 block w-fit text-xs hover:opacity-85" aria-label="View prediction details">
+      <Link href={href} className="mt-1 block w-fit text-xs hover:opacity-85">
         {content}
       </Link>
     );

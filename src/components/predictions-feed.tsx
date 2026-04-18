@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
+import { formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type PublicStatusFilter = "ALL" | "ACTIVE" | "CLOSED";
@@ -146,10 +146,10 @@ export function PredictionsFeed() {
                   <Link
                     href={`/ticker/${item.ticker}`}
                     className="flex w-fit items-center gap-1 font-semibold text-cyan-200 hover:text-cyan-100"
+                    aria-label={`${item.direction === "UP" ? "Up" : "Down"} prediction for ${item.ticker}`}
                   >
+                    <span className="text-white" aria-hidden="true">{item.direction === "UP" ? "\u2191" : "\u2193"}</span>
                     <span>{formatTickerSymbol(item.ticker)}</span>
-                    <span className="text-slate-500">/</span>
-                    <DirectionBadge direction={item.direction} />
                   </Link>
                   <p className="text-xs text-slate-400 sm:text-sm">
                     <RelativeTime value={item.createdAt} />

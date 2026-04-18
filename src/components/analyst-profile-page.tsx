@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
+import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type ProfileStatusFilter = "ALL" | "LIVE" | "FINAL";
@@ -626,11 +626,14 @@ export function AnalystProfilePage({
               key={prediction.id}
               className="rounded-xl border border-white/10 p-3 hover:border-cyan-300/60"
             >
-              <p className="flex flex-wrap items-center gap-1 text-sm text-slate-100">
+              <Link
+                href={`/ticker/${prediction.ticker}`}
+                className="flex w-fit items-center gap-1 text-sm font-semibold text-cyan-200 hover:text-cyan-100"
+                aria-label={`${prediction.direction === "UP" ? "Up" : "Down"} prediction for ${prediction.ticker}`}
+              >
+                <span aria-hidden="true">{prediction.direction === "UP" ? "\u2191" : "\u2193"}</span>
                 <span>{formatTickerSymbol(prediction.ticker)}</span>
-                <span className="text-slate-500">/</span>
-                <DirectionBadge direction={prediction.direction} />
-              </p>
+              </Link>
               {prediction.result ? (
                 <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>
               ) : null}

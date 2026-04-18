@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DirectionBadge, formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
+import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type Prediction = {
@@ -128,9 +129,14 @@ export function TickerPage({ ticker }: { ticker: string }) {
               className="rounded-xl border border-white/10 p-3 hover:border-cyan-300/60"
             >
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <p className="flex items-center gap-1 text-sm font-semibold text-cyan-200">
-                  <DirectionBadge direction={prediction.direction} />
-                </p>
+                <Link
+                  href={`/ticker/${payload.ticker}`}
+                  className="flex w-fit items-center gap-1 text-sm font-semibold text-cyan-200 hover:text-cyan-100"
+                  aria-label={`${prediction.direction === "UP" ? "Up" : "Down"} prediction for ${payload.ticker}`}
+                >
+                  <span aria-hidden="true">{prediction.direction === "UP" ? "\u2191" : "\u2193"}</span>
+                  <span>{displayTicker}</span>
+                </Link>
               </div>
               <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} status={prediction.status} />
               <PredictionAuthorSummary author={prediction} />

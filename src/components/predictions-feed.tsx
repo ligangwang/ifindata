@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
+import { formatMarkPercent, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, markToneClass, RelativeTime } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type PublicStatusFilter = "ALL" | "ACTIVE" | "CLOSED";
@@ -39,6 +39,26 @@ const FILTERS: Array<{ label: string; value: PublicStatusFilter }> = [
   { label: "Active", value: "ACTIVE" },
   { label: "Closed", value: "CLOSED" },
 ];
+
+function parseDateOnly(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const [dateOnly] = value.split("T");
+  const timestamp = Date.parse(`${dateOnly}T00:00:00.000Z`);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function daysSinceCall(entryDate: string | null, markPriceDate: string | null | undefined): number | null {
+  const entryTimestamp = parseDateOnly(entryDate);
+  const markTimestamp = parseDateOnly(markPriceDate);
+  if (entryTimestamp === null || markTimestamp === null) {
+    return null;
+  }
+
+  return Math.max(0, Math.floor((markTimestamp - entryTimestamp) / (24 * 60 * 60 * 1000)));
+}
 
 export function PredictionsFeed() {
   const [status, setStatus] = useState<PublicStatusFilter>("ALL");
@@ -137,7 +157,12 @@ export function PredictionsFeed() {
         {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 
         <div className="grid gap-3">
-          {items.map((item) => (
+          {items.map((item) => {
+            const sinceCallDays = daysSinceCall(item.entryDate, item.markPriceDate);
+            const markDisplayPercent = item.markDisplayPercent;
+            const showReturnLine = typeof markDisplayPercent === "number" && sinceCallDays !== null;
+
+            return (
               <div
                 key={item.id}
                 className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition"
@@ -161,6 +186,14 @@ export function PredictionsFeed() {
                 >
                   {formatPredictionThesisTitle(item.thesisTitle)}
                 </Link>
+                {showReturnLine ? (
+                  <p className="mt-1 text-xs">
+                    <span className={`font-semibold ${markToneClass(markDisplayPercent)}`}>
+                      {formatMarkPercent(markDisplayPercent)}
+                    </span>
+                    <span className="text-slate-400"> since call ({sinceCallDays}d)</span>
+                  </p>
+                ) : null}
                 <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
                   <p>
                     by{" "}
@@ -176,9 +209,9 @@ export function PredictionsFeed() {
                     {item.result ? ` / ${formatScorePercent(item.result.score)}` : ""}
                   </p>
                 </div>
-                <PredictionMarkSummary prediction={item} />
               </div>
-          ))}
+            );
+          })}
 
           {!loading && items.length === 0 ? (
             <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">

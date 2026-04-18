@@ -213,19 +213,36 @@ export function DirectionBadge({ direction }: { direction: PredictionDirection }
   );
 }
 
-export function PredictionReturnSummary({ prediction, href }: { prediction: PredictionMarkFields; href?: string }) {
-  const markDisplayPercent = prediction.markDisplayPercent;
+export function PredictionReturnSummary({
+  prediction,
+  href,
+  status,
+}: {
+  prediction: PredictionMarkFields;
+  href?: string;
+  status?: PredictionStatus;
+}) {
+  const markDisplayPercent = typeof prediction.markDisplayPercent === "number" ? prediction.markDisplayPercent : null;
   const sinceCallDays = daysSinceCall(prediction.entryDate, prediction.markPriceDate);
-  if (typeof markDisplayPercent !== "number" || sinceCallDays === null) {
+  const hasReturn = markDisplayPercent !== null && sinceCallDays !== null;
+  const statusLabel = status ? formatPredictionStatus(status).toLowerCase() : null;
+
+  if (!hasReturn && !statusLabel) {
     return null;
   }
 
   const content = (
     <>
-      <span className={`font-semibold ${markToneClass(markDisplayPercent)}`}>
-        {formatMarkPercent(markDisplayPercent)}
-      </span>
-      <span className="text-slate-400"> since call ({sinceCallDays}d)</span>
+      {hasReturn ? (
+        <>
+          <span className={`font-semibold ${markToneClass(markDisplayPercent)}`}>
+            {formatMarkPercent(markDisplayPercent)}
+          </span>
+          <span className="text-slate-400"> since call ({sinceCallDays}d)</span>
+        </>
+      ) : null}
+      {hasReturn && statusLabel ? <span className="text-slate-500"> &middot; </span> : null}
+      {statusLabel ? <span className="text-slate-400">{statusLabel}</span> : null}
     </>
   );
 

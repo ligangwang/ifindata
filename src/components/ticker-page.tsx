@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DirectionBadge, formatPredictionStatus, formatScorePercent, formatTickerSymbol, PredictionReturnSummary, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatScorePercent, formatTickerSymbol, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type Prediction = {
@@ -126,11 +126,6 @@ export function TickerPage({ ticker }: { ticker: string }) {
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <p className="flex items-center gap-1 text-sm font-semibold text-cyan-200">
                   <DirectionBadge direction={prediction.direction} />
-                  <span className="text-slate-500">/</span>
-                  <span>{formatPredictionStatus(prediction.status)}</span>
-                </p>
-                <p className="text-xs text-slate-400">
-                  <RelativeTime value={prediction.createdAt} />
                 </p>
               </div>
               <div className="mt-2 flex flex-col gap-1 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
@@ -146,7 +141,7 @@ export function TickerPage({ ticker }: { ticker: string }) {
                 </p>
                 {prediction.result ? <p className="text-emerald-200">Result {formatScorePercent(prediction.result.score)}</p> : null}
               </div>
-              <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} />
+              <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} status={prediction.status} />
             </article>
           ))}
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, formatTickerSymbol, PredictionReturnSummary, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatTickerSymbol, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type ProfileStatusFilter = "ALL" | "LIVE" | "FINAL";
@@ -618,16 +618,11 @@ export function AnalystProfilePage({
                 <span>{formatTickerSymbol(prediction.ticker)}</span>
                 <span className="text-slate-500">/</span>
                 <DirectionBadge direction={prediction.direction} />
-                <span className="text-slate-500">/</span>
-                <span>{formatPredictionStatus(prediction.status)}</span>
-              </p>
-              <p className="mt-1 break-words text-xs text-slate-400">
-                <RelativeTime value={prediction.createdAt} prefix="Created" />
               </p>
               {prediction.result ? (
                 <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>
               ) : null}
-              <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} />
+              <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} status={prediction.status} />
             </article>
           ))}
 

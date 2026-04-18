@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { formatPredictionStatus, formatScorePercent, formatTickerSymbol, PredictionReturnSummary, RelativeTime } from "@/components/prediction-ui";
+import { formatScorePercent, formatTickerSymbol, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type PublicStatusFilter = "ALL" | "LIVE" | "FINAL";
@@ -151,11 +151,8 @@ export function PredictionsFeed() {
                   <span aria-hidden="true">{item.direction === "UP" ? "\u2191" : "\u2193"}</span>
                   <span>{formatTickerSymbol(item.ticker)}</span>
                 </Link>
-                <p className="text-xs text-slate-400 sm:text-sm">
-                  <RelativeTime value={item.createdAt} />
-                </p>
               </div>
-              <PredictionReturnSummary prediction={item} href={`/predictions/${item.id}`} />
+              <PredictionReturnSummary prediction={item} href={`/predictions/${item.id}`} status={item.status} />
               <div className="mt-3 flex flex-col gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between">
                 <p>
                   by{" "}
@@ -166,10 +163,7 @@ export function PredictionsFeed() {
                     {item.authorNickname ? `@${item.authorNickname}` : item.authorDisplayName ?? "Anonymous"}
                   </Link>
                 </p>
-                <p>
-                  {formatPredictionStatus(item.status)}
-                  {item.result ? ` / ${formatScorePercent(item.result.score)}` : ""}
-                </p>
+                {item.result ? <p>{formatScorePercent(item.result.score)}</p> : null}
               </div>
             </div>
           ))}

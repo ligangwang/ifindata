@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import type { PredictionDirection, PredictionStatus, PredictionTimeHorizon } from "@/lib/predictions/types";
 
@@ -303,9 +304,11 @@ export function PredictionAuthorSummary({ author, className = "" }: { author: Pr
       className={`mt-3 flex w-fit items-center gap-2 text-xs text-slate-300 hover:text-slate-100 ${className}`}
     >
       {author.authorPhotoURL ? (
-        <img
+        <Image
           src={author.authorPhotoURL}
           alt=""
+          width={20}
+          height={20}
           className="h-5 w-5 rounded-full object-cover"
           referrerPolicy="no-referrer"
         />

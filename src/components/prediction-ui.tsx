@@ -240,7 +240,8 @@ export function PredictionReturnSummary({
 }) {
   const markDisplayPercent = typeof prediction.markDisplayPercent === "number" ? prediction.markDisplayPercent : null;
   const sinceCallDays = daysSinceCall(prediction.entryDate, prediction.markPriceDate);
-  const hasReturn = markDisplayPercent !== null && sinceCallDays !== null;
+  const isAwaitingEntry = status === "OPENING";
+  const hasReturn = !isAwaitingEntry && markDisplayPercent !== null && sinceCallDays !== null;
   const statusLabel = status ? formatPredictionStatus(status).toLowerCase() : null;
 
   if (!hasReturn && !statusLabel) {
@@ -257,7 +258,8 @@ export function PredictionReturnSummary({
           <span className="text-slate-400"> since call ({sinceCallDays}d)</span>
         </>
       ) : null}
-      {hasReturn && statusLabel ? <span className="text-slate-500"> &middot; </span> : null}
+      {isAwaitingEntry ? <span className="text-slate-400">Awaiting entry price</span> : null}
+      {(hasReturn || isAwaitingEntry) && statusLabel ? <span className="text-slate-500"> &middot; </span> : null}
       {statusLabel ? <span className="text-slate-400">{statusLabel}</span> : null}
     </>
   );

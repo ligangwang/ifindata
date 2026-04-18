@@ -4,10 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatTickerSymbol, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
-type ProfileStatusFilter = "ALL" | Exclude<PredictionStatus, "CANCELED">;
+type ProfileStatusFilter = "ALL" | "LIVE" | "FINAL";
 
 type Prediction = {
   id: string;
@@ -82,7 +82,13 @@ function compactDate(value: string): string {
 }
 
 function statusFilterLabel(status: ProfileStatusFilter): string {
-  return status === "ALL" ? "All" : formatPredictionStatus(status);
+  if (status === "LIVE") {
+    return "Live";
+  }
+  if (status === "FINAL") {
+    return "Final";
+  }
+  return "All";
 }
 
 function countText(count: number, singular: string, plural = `${singular}s`): string {
@@ -125,6 +131,21 @@ export function AnalystProfilePage({
   const preferredName = payload?.profile.nickname ?? payload?.profile.displayName ?? "Analyst";
   const badgePath = `/api/users/${userId}/badge.svg`;
   const profilePath = `/analysts/${userId}`;
+  const livePredictions = payload
+    ? payload.profile.stats.openingPredictions + payload.profile.stats.openPredictions + payload.profile.stats.closingPredictions
+    : 0;
+  const profileAuthor = payload
+    ? {
+        userId,
+        authorDisplayName: payload.profile.displayName,
+        authorNickname: payload.profile.nickname,
+        authorPhotoURL: payload.profile.photoURL,
+        authorStats: {
+          totalScore: payload.profile.stats.totalScore,
+          totalPredictions: payload.profile.stats.totalPredictions,
+        },
+      }
+    : null;
 
   async function fetchProfile(cursorCreatedAt?: string): Promise<ProfilePayload> {
     const params = new URLSearchParams();
@@ -485,7 +506,7 @@ export function AnalystProfilePage({
         ) : (
           <p className="mt-2 text-sm text-slate-300">{payload.profile.bio || "No bio yet."}</p>
         )}
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-4 lg:grid-cols-6">
+        <div className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
           <div className="rounded-xl border border-white/10 p-3">
             <p className="text-slate-400">Total Score</p>
             <p className="font-semibold text-cyan-100">{basisPointText(payload.profile.stats.totalScore)}</p>
@@ -504,19 +525,11 @@ export function AnalystProfilePage({
             <p className="font-semibold text-cyan-100">{payload.profile.stats.totalPredictions}</p>
           </div>
           <div className="rounded-xl border border-white/10 p-3">
-            <p className="text-slate-400">Opening</p>
-            <p className="font-semibold text-cyan-100">{payload.profile.stats.openingPredictions}</p>
+            <p className="text-slate-400">Live</p>
+            <p className="font-semibold text-cyan-100">{livePredictions}</p>
           </div>
           <div className="rounded-xl border border-white/10 p-3">
-            <p className="text-slate-400">Open</p>
-            <p className="font-semibold text-cyan-100">{payload.profile.stats.openPredictions}</p>
-          </div>
-          <div className="rounded-xl border border-white/10 p-3">
-            <p className="text-slate-400">Closing</p>
-            <p className="font-semibold text-cyan-100">{payload.profile.stats.closingPredictions}</p>
-          </div>
-          <div className="rounded-xl border border-white/10 p-3">
-            <p className="text-slate-400">Closed</p>
+            <p className="text-slate-400">Final</p>
             <p className="font-semibold text-cyan-100">{payload.profile.stats.closedPredictions}</p>
           </div>
         </div>
@@ -593,7 +606,7 @@ export function AnalystProfilePage({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Prediction history</h2>
           <div className="inline-flex rounded-full border border-slate-700 bg-slate-800/70 p-1 text-xs">
-            {(["ALL", "OPENING", "OPEN", "CLOSING", "CLOSED"] as const).map((option) => (
+            {(["ALL", "LIVE", "FINAL"] as const).map((option) => (
               <button
                 key={option}
                 type="button"
@@ -617,21 +630,12 @@ export function AnalystProfilePage({
                 <span>{formatTickerSymbol(prediction.ticker)}</span>
                 <span className="text-slate-500">/</span>
                 <DirectionBadge direction={prediction.direction} />
-                <span className="text-slate-500">/</span>
-                <span>{formatPredictionStatus(prediction.status)}</span>
-              </p>
-              <div className="mt-1 break-words text-xs">
-                <Link href={`/predictions/${prediction.id}`} className="block font-semibold text-slate-100 hover:text-slate-50">
-                  {formatPredictionThesisTitle(prediction.thesisTitle)}
-                </Link>
-              </div>
-              <p className="mt-1 break-words text-xs text-slate-400">
-                <RelativeTime value={prediction.createdAt} prefix="Created" />
               </p>
               {prediction.result ? (
                 <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>
               ) : null}
-              <PredictionMarkSummary prediction={prediction} />
+              <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} status={prediction.status} />
+              {profileAuthor ? <PredictionAuthorSummary author={profileAuthor} /> : null}
             </article>
           ))}
 

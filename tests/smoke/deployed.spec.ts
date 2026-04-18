@@ -16,10 +16,13 @@ test("homepage renders predictions feed", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Feed", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: /Predict/i })).toBeVisible();
   
-  // Verify predictions feed is on the page
-  await expect(page.getByRole("button", { name: "All", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Active", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Closed", exact: true })).toBeVisible();
+  // Verify simplified predictions feed is on the page
+  await expect(page.getByRole("button", { name: "All", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Live", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Final", exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: /prediction for/i }).or(page.getByText("No predictions yet.")).first(),
+  ).toBeVisible();
 });
 
 test("staging banner is present only when expected", async ({ page }) => {

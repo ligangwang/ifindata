@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DirectionBadge, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, PredictionMarkSummary, RelativeTime } from "@/components/prediction-ui";
+import { DirectionBadge, formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type Prediction = {
@@ -10,6 +9,11 @@ type Prediction = {
   userId: string;
   authorDisplayName: string | null;
   authorNickname: string | null;
+  authorPhotoURL: string | null;
+  authorStats?: {
+    totalScore?: number | null;
+    totalPredictions?: number | null;
+  } | null;
   direction: "UP" | "DOWN";
   entryPrice: number | null;
   entryDate: string | null;
@@ -126,30 +130,10 @@ export function TickerPage({ ticker }: { ticker: string }) {
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <p className="flex items-center gap-1 text-sm font-semibold text-cyan-200">
                   <DirectionBadge direction={prediction.direction} />
-                  <span className="text-slate-500">/</span>
-                  <span>{formatPredictionStatus(prediction.status)}</span>
-                </p>
-                <p className="text-xs text-slate-400">
-                  <RelativeTime value={prediction.createdAt} />
                 </p>
               </div>
-              <Link href={`/predictions/${prediction.id}`} className="mt-2 block text-sm font-semibold text-slate-100 hover:text-slate-50">
-                {formatPredictionThesisTitle(prediction.thesisTitle)}
-              </Link>
-              <div className="mt-2 flex flex-col gap-1 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-                <p>
-                  by{" "}
-                  {prediction.userId ? (
-                    <Link href={`/analysts/${prediction.userId}`} className="text-cyan-300 hover:text-cyan-100">
-                      {prediction.authorNickname ? `@${prediction.authorNickname}` : prediction.authorDisplayName ?? "Anonymous"}
-                    </Link>
-                  ) : (
-                    prediction.authorNickname ? `@${prediction.authorNickname}` : prediction.authorDisplayName ?? "Anonymous"
-                  )}
-                </p>
-                {prediction.result ? <p className="text-emerald-200">Result {formatScorePercent(prediction.result.score)}</p> : null}
-              </div>
-              <PredictionMarkSummary prediction={prediction} />
+              <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} status={prediction.status} />
+              <PredictionAuthorSummary author={prediction} />
             </article>
           ))}
 

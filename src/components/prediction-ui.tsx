@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { PredictionDirection, PredictionStatus, PredictionTimeHorizon } from "@/lib/predictions/types";
 
@@ -14,6 +15,17 @@ export type PredictionMarkFields = {
   commentCount?: number | null;
 };
 
+export type PredictionAuthorFields = {
+  userId: string;
+  authorDisplayName?: string | null;
+  authorNickname?: string | null;
+  authorPhotoURL?: string | null;
+  authorStats?: {
+    totalScore?: number | null;
+    totalPredictions?: number | null;
+  } | null;
+};
+
 function formatSignedPercent(value: number): string {
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
@@ -21,6 +33,11 @@ function formatSignedPercent(value: number): string {
 
 export function formatScorePercent(score: number): string {
   return formatSignedPercent(score / 100);
+}
+
+function formatBasisPoints(score: number): string {
+  const sign = score > 0 ? "+" : "";
+  return `${sign}${Math.round(score).toLocaleString()} bp`;
 }
 
 export function formatTickerSymbol(ticker: string | null | undefined): string {
@@ -168,16 +185,34 @@ export function markToneClass(value: number): string {
   return "text-slate-300";
 }
 
+function parseDateOnly(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const [dateOnly] = value.split("T");
+  const timestamp = Date.parse(`${dateOnly}T00:00:00.000Z`);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function daysSinceCall(entryDate: string | null | undefined, markPriceDate: string | null | undefined): number | null {
+  const entryTimestamp = parseDateOnly(entryDate);
+  const markTimestamp = parseDateOnly(markPriceDate);
+  if (entryTimestamp === null || markTimestamp === null) {
+    return null;
+  }
+
+  return Math.max(0, Math.floor((markTimestamp - entryTimestamp) / (24 * 60 * 60 * 1000)));
+}
+
 export function formatPredictionStatus(status: PredictionStatus): string {
   switch (status) {
     case "OPENING":
-      return "Opening";
     case "OPEN":
-      return "Open";
     case "CLOSING":
-      return "Closing";
+      return "Live";
     case "CLOSED":
-      return "Closed";
+      return "Final";
     case "CANCELED":
       return "Canceled";
   }
@@ -191,6 +226,95 @@ export function DirectionBadge({ direction }: { direction: PredictionDirection }
       <span aria-hidden="true">{isUp ? "\u2191" : "\u2193"}</span>
       {direction}
     </span>
+  );
+}
+
+export function PredictionReturnSummary({
+  prediction,
+  href,
+  status,
+}: {
+  prediction: PredictionMarkFields;
+  href?: string;
+  status?: PredictionStatus;
+}) {
+  const markDisplayPercent = typeof prediction.markDisplayPercent === "number" ? prediction.markDisplayPercent : null;
+  const sinceCallDays = daysSinceCall(prediction.entryDate, prediction.markPriceDate);
+  const isAwaitingEntry = status === "OPENING";
+  const hasReturn = !isAwaitingEntry && markDisplayPercent !== null && sinceCallDays !== null;
+  const statusLabel = status ? formatPredictionStatus(status).toLowerCase() : null;
+
+  if (!hasReturn && !statusLabel) {
+    return null;
+  }
+
+  const content = (
+    <>
+      {hasReturn ? (
+        <>
+          <span className={`font-semibold ${markToneClass(markDisplayPercent)}`}>
+            {formatMarkPercent(markDisplayPercent)}
+          </span>
+          <span className="text-slate-400"> since call ({sinceCallDays}d)</span>
+        </>
+      ) : null}
+      {isAwaitingEntry ? <span className="text-slate-400">Awaiting entry price</span> : null}
+      {(hasReturn || isAwaitingEntry) && statusLabel ? <span className="text-slate-500"> &middot; </span> : null}
+      {statusLabel ? <span className="text-slate-400">{statusLabel}</span> : null}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className="mt-1 block w-fit text-xs hover:opacity-85">
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <p className="mt-1 text-xs">
+      {content}
+    </p>
+  );
+}
+
+export function PredictionAuthorSummary({ author }: { author: PredictionAuthorFields }) {
+  const nickname = author.authorNickname?.trim();
+  const displayName = author.authorDisplayName?.trim();
+  const label = nickname ? `@${nickname}` : displayName || "Anonymous";
+  const avatarLabel = nickname?.slice(0, 1) ?? displayName?.slice(0, 1) ?? "?";
+  const totalScore = author.authorStats?.totalScore;
+  const totalPredictions = author.authorStats?.totalPredictions;
+  const hasStats = typeof totalScore === "number" && typeof totalPredictions === "number";
+
+  return (
+    <Link
+      href={`/analysts/${author.userId}`}
+      className="mt-3 flex w-fit items-center gap-2 text-xs text-slate-300 hover:text-slate-100"
+    >
+      {author.authorPhotoURL ? (
+        <img
+          src={author.authorPhotoURL}
+          alt=""
+          className="h-5 w-5 rounded-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span className="grid h-5 w-5 place-items-center rounded-full bg-cyan-500/20 text-[10px] font-semibold uppercase text-cyan-100">
+          {avatarLabel}
+        </span>
+      )}
+      <span className="font-medium text-cyan-200">{label}</span>
+      {hasStats ? (
+        <>
+          <span className="text-slate-500">&middot;</span>
+          <span>{formatBasisPoints(totalScore)}</span>
+          <span className="text-slate-500">&middot;</span>
+          <span>{totalPredictions.toLocaleString()} calls</span>
+        </>
+      ) : null}
+    </Link>
   );
 }
 

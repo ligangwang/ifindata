@@ -50,6 +50,20 @@ function mapPredictionDoc(doc: FirebaseFirestore.QueryDocumentSnapshot) {
   };
 }
 
+function numberFromStats(stats: Record<string, unknown> | undefined, key: string): number {
+  const value = stats?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function isPublicProfile(data: Record<string, unknown> | undefined): boolean {
+  const settings = data?.settings;
+  if (!settings || typeof settings !== "object") {
+    return true;
+  }
+
+  return (settings as Record<string, unknown>).isPublic !== false;
+}
+
 async function listTickerPredictions(
   db: FirebaseFirestore.Firestore,
   ticker: string,
@@ -138,7 +152,7 @@ async function listTickerPredictions(
   }
 }
 
-async function applyAuthorNicknames(
+async function applyAuthorInfo(
   db: FirebaseFirestore.Firestore,
   items: Array<ReturnType<typeof mapPredictionDoc>>,
 ) {
@@ -147,19 +161,33 @@ async function applyAuthorNicknames(
     return items;
   }
 
-  const nicknameEntries = await Promise.all(
+  const authorEntries = await Promise.all(
     userIds.map(async (userId) => {
       const userSnapshot = await db.collection("users").doc(userId).get();
       const userData = userSnapshot.data() as Record<string, unknown> | undefined;
       const rawNickname = typeof userData?.nickname === "string" ? userData.nickname.trim() : "";
-      return [userId, rawNickname || null] as const;
+      const stats = userData?.stats as Record<string, unknown> | undefined;
+      const canShowStats = isPublicProfile(userData);
+      return [userId, {
+        nickname: rawNickname || null,
+        totalScore: canShowStats ? numberFromStats(stats, "totalScore") : null,
+        totalPredictions: canShowStats ? numberFromStats(stats, "totalPredictions") : null,
+      }] as const;
     }),
   );
-  const nicknameByUserId = new Map<string, string | null>(nicknameEntries);
+  const authorByUserId = new Map(authorEntries);
 
   return items.map((item) => ({
     ...item,
-    authorNickname: nicknameByUserId.get(item.userId) ?? null,
+    authorNickname: authorByUserId.get(item.userId)?.nickname ?? null,
+    authorStats:
+      authorByUserId.get(item.userId)?.totalScore === null ||
+      authorByUserId.get(item.userId)?.totalPredictions === null
+        ? null
+        : {
+            totalScore: authorByUserId.get(item.userId)?.totalScore ?? 0,
+            totalPredictions: authorByUserId.get(item.userId)?.totalPredictions ?? 0,
+          },
   }));
 }
 
@@ -175,7 +203,7 @@ export async function GET(
 
   try {
     const result = await listTickerPredictions(db, normalizedTicker, limit, cursorCreatedAt);
-    const itemsWithPreferredNames = await applyAuthorNicknames(db, result.items);
+    const itemsWithPreferredNames = await applyAuthorInfo(db, result.items);
 
     return NextResponse.json({
       items: itemsWithPreferredNames,

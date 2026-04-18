@@ -58,6 +58,16 @@ function userName(user: { displayName: string | null; nickname: string | null })
   return user.nickname ? `@${user.nickname}` : user.displayName ?? "Anonymous";
 }
 
+function directionArrow(direction: string | null): string {
+  if (direction === "UP") {
+    return "\u2191";
+  }
+  if (direction === "DOWN") {
+    return "\u2193";
+  }
+  return "";
+}
+
 function absoluteUrl(path: string): string {
   if (typeof window === "undefined") {
     return path;
@@ -230,9 +240,12 @@ export function DailyScoresPage() {
                 >
                   <span className="text-sm font-semibold text-cyan-200">#{index + 1}</span>
                   <span className="min-w-0 text-sm text-slate-100">
+                    {directionArrow(prediction.direction) ? (
+                      <span aria-hidden="true" className="mr-1 font-semibold text-cyan-200">
+                        {directionArrow(prediction.direction)}
+                      </span>
+                    ) : null}
                     <span className="font-semibold">{formatTickerSymbol(prediction.ticker)}</span>
-                    <span className="text-slate-500"> / </span>
-                    <span>{prediction.direction ?? "N/A"}</span>
                     <span className="text-slate-500"> / </span>
                     <span>{userName(prediction)}</span>
                   </span>

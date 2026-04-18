@@ -87,6 +87,10 @@ function formatDetailDate(value: string | null | undefined): string {
   return DETAIL_DATE_FORMATTER.format(date);
 }
 
+function formatDetailStatus(status: PredictionStatus): string {
+  return status === "CLOSING" ? "Close pending" : formatPredictionStatus(status);
+}
+
 export function PredictionDetailPage({ predictionId }: { predictionId: string }) {
   const { getIdToken, user } = useAuth();
   const [prediction, setPrediction] = useState<PredictionDetail | null>(null);
@@ -338,7 +342,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           </h1>
           <div className="flex items-center gap-3">
             <span className="rounded-lg border border-cyan-400/30 px-2.5 py-1 text-xs font-medium text-cyan-100">
-              {formatPredictionStatus(prediction.status)}
+              {formatDetailStatus(prediction.status)}
             </span>
             {ownerAction ? (
               <button

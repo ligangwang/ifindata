@@ -1,3 +1,4 @@
+import { FieldValue } from "firebase-admin/firestore";
 import {
   computeLevel,
   computeSettledPredictionAnalytics,
@@ -10,10 +11,6 @@ import { isPredictionDirection } from "@/lib/predictions/types";
 function finiteNumberOrNull(value: unknown): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function statusLabelValue(value: unknown): "ESTABLISHED" | "PROVEN" | null {
-  return value === "ESTABLISHED" || value === "PROVEN" ? value : null;
 }
 
 function analyticsFromClosedPrediction(data: Record<string, unknown>): SettledPredictionAnalytics | null {
@@ -61,7 +58,6 @@ export async function readUserAnalytics(
     ...computed,
     totalXP,
     level,
-    statusLabel: statusLabelValue(computed.statusLabel),
   };
 }
 
@@ -94,7 +90,7 @@ export async function recomputeUserAnalytics(
     "stats.avgReturn": computed.avgReturn,
     "stats.winRate": computed.winRate,
     "stats.eligibleForLeaderboard": computed.eligibleForLeaderboard,
-    "stats.statusLabel": computed.statusLabel,
+    "stats.statusLabel": FieldValue.delete(),
   });
 
   return true;

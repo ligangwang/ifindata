@@ -13,14 +13,9 @@ type LeaderboardUser = {
   avgReturn: number;
   totalXP: number;
   level: number;
-  statusLabel: "ESTABLISHED" | "PROVEN" | null;
 };
 
 const LEADERBOARD_CANDIDATE_MULTIPLIER = 5;
-
-function statusLabel(value: unknown): "ESTABLISHED" | "PROVEN" | null {
-  return value === "ESTABLISHED" || value === "PROVEN" ? value : null;
-}
 
 function parseLimit(raw: string | null): number {
   const parsed = Number(raw ?? "50");
@@ -66,7 +61,6 @@ export async function GET(request: NextRequest) {
         avgReturn: analytics.avgReturn,
         totalXP: analytics.totalXP,
         level: analytics.level,
-        statusLabel: statusLabel(analytics.statusLabel),
       });
     }
 

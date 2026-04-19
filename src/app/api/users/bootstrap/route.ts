@@ -58,7 +58,6 @@ export async function POST(request: NextRequest) {
         avgReturn: 0,
         winRate: 0,
         eligibleForLeaderboard: false,
-        statusLabel: null,
         followersCount: 0,
         followingCount: 0,
       },

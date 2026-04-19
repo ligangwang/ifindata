@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { analystLevelName } from "@/lib/predictions/analytics";
 
 type LeaderboardEntry = {
   userId: string;
@@ -13,7 +14,6 @@ type LeaderboardEntry = {
   settledCalls: number;
   totalXP: number;
   level: number;
-  statusLabel: "ESTABLISHED" | "PROVEN" | null;
 };
 
 type LeaderboardResponse = {
@@ -107,8 +107,7 @@ export function LeaderboardPage() {
                 <div className="min-w-0">
                   <p className="truncate text-sm text-slate-100">{displayName}</p>
                   <p className="text-xs text-slate-400">
-                    Level {entry.level} / {entry.settledCalls.toLocaleString()} settled
-                    {entry.statusLabel ? ` / ${entry.statusLabel === "PROVEN" ? "Proven" : "Established"}` : ""}
+                    {analystLevelName(entry.level)} &middot; Level {entry.level} / {entry.settledCalls.toLocaleString()} settled
                   </p>
                 </div>
                 <p className="text-sm font-semibold text-emerald-200">{scoreText(entry.totalScore)}</p>

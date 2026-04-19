@@ -39,7 +39,7 @@ function initials(name: string): string {
 
 function scoreText(score: number): string {
   const sign = score > 0 ? "+" : "";
-  return `${sign}${Math.round(score)} bp`;
+  return `Score ${sign}${Math.round(score)}`;
 }
 
 function countText(count: number, singular: string, plural = `${singular}s`): string {

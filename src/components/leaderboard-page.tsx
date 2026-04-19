@@ -10,6 +10,10 @@ type LeaderboardEntry = {
   nickname: string | null;
   photoURL: string | null;
   totalScore: number;
+  settledCalls: number;
+  totalXP: number;
+  level: number;
+  statusLabel: "ESTABLISHED" | "PROVEN" | null;
 };
 
 type LeaderboardResponse = {
@@ -73,7 +77,7 @@ export function LeaderboardPage() {
     <main className="mx-auto w-full max-w-4xl px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
         <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">Leaderboard</h1>
-        <p className="mb-4 text-sm text-slate-300">Analysts ranked by total score in basis points.</p>
+        <p className="mb-4 text-sm text-slate-300">Analysts ranked by settled-call performance.</p>
 
         <div className="grid gap-2">
           {payload.items.map((entry, index) => {
@@ -100,7 +104,13 @@ export function LeaderboardPage() {
                     {initials(displayName)}
                   </span>
                 )}
-                <p className="min-w-0 truncate text-sm text-slate-100">{displayName}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-slate-100">{displayName}</p>
+                  <p className="text-xs text-slate-400">
+                    Level {entry.level} / {entry.settledCalls.toLocaleString()} settled
+                    {entry.statusLabel ? ` / ${entry.statusLabel === "PROVEN" ? "Proven" : "Established"}` : ""}
+                  </p>
+                </div>
                 <p className="text-sm font-semibold text-emerald-200">{scoreText(entry.totalScore)}</p>
               </Link>
             );

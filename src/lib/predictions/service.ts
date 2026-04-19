@@ -54,11 +54,6 @@ const TIME_HORIZON_LIMITS: Record<PredictionTimeHorizonUnit, number> = {
   YEARS: 10,
 };
 
-function numberFromStats(stats: Record<string, unknown> | undefined, key: string): number {
-  const value = stats?.[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
 function isPublicProfile(data: Record<string, unknown> | undefined): boolean {
   const settings = data?.settings;
   if (!settings || typeof settings !== "object") {
@@ -66,6 +61,11 @@ function isPublicProfile(data: Record<string, unknown> | undefined): boolean {
   }
 
   return (settings as Record<string, unknown>).isPublic !== false;
+}
+
+function numberFromStats(stats: Record<string, unknown>, key: string): number {
+  const value = stats[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 function getCurrentEasternDate(): string {
@@ -204,12 +204,14 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
       const userSnapshot = await db.collection("users").doc(id).get();
       const userData = userSnapshot.data() as Record<string, unknown> | undefined;
       const nickname = typeof userData?.nickname === "string" ? userData.nickname : null;
-      const stats = userData?.stats as Record<string, unknown> | undefined;
+      const stats = userData?.stats && typeof userData.stats === "object"
+        ? userData.stats as Record<string, unknown>
+        : {};
       const canShowStats = isPublicProfile(userData);
       return [id, {
         nickname,
         totalScore: canShowStats ? numberFromStats(stats, "totalScore") : null,
-        totalPredictions: canShowStats ? numberFromStats(stats, "totalPredictions") : null,
+        totalPredictions: canShowStats ? numberFromStats(stats, "settledCalls") || numberFromStats(stats, "closedPredictions") : null,
       }] as const;
     }),
   );

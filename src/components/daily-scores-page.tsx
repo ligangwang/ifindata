@@ -34,7 +34,7 @@ type DailyScoresResponse = {
 
 function scoreText(score: number): string {
   const sign = score > 0 ? "+" : "";
-  return `${sign}${Math.round(score)} bp`;
+  return `${sign}${Math.round(score)}`;
 }
 
 function compactDate(value: string | null): string {

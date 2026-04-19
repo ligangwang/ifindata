@@ -41,6 +41,19 @@ function scoreTone(score: number): string {
   return "text-slate-300";
 }
 
+function returnTone(returnValue: number | null): string {
+  if (returnValue === null) {
+    return "text-slate-300";
+  }
+  if (returnValue > 0) {
+    return "text-emerald-300";
+  }
+  if (returnValue < 0) {
+    return "text-rose-300";
+  }
+  return "text-slate-300";
+}
+
 function dateLabel(value: string | null): string {
   if (!value) {
     return "LATEST DAY";
@@ -314,7 +327,7 @@ export function DailyScoresPage() {
               <p className="mt-3 text-sm text-slate-400">{callDescription(callOfTheDay)}</p>
             </div>
             <div className="sm:text-right">
-              <p className={`text-4xl font-semibold ${scoreTone(callOfTheDay.dailyScoreChange)}`}>
+              <p className={`text-4xl font-semibold ${returnTone(callOfTheDay.dailyReturnChange)}`}>
                 {dailyReturnText(callOfTheDay.dailyReturnChange)}
               </p>
               <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">today</p>
@@ -354,7 +367,7 @@ export function DailyScoresPage() {
                   <span>{userName(call)}</span>
                 </span>
                 <span className="text-right">
-                  <span className={`block text-sm font-semibold ${scoreTone(call.dailyScoreChange)}`}>
+                  <span className={`block text-sm font-semibold ${returnTone(call.dailyReturnChange)}`}>
                     {dailyReturnText(call.dailyReturnChange)}
                   </span>
                   <span className="block text-[11px] text-slate-500">{scoreText(call.dailyScoreChange)} score</span>

@@ -147,6 +147,20 @@
       ]
     },
     {
+      "collectionGroup": "prediction_daily_marks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "scoreChange",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "user_daily_scores",
       "queryScope": "COLLECTION",
       "fields": [

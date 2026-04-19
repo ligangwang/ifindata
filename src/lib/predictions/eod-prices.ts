@@ -569,22 +569,22 @@ function existingDailyPreviousScore(
   return fallbackPreviousScore ?? 0;
 }
 
-function existingDailyPreviousDisplayPercent(
+function existingDailyPreviousReturnValue(
   data: FirebaseFirestore.DocumentData | undefined,
-  fallbackPreviousDisplayPercent: number | null,
+  fallbackPreviousReturnValue: number | null,
 ): number {
-  const previousDisplayPercent = finiteNumberOrNull(data?.previousDisplayPercent);
-  if (previousDisplayPercent !== null) {
-    return previousDisplayPercent;
+  const previousReturnValue = finiteNumberOrNull(data?.previousReturnValue);
+  if (previousReturnValue !== null) {
+    return previousReturnValue;
   }
 
-  const displayPercent = finiteNumberOrNull(data?.markDisplayPercent);
-  const displayPercentChange = finiteNumberOrNull(data?.displayPercentChange);
-  if (displayPercent !== null && displayPercentChange !== null) {
-    return displayPercent - displayPercentChange;
+  const returnValue = finiteNumberOrNull(data?.markReturnValue);
+  const returnValueChange = finiteNumberOrNull(data?.returnValueChange);
+  if (returnValue !== null && returnValueChange !== null) {
+    return returnValue - returnValueChange;
   }
 
-  return fallbackPreviousDisplayPercent ?? 0;
+  return fallbackPreviousReturnValue ?? 0;
 }
 
 function markSummaryFromDoc(doc: FirebaseFirestore.QueryDocumentSnapshot): {
@@ -623,7 +623,7 @@ async function readPreviousPredictionDailyScore(
   db: FirebaseFirestore.Firestore,
   predictionId: string,
   tradingDate: string,
-): Promise<{ score: number | null; displayPercent: number | null }> {
+): Promise<{ score: number | null; returnValue: number | null }> {
   const snapshot = await db
     .collection("prediction_daily_marks")
     .where("predictionId", "==", predictionId)
@@ -638,7 +638,7 @@ async function readPreviousPredictionDailyScore(
 
   return {
     score: finiteNumberOrNull(snapshot.docs[0].get("score")),
-    displayPercent: finiteNumberOrNull(snapshot.docs[0].get("markDisplayPercent")),
+    returnValue: finiteNumberOrNull(snapshot.docs[0].get("markReturnValue")),
   };
 }
 
@@ -1151,8 +1151,8 @@ export async function runDailyEodMaintenance(
               score: 0,
               previousScore: 0,
               scoreChange: 0,
-              previousDisplayPercent: 0,
-              displayPercentChange: 0,
+              previousReturnValue: 0,
+              returnValueChange: 0,
               isClosed: false,
               createdAt: dailyMarkSnapshot.get("createdAt") ?? nowIso,
               updatedAt: nowIso,
@@ -1196,9 +1196,9 @@ export async function runDailyEodMaintenance(
             dailyMarkSnapshot.data(),
             previousDaily.score,
           );
-          const previousDisplayPercent = existingDailyPreviousDisplayPercent(
+          const previousReturnValue = existingDailyPreviousReturnValue(
             dailyMarkSnapshot.data(),
-            previousDaily.displayPercent,
+            previousDaily.returnValue,
           );
           const snapshotStatus = dailySnapshotStatus(prediction, price.tradingDate);
           const nextStatus = (latestStatus === "CLOSING" && shouldMutatePrediction) || shouldCloseForOpenUntil
@@ -1225,8 +1225,8 @@ export async function runDailyEodMaintenance(
             score: mark.score,
             previousScore,
             scoreChange: mark.score - previousScore,
-            previousDisplayPercent,
-            displayPercentChange: mark.displayPercent - previousDisplayPercent,
+            previousReturnValue,
+            returnValueChange: mark.returnValue - previousReturnValue,
             isClosed: nextStatus === "CLOSED",
             createdAt: dailyMarkSnapshot.get("createdAt") ?? nowIso,
             updatedAt: nowIso,

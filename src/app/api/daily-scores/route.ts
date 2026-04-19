@@ -33,6 +33,11 @@ function asNumberOrNull(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function percentFromReturnValue(value: unknown): number | null {
+  const parsed = asNumberOrNull(value);
+  return parsed === null ? null : parsed * 100;
+}
+
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -136,9 +141,9 @@ async function topDailyCalls(db: FirebaseFirestore.Firestore, date: string): Pro
       ticker: asString(data.ticker),
       direction: directionValue(data.direction),
       dailyScoreChange: asNumber(data.scoreChange),
-      dailyReturnChange: asNumberOrNull(data.displayPercentChange) ?? asNumberOrNull(data.markDisplayPercent),
+      dailyReturnChange: percentFromReturnValue(data.returnValueChange) ?? percentFromReturnValue(data.markReturnValue),
       totalScore: asNumber(data.score),
-      returnSinceEntry: asNumberOrNull(data.markDisplayPercent),
+      returnSinceEntry: percentFromReturnValue(data.markReturnValue),
       status: statusValue(data.status),
       createdAt: asString(data.predictionCreatedAt) ?? asString(data.createdAt) ?? "",
     };

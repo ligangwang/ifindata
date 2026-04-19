@@ -7,7 +7,6 @@ import { formatMarkPercent, formatPredictionStatus, formatPredictionThesisTitle,
 import {
   MAX_PREDICTION_THESIS_LENGTH,
   MAX_PREDICTION_THESIS_TITLE_LENGTH,
-  MIN_PREDICTION_THESIS_LENGTH,
   sanitizePredictionThesis,
   type PredictionStatus,
   type PredictionTimeHorizon,
@@ -241,10 +240,6 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
       setError(`Title must be ${MAX_PREDICTION_THESIS_TITLE_LENGTH} characters or fewer.`);
       return;
     }
-    if (trimmedThesis.length < MIN_PREDICTION_THESIS_LENGTH) {
-      setError(`Thesis must be at least ${MIN_PREDICTION_THESIS_LENGTH} characters.`);
-      return;
-    }
     if (trimmedThesis.length > MAX_PREDICTION_THESIS_LENGTH) {
       setError(`Thesis must be ${MAX_PREDICTION_THESIS_LENGTH} characters or fewer.`);
       return;
@@ -384,13 +379,12 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
                 id="edit-thesis"
                 value={editThesis}
                 onChange={(event) => setEditThesis(event.target.value)}
-                minLength={MIN_PREDICTION_THESIS_LENGTH}
                 maxLength={MAX_PREDICTION_THESIS_LENGTH}
                 rows={8}
                 className="min-h-48 rounded-lg border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
               />
               <p className="text-xs text-slate-400">
-                {editThesis.trim().length}/{MIN_PREDICTION_THESIS_LENGTH} minimum
+                {editThesis.trim().length}/{MAX_PREDICTION_THESIS_LENGTH}
               </p>
             </div>
             <div className="grid gap-1">

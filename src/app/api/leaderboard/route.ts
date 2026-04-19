@@ -16,6 +16,8 @@ type LeaderboardUser = {
   statusLabel: "ESTABLISHED" | "PROVEN" | null;
 };
 
+const LEADERBOARD_CANDIDATE_MULTIPLIER = 5;
+
 function statusLabel(value: unknown): "ESTABLISHED" | "PROVEN" | null {
   return value === "ESTABLISHED" || value === "PROVEN" ? value : null;
 }
@@ -32,10 +34,13 @@ function parseLimit(raw: string | null): number {
 export async function GET(request: NextRequest) {
   const db = getAdminFirestore();
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
+  const candidateLimit = limit * LEADERBOARD_CANDIDATE_MULTIPLIER;
 
   try {
     const snapshot = await db
       .collection("users")
+      .orderBy("stats.totalScore", "desc")
+      .limit(candidateLimit)
       .get();
 
     const users: LeaderboardUser[] = [];

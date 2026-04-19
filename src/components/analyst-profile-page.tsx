@@ -8,7 +8,7 @@ import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } 
 import { analystLevelName } from "@/lib/predictions/analytics";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
-type ProfileStatusFilter = "ALL" | "LIVE" | "FINAL";
+type ProfileStatusFilter = "ALL" | "LIVE" | "SETTLED";
 
 type Prediction = {
   id: string;
@@ -83,8 +83,8 @@ function statusFilterLabel(status: ProfileStatusFilter): string {
   if (status === "LIVE") {
     return "Live";
   }
-  if (status === "FINAL") {
-    return "Final";
+  if (status === "SETTLED") {
+    return "Settled";
   }
   return "All";
 }
@@ -414,7 +414,7 @@ export function AnalystProfilePage({
               <p className="text-sm">
                 <span className="text-slate-400">Level: </span>
                 <span className="font-semibold text-cyan-100">
-                  {analystLevelName(payload.profile.stats.level)} &middot; Level {payload.profile.stats.level}
+                  Level {payload.profile.stats.level} &middot; {analystLevelName(payload.profile.stats.level)}
                 </span>
               </p>
               <p className="text-xs">
@@ -424,7 +424,7 @@ export function AnalystProfilePage({
                 </span>
               </p>
               <p className="text-xs">
-                <span className="text-slate-400">Calls: </span>
+                <span className="text-slate-400">Settled: </span>
                 <span className="font-semibold text-cyan-100">{settledCalls.toLocaleString()}</span>
               </p>
             </div>
@@ -606,7 +606,7 @@ export function AnalystProfilePage({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Prediction history</h2>
           <div className="inline-flex rounded-full border border-slate-700 bg-slate-800/70 p-1 text-xs">
-            {(["ALL", "LIVE", "FINAL"] as const).map((option) => (
+            {(["ALL", "LIVE", "SETTLED"] as const).map((option) => (
               <button
                 key={option}
                 type="button"

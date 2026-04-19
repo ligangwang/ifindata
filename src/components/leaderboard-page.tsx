@@ -107,7 +107,7 @@ export function LeaderboardPage() {
                 <div className="min-w-0">
                   <p className="truncate text-sm text-slate-100">{displayName}</p>
                   <p className="text-xs text-slate-400">
-                    {analystLevelName(entry.level)} &middot; Level {entry.level} / {entry.settledCalls.toLocaleString()} settled
+                    Level {entry.level} &middot; {analystLevelName(entry.level)} &middot; Settled {entry.settledCalls.toLocaleString()}
                   </p>
                 </div>
                 <p className="text-sm font-semibold text-emerald-200">{scoreText(entry.totalScore)}</p>

@@ -12,8 +12,8 @@ const lifecycle = [
     description: "The prediction is waiting for entry, tracking daily marks, or waiting for a requested close to settle.",
   },
   {
-    status: "Final",
-    description: "The final price, result, and score are locked.",
+    status: "Settled",
+    description: "The settled price, result, and score are locked.",
   },
 ];
 
@@ -47,7 +47,7 @@ export default function HowItWorksPage() {
         <div>
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Close when ready</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Request a close any time. The next eligible end-of-day run locks the final result and score.
+            Request a close any time. The next eligible end-of-day run locks the settled result and score.
           </p>
         </div>
       </section>
@@ -68,7 +68,7 @@ export default function HowItWorksPage() {
         <div>
           <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">How Scores Work</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Score is based on the return from entry price to mark or final price. One basis point of return equals one
+            Score is based on the return from entry price to mark or settled price. One basis point of return equals one
             score point. Up predictions earn positive scores when the price rises. Down predictions earn positive scores when the price falls.
           </p>
         </div>

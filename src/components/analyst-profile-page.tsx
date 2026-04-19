@@ -70,7 +70,7 @@ function scoreValueText(score: number): string {
 }
 
 function xpProgressText(totalXP: number, level: number): string {
-  return `XP ${Math.round(totalXP).toLocaleString()} / ${(100 * Math.max(1, level) ** 2).toLocaleString()}`;
+  return `${Math.round(totalXP).toLocaleString()} / ${(100 * Math.max(1, level) ** 2).toLocaleString()}`;
 }
 
 function resultReturnText(result: NonNullable<Prediction["result"]>): string {
@@ -131,6 +131,13 @@ export function AnalystProfilePage({
   const profilePath = `/analysts/${userId}`;
   const settledCalls = payload?.profile.stats.settledCalls ?? payload?.profile.stats.closedPredictions ?? 0;
   const isProvisional = settledCalls < 5;
+  const statusLabel = isProvisional
+    ? "Provisional"
+    : payload?.profile.stats.statusLabel === "ESTABLISHED"
+      ? "Established"
+      : payload?.profile.stats.statusLabel === "PROVEN"
+        ? "Proven"
+        : null;
   const profileAuthor = payload
     ? {
         userId,
@@ -415,10 +422,18 @@ export function AnalystProfilePage({
                   <span className="text-slate-400">Level: </span>
                   <span className="font-semibold text-cyan-100">{payload.profile.stats.level}</span>
                 </p>
-                <p className="text-slate-300">{xpProgressText(payload.profile.stats.totalXP, payload.profile.stats.level)}</p>
-                {isProvisional ? <p className="text-slate-300">Provisional</p> : null}
-                {payload.profile.stats.statusLabel === "ESTABLISHED" ? <p className="text-slate-300">Established</p> : null}
-                {payload.profile.stats.statusLabel === "PROVEN" ? <p className="text-slate-300">Proven</p> : null}
+                <p>
+                  <span className="text-slate-400">XP: </span>
+                  <span className="font-semibold text-cyan-100">
+                    {xpProgressText(payload.profile.stats.totalXP, payload.profile.stats.level)}
+                  </span>
+                </p>
+                {statusLabel ? (
+                  <p>
+                    <span className="text-slate-400">Status: </span>
+                    <span className="font-semibold text-cyan-100">{statusLabel}</span>
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>

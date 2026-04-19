@@ -493,6 +493,10 @@ function finiteNumberOrNull(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function statusLabelFromStats(value: unknown): "ESTABLISHED" | "PROVEN" | null {
+  return value === "ESTABLISHED" || value === "PROVEN" ? value : null;
+}
+
 function buildMarkUpdate(
   price: EodPrice,
   mark: { returnValue: number; score: number; outcome: number; xpEarned: number; displayPercent: number },
@@ -648,13 +652,28 @@ async function writeUserDailyScoreSnapshots(
     const userData = userSnapshot.data() as Record<string, unknown>;
     const stats = (userData.stats as Record<string, unknown> | undefined) ?? {};
     const totalScore = finiteNumberOrNull(stats.totalScore) ?? 0;
+    const totalCalls = finiteNumberOrNull(stats.totalCalls ?? stats.totalPredictions) ?? 0;
+    const settledCalls = finiteNumberOrNull(stats.settledCalls ?? stats.closedPredictions) ?? 0;
+    const totalXP = finiteNumberOrNull(stats.totalXP) ?? 0;
+    const level = finiteNumberOrNull(stats.level) ?? 1;
+    const avgPredictionScore = finiteNumberOrNull(stats.avgPredictionScore) ?? 0;
+    const consistency = finiteNumberOrNull(stats.consistency) ?? 0;
+    const coverage = finiteNumberOrNull(stats.coverage) ?? 0;
+    const avgReturn = finiteNumberOrNull(stats.avgReturn) ?? 0;
+    const winRate = finiteNumberOrNull(stats.winRate) ?? 0;
+    const eligibleForLeaderboard = stats.eligibleForLeaderboard === true;
+    const statusLabel = statusLabelFromStats(stats.statusLabel);
     const previousTotalScore = previousDailySnapshot.empty
       ? null
       : finiteNumberOrNull(previousDailySnapshot.docs[0].get("totalScore"));
+    const previousTotalXP = previousDailySnapshot.empty
+      ? null
+      : finiteNumberOrNull(previousDailySnapshot.docs[0].get("totalXP"));
     const marks = dailyMarkSnapshot.docs
       .map(markSummaryFromDoc)
       .filter((mark): mark is NonNullable<ReturnType<typeof markSummaryFromDoc>> => mark !== null);
     const dailyScoreChange = totalScore - (previousTotalScore ?? 0);
+    const dailyXPChange = totalXP - (previousTotalXP ?? 0);
     const bestMark = marks.reduce<typeof marks[number] | null>(
       (best, mark) => (!best || mark.scoreChange > best.scoreChange ? mark : best),
       null,
@@ -674,6 +693,19 @@ async function writeUserDailyScoreSnapshots(
       totalScore,
       previousTotalScore,
       dailyScoreChange,
+      totalCalls,
+      settledCalls,
+      totalXP,
+      previousTotalXP,
+      dailyXPChange,
+      level,
+      avgPredictionScore,
+      consistency,
+      coverage,
+      avgReturn,
+      winRate,
+      eligibleForLeaderboard,
+      statusLabel,
       totalPredictions: marks.length,
       openingPredictions,
       openPredictions,

@@ -61,7 +61,6 @@ export type PredictionResult = {
   predictionScore?: number;
   outcome?: number;
   xpEarned?: number;
-  displayPercent: number;
 };
 
 export type Prediction = {
@@ -92,7 +91,6 @@ export type Prediction = {
   markReturnValue?: number | null;
   markScore?: number | null;
   markPredictionScore?: number | null;
-  markDisplayPercent?: number | null;
   scoreAppliedToUser?: number | null;
   predictionScore?: number | null;
   xpEarned?: number | null;

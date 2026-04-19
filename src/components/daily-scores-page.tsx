@@ -4,32 +4,25 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatTickerSymbol } from "@/components/prediction-ui";
 
-type DailyUserGainer = {
-  userId: string;
-  displayName: string | null;
-  nickname: string | null;
-  photoURL: string | null;
-  totalScore: number;
-  dailyScoreChange: number;
-  dailyMarkedPredictions: number;
-};
-
-type DailyPredictionGainer = {
+type DailyCallHighlight = {
   predictionId: string;
   userId: string;
   displayName: string | null;
   nickname: string | null;
   ticker: string | null;
-  direction: string | null;
-  score: number;
-  scoreChange: number;
-  status: string | null;
+  direction: "UP" | "DOWN" | null;
+  dailyScoreChange: number;
+  dailyReturnChange: number | null;
+  totalScore: number;
+  returnSinceEntry: number | null;
+  status: "LIVE" | "SETTLED";
+  createdAt: string;
 };
 
 type DailyScoresResponse = {
   date: string | null;
-  userGainers: DailyUserGainer[];
-  predictionGainers: DailyPredictionGainer[];
+  callOfTheDay: DailyCallHighlight | null;
+  topCalls: DailyCallHighlight[];
 };
 
 function scoreText(score: number): string {
@@ -37,9 +30,19 @@ function scoreText(score: number): string {
   return `${sign}${Math.round(score)}`;
 }
 
-function compactDate(value: string | null): string {
+function scoreTone(score: number): string {
+  if (score > 0) {
+    return "text-emerald-300";
+  }
+  if (score < 0) {
+    return "text-rose-300";
+  }
+  return "text-slate-300";
+}
+
+function dateLabel(value: string | null): string {
   if (!value) {
-    return "Latest day";
+    return "LATEST DAY";
   }
 
   const date = new Date(`${value}T00:00:00`);
@@ -51,14 +54,14 @@ function compactDate(value: string | null): string {
     month: "short",
     day: "numeric",
     year: "numeric",
-  });
+  }).toUpperCase();
 }
 
 function userName(user: { displayName: string | null; nickname: string | null }): string {
   return user.nickname ? `@${user.nickname}` : user.displayName ?? "Anonymous";
 }
 
-function directionArrow(direction: string | null): string {
+function directionArrow(direction: "UP" | "DOWN" | null): string {
   if (direction === "UP") {
     return "\u2191";
   }
@@ -66,6 +69,10 @@ function directionArrow(direction: string | null): string {
     return "\u2193";
   }
   return "";
+}
+
+function directionTone(direction: "UP" | "DOWN" | null): string {
+  return direction === "DOWN" ? "text-rose-300" : "text-emerald-300";
 }
 
 function absoluteUrl(path: string): string {
@@ -79,15 +86,47 @@ function dailyPath(date: string | null): string {
   return date ? `/daily?date=${encodeURIComponent(date)}` : "/daily";
 }
 
-function shareText(payload: DailyScoresResponse): string {
-  const topUser = payload.userGainers[0];
-  const topPrediction = payload.predictionGainers[0];
-  const userPart = topUser ? `Top analyst: ${userName(topUser)} ${scoreText(topUser.dailyScoreChange)}.` : "";
-  const predictionPart = topPrediction
-    ? ` Top prediction: ${formatTickerSymbol(topPrediction.ticker)} ${scoreText(topPrediction.scoreChange)}.`
-    : "";
+function predictionPath(predictionId: string): string {
+  return `/predictions/${predictionId}`;
+}
 
-  return `YouAnalyst daily moves for ${compactDate(payload.date)}. ${userPart}${predictionPart}`;
+function shareText(payload: DailyScoresResponse): string {
+  const call = payload.callOfTheDay;
+  if (!call) {
+    return `Best Calls Today on YouAnalyst for ${dateLabel(payload.date)}.`;
+  }
+
+  return `Best Calls Today on YouAnalyst: ${directionArrow(call.direction)} ${formatTickerSymbol(call.ticker)} by ${userName(call)} ${dailyReturnText(call.dailyReturnChange)} today.`;
+}
+
+function xShareUrl(payload: DailyScoresResponse): string {
+  const text = shareText(payload);
+  const url = absoluteUrl(dailyPath(payload.date));
+  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+}
+
+function callDescription(call: DailyCallHighlight): string {
+  return call.dailyScoreChange > 0
+    ? "Best-performing call in today's end-of-day update."
+    : "Largest call move in today's end-of-day update.";
+}
+
+function returnText(value: number | null): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(2)}%`;
+}
+
+function dailyReturnText(value: number | null): string {
+  if (value === null) {
+    return "N/A";
+  }
+
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}%`;
 }
 
 export function DailyScoresPage() {
@@ -111,7 +150,7 @@ export function DailyScoresPage() {
     void fetch(apiPath)
       .then(async (response) => {
         if (!response.ok) {
-          throw new Error("Unable to load daily moves.");
+          throw new Error("Unable to load daily highlights.");
         }
 
         const nextPayload = (await response.json()) as DailyScoresResponse;
@@ -121,7 +160,7 @@ export function DailyScoresPage() {
       })
       .catch((nextError) => {
         if (!cancelled) {
-          setError(nextError instanceof Error ? nextError.message : "Unable to load daily moves.");
+          setError(nextError instanceof Error ? nextError.message : "Unable to load daily highlights.");
         }
       })
       .finally(() => {
@@ -149,114 +188,153 @@ export function DailyScoresPage() {
     }
   }
 
-  async function shareDaily() {
-    if (!payload) {
-      return;
-    }
-
-    const url = absoluteUrl(dailyPath(payload.date));
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `YouAnalyst daily moves for ${compactDate(payload.date)}`,
-          text: shareText(payload),
-          url,
-        });
-        return;
-      } catch {
-        return;
-      }
-    }
-
-    await copyDailyLink();
-  }
-
   if (loading) {
-    return <main className="mx-auto w-full max-w-6xl px-4 py-8 text-sm text-slate-300">Loading daily moves...</main>;
+    return <main className="mx-auto w-full max-w-5xl px-4 py-8 text-sm text-slate-300">Loading daily highlights...</main>;
   }
+
+  const topCalls = payload?.topCalls ?? [];
+  const callOfTheDay = payload?.callOfTheDay ?? null;
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8">
+    <main className="mx-auto w-full max-w-5xl px-4 py-8">
       <section className="rounded-xl border border-cyan-500/25 bg-slate-900/70 p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-xs font-medium uppercase text-slate-500">{compactDate(payload?.date ?? null)}</p>
-            <h1 className="mt-1 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">Daily Moves</h1>
-            <p className="mt-2 text-sm text-slate-300">
-              Sitewide score highlights from the latest end-of-day prediction marks.
+            <p className="text-xs font-semibold tracking-wide text-cyan-300">{dateLabel(payload?.date ?? null)}</p>
+            <h1 className="mt-2 font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">Best Calls Today</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+              Top-performing predictions based on the latest end-of-day results.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void shareDaily()}
-              className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
-            >
-              Share
-            </button>
-            <button
-              type="button"
-              onClick={() => void copyDailyLink()}
-              className="rounded-lg border border-cyan-400/35 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/15"
-            >
-              Copy link
-            </button>
-            {copied ? <span className="self-center text-xs text-emerald-300">Copied</span> : null}
-          </div>
+          {payload ? (
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={xShareUrl(payload)}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
+              >
+                Share on X
+              </a>
+              <button
+                type="button"
+                onClick={() => void copyDailyLink()}
+                className="rounded-lg border border-cyan-400/35 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/15"
+              >
+                Copy link
+              </button>
+              {copied ? <span className="self-center text-xs text-emerald-300">Copied</span> : null}
+            </div>
+          ) : null}
         </div>
       </section>
 
       {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
 
-      {payload ? (
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <section className="rounded-xl border border-white/10 bg-slate-950/55 p-4">
-            <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Top Analysts</h2>
-            <div className="mt-3 grid gap-2">
-              {payload.userGainers.map((user, index) => (
-                <Link
-                  key={user.userId}
-                  href={`/analysts/${user.userId}`}
-                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-white/10 p-3 hover:border-cyan-300/60"
-                >
-                  <span className="text-sm font-semibold text-cyan-200">#{index + 1}</span>
-                  <span className="min-w-0 truncate text-sm text-slate-100">{userName(user)}</span>
-                  <span className="text-sm font-semibold text-emerald-300">{scoreText(user.dailyScoreChange)}</span>
-                </Link>
-              ))}
-              {payload.userGainers.length === 0 ? <p className="text-sm text-slate-300">No analyst moves yet.</p> : null}
-            </div>
-          </section>
-
-          <section className="rounded-xl border border-white/10 bg-slate-950/55 p-4">
-            <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Top Predictions</h2>
-            <div className="mt-3 grid gap-2">
-              {payload.predictionGainers.map((prediction, index) => (
-                <Link
-                  key={prediction.predictionId}
-                  href={`/predictions/${prediction.predictionId}`}
-                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-white/10 p-3 hover:border-cyan-300/60"
-                >
-                  <span className="text-sm font-semibold text-cyan-200">#{index + 1}</span>
-                  <span className="min-w-0 text-sm text-slate-100">
-                    {directionArrow(prediction.direction) ? (
-                      <span aria-hidden="true" className="mr-1 font-semibold text-cyan-200">
-                        {directionArrow(prediction.direction)}
-                      </span>
-                    ) : null}
-                    <span className="font-semibold">{formatTickerSymbol(prediction.ticker)}</span>
-                    <span className="text-slate-500"> / </span>
-                    <span>{userName(prediction)}</span>
-                  </span>
-                  <span className="text-sm font-semibold text-emerald-300">{scoreText(prediction.scoreChange)}</span>
-                </Link>
-              ))}
-              {payload.predictionGainers.length === 0 ? <p className="text-sm text-slate-300">No prediction moves yet.</p> : null}
-            </div>
-          </section>
-        </div>
+      {payload && topCalls.length === 0 ? (
+        <section className="mt-4 rounded-xl border border-white/10 bg-slate-950/55 p-5">
+          <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">No daily highlights yet.</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-300">
+            Check back after more predictions settle and update.
+          </p>
+          <Link
+            href="/predictions/new"
+            className="mt-4 inline-flex rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+          >
+            Make the first call
+          </Link>
+        </section>
       ) : null}
+
+      {callOfTheDay ? (
+        <Link
+          href={predictionPath(callOfTheDay.predictionId)}
+          className="mt-4 block rounded-xl border border-cyan-400/35 bg-slate-900/80 p-5 hover:border-cyan-300/70"
+        >
+          <p className="text-sm font-semibold text-cyan-200">🏆 Call of the Day</p>
+          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="font-[var(--font-sora)] text-4xl font-semibold text-cyan-100">
+                <span aria-hidden="true" className={`mr-2 ${directionTone(callOfTheDay.direction)}`}>
+                  {directionArrow(callOfTheDay.direction)}
+                </span>
+                {formatTickerSymbol(callOfTheDay.ticker)}
+              </p>
+              <p className="mt-2 text-sm text-slate-300">by {userName(callOfTheDay)}</p>
+              <p className="mt-3 text-sm text-slate-400">{callDescription(callOfTheDay)}</p>
+            </div>
+            <div className="sm:text-right">
+              <p className={`text-4xl font-semibold ${scoreTone(callOfTheDay.dailyScoreChange)}`}>
+                {dailyReturnText(callOfTheDay.dailyReturnChange)}
+              </p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">today</p>
+              <p className="mt-1 text-xs text-slate-400">{scoreText(callOfTheDay.dailyScoreChange)} score</p>
+              {returnText(callOfTheDay.returnSinceEntry) && callOfTheDay.returnSinceEntry !== callOfTheDay.dailyReturnChange ? (
+                <p className="mt-1 text-xs text-slate-500">{returnText(callOfTheDay.returnSinceEntry)} since entry</p>
+              ) : null}
+            </div>
+          </div>
+        </Link>
+      ) : null}
+
+      {topCalls.length > 0 ? (
+        <section className="mt-4 rounded-xl border border-white/10 bg-slate-950/55 p-4">
+          <div>
+            <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Top Calls Today</h2>
+            <p className="mt-1 text-sm text-slate-300">
+              The strongest prediction moves from the latest end-of-day update.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-2">
+            {topCalls.map((call, index) => (
+              <Link
+                key={call.predictionId}
+                href={predictionPath(call.predictionId)}
+                className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-white/10 p-3 hover:border-cyan-300/60"
+              >
+                <span className="text-sm font-semibold text-cyan-200">#{index + 1}</span>
+                <span className="min-w-0 text-sm text-slate-100">
+                  {directionArrow(call.direction) ? (
+                    <span aria-hidden="true" className={`mr-1 font-semibold ${directionTone(call.direction)}`}>
+                      {directionArrow(call.direction)}
+                    </span>
+                  ) : null}
+                  <span className="font-semibold">{formatTickerSymbol(call.ticker)}</span>
+                  <span className="text-slate-500"> / </span>
+                  <span>{userName(call)}</span>
+                </span>
+                <span className="text-right">
+                  <span className={`block text-sm font-semibold ${scoreTone(call.dailyScoreChange)}`}>
+                    {dailyReturnText(call.dailyReturnChange)}
+                  </span>
+                  <span className="block text-[11px] text-slate-500">{scoreText(call.dailyScoreChange)} score</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="mt-4 rounded-xl border border-white/10 bg-slate-900/55 p-5">
+        <p className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">
+          Think you can beat today&apos;s top call?
+        </p>
+        <p className="mt-1 text-sm text-slate-300">Make your prediction on YouAnalyst.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href="/predictions/new"
+            className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+          >
+            Make a prediction
+          </Link>
+          <Link
+            href="/predictions"
+            className="rounded-lg border border-cyan-400/35 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-500/15"
+          >
+            View feed
+          </Link>
+        </div>
+      </section>
     </main>
   );
 }

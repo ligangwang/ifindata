@@ -3,17 +3,17 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "How It Works | YouAnalyst",
-  description: "How YouAnalyst predictions open, mark, close, and score using end-of-day prices.",
+  description: "How YouAnalyst predictions, scores, XP, and levels work.",
 };
 
 const lifecycle = [
   {
     status: "Live",
-    description: "The prediction is waiting for entry, tracking daily marks, or waiting for a requested close to settle.",
+    description: "Active and updated daily.",
   },
   {
     status: "Settled",
-    description: "The settled price, result, and score are locked.",
+    description: "Settled result and score are locked.",
   },
 ];
 
@@ -26,8 +26,7 @@ export default function HowItWorksPage() {
           Predictions run on end-of-day prices.
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-          YouAnalyst keeps prediction timing simple. Create and close requests do not use realtime quotes. The daily
-          end-of-day run assigns entry prices, updates marks, closes requested predictions, and calculates scores.
+          Make predictions on stocks. We track results using end-of-day prices to keep everything fair and consistent.
         </p>
       </section>
 
@@ -35,19 +34,19 @@ export default function HowItWorksPage() {
         <div>
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Make a prediction</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Pick a ticker, choose up or down, and write your thesis. The prediction starts as Live.
+            Pick a stock, choose Up or Down, and share your view.
           </p>
         </div>
         <div>
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Track the mark</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Once opened, the prediction receives a daily mark price and provisional score from end-of-day data.
+            We update your prediction daily using end-of-day prices.
           </p>
         </div>
         <div>
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Close when ready</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Request a close any time. The next eligible end-of-day run locks the settled result and score.
+            Close your prediction anytime. The next end-of-day update locks the settled result.
           </p>
         </div>
       </section>
@@ -67,16 +66,27 @@ export default function HowItWorksPage() {
       <section className="grid gap-5 py-6 md:grid-cols-2">
         <div>
           <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">How Scores Work</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-300">
-            Score is based on the return from entry price to mark or settled price. One basis point of return equals one
-            score point. Up predictions earn positive scores when the price rises. Down predictions earn positive scores when the price falls.
-          </p>
+          <div className="mt-2 space-y-2 text-sm leading-6 text-slate-300">
+            <p>Your Score reflects how your predictions perform.</p>
+            <p>Correct calls earn positive score. Wrong calls reduce your score.</p>
+            <p>Rankings are based on overall Score.</p>
+          </div>
         </div>
         <div>
+          <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Level & XP</h2>
+          <div className="mt-2 space-y-2 text-sm leading-6 text-slate-300">
+            <p>You earn XP from settled predictions.</p>
+            <p>XP increases your Level, which reflects your experience over time.</p>
+            <p>Level does not affect ranking.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-white/10 py-6">
+        <div className="max-w-2xl">
           <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Why End-of-Day</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            End-of-day pricing keeps timing consistent, avoids random intraday quote differences, and makes every
-            prediction easier to compare on the leaderboard.
+            End-of-day pricing keeps results consistent and comparable across all users.
           </p>
         </div>
       </section>

@@ -11,7 +11,7 @@ export type PredictionMarkFields = {
   entryDate?: string | null;
   markPrice?: number | null;
   markPriceDate?: string | null;
-  markDisplayPercent?: number | null;
+  markReturnValue?: number | null;
   timeHorizon?: PredictionTimeHorizon | null;
   commentCount?: number | null;
 };
@@ -49,8 +49,8 @@ export function formatTickerSymbol(ticker: string | null | undefined): string {
   return symbol.startsWith("$") ? symbol : `$${symbol}`;
 }
 
-export function formatMarkPercent(markDisplayPercent: number): string {
-  return formatSignedPercent(markDisplayPercent);
+export function formatReturnPercent(returnValue: number): string {
+  return formatSignedPercent(returnValue * 100);
 }
 
 export function formatAbsoluteDateTime(value: string): string {
@@ -239,12 +239,12 @@ export function PredictionReturnSummary({
   href?: string;
   status?: PredictionStatus;
 }) {
-  const markDisplayPercent = typeof prediction.markDisplayPercent === "number" ? prediction.markDisplayPercent : null;
+  const markReturnValue = typeof prediction.markReturnValue === "number" ? prediction.markReturnValue : null;
   const entryPrice = typeof prediction.entryPrice === "number" ? prediction.entryPrice : null;
   const sinceCallDays = daysSinceCall(prediction.entryDate, prediction.markPriceDate);
   const isAwaitingEntry = status === "OPENING";
-  const isAwaitingFirstMark = (status === "OPEN" || status === "CLOSING") && entryPrice !== null && markDisplayPercent === null;
-  const hasReturn = !isAwaitingEntry && markDisplayPercent !== null && sinceCallDays !== null;
+  const isAwaitingFirstMark = (status === "OPEN" || status === "CLOSING") && entryPrice !== null && markReturnValue === null;
+  const hasReturn = !isAwaitingEntry && markReturnValue !== null && sinceCallDays !== null;
   const statusLabel = status ? formatPredictionStatus(status).toLowerCase() : null;
 
   if (!hasReturn && !statusLabel && !isAwaitingFirstMark) {
@@ -255,8 +255,8 @@ export function PredictionReturnSummary({
     <>
       {hasReturn ? (
         <>
-          <span className={`font-semibold ${markToneClass(markDisplayPercent)}`}>
-            {formatMarkPercent(markDisplayPercent)}
+          <span className={`font-semibold ${markToneClass(markReturnValue)}`}>
+            {formatReturnPercent(markReturnValue)}
           </span>
           <span className="text-slate-400"> since call ({sinceCallDays}d)</span>
         </>
@@ -335,7 +335,7 @@ export function PredictionMarkSummary({ prediction }: { prediction: PredictionMa
   const entryDate = prediction.entryDate;
   const markPrice = prediction.markPrice;
   const markPriceDate = prediction.markPriceDate;
-  const markDisplayPercent = prediction.markDisplayPercent;
+  const markReturnValue = prediction.markReturnValue;
   const timeHorizon = formatTimeHorizon(prediction.timeHorizon);
   const hasEntryData =
     typeof entryPrice === "number" &&
@@ -343,7 +343,7 @@ export function PredictionMarkSummary({ prediction }: { prediction: PredictionMa
     entryDate.length > 0;
   const hasMarkData =
     typeof markPrice === "number" &&
-    typeof markDisplayPercent === "number" &&
+    typeof markReturnValue === "number" &&
     typeof markPriceDate === "string" &&
     markPriceDate.length > 0;
 
@@ -355,8 +355,8 @@ export function PredictionMarkSummary({ prediction }: { prediction: PredictionMa
           <span>
             Mark {markPrice.toFixed(2)} @ {markPriceDate}
           </span>
-          <span className={markToneClass(markDisplayPercent)}>
-            {formatMarkPercent(markDisplayPercent)}
+          <span className={markToneClass(markReturnValue)}>
+            {formatReturnPercent(markReturnValue)}
           </span>
         </>
       ) : null}

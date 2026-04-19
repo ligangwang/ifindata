@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { formatMarkPercent, formatPredictionStatus, formatPredictionThesisTitle, formatTickerSymbol, markToneClass, PredictionAuthorSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { formatPredictionStatus, formatPredictionThesisTitle, formatReturnPercent, formatTickerSymbol, markToneClass, PredictionAuthorSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import {
   MAX_PREDICTION_THESIS_LENGTH,
   MAX_PREDICTION_THESIS_TITLE_LENGTH,
@@ -35,12 +35,12 @@ type PredictionDetail = {
   closeRequestedAt?: string | null;
   markPrice?: number | null;
   markPriceDate?: string | null;
-  markDisplayPercent?: number | null;
+  markReturnValue?: number | null;
   commentCount: number;
   result: {
     score: number;
     exitPrice: number;
-    displayPercent?: number | null;
+    returnValue: number;
   } | null;
 };
 
@@ -92,9 +92,7 @@ function formatDetailStatus(status: PredictionStatus): string {
 }
 
 function formatResultReturn(result: NonNullable<PredictionDetail["result"]>): string {
-  const displayPercent = typeof result.displayPercent === "number" ? result.displayPercent : result.score / 100;
-  const sign = displayPercent > 0 ? "+" : "";
-  return `${sign}${displayPercent.toFixed(2)}%`;
+  return formatReturnPercent(result.returnValue);
 }
 
 export function PredictionDetailPage({ predictionId }: { predictionId: string }) {
@@ -316,8 +314,8 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
     isOwner &&
     (prediction.status === "OPEN" || (prediction.status === "OPENING" && !createCancelWindowOpen));
   const returnText =
-    typeof prediction.markDisplayPercent === "number"
-      ? formatMarkPercent(prediction.markDisplayPercent)
+    typeof prediction.markReturnValue === "number"
+      ? formatReturnPercent(prediction.markReturnValue)
       : "Pending";
   const ownerAction =
     isOwner && prediction.status === "OPENING" && createCancelWindowOpen
@@ -467,7 +465,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             </div>
             <div className="grid grid-cols-[110px_1fr] gap-3">
               <dt className="text-slate-400">Return:</dt>
-              <dd className={typeof prediction.markDisplayPercent === "number" ? markToneClass(prediction.markDisplayPercent) : "text-slate-100"}>
+              <dd className={typeof prediction.markReturnValue === "number" ? markToneClass(prediction.markReturnValue) : "text-slate-100"}>
                 {returnText}
               </dd>
             </div>

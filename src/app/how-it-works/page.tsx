@@ -68,7 +68,7 @@ export default function HowItWorksPage() {
           <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">How Scores Work</h2>
           <div className="mt-2 space-y-2 text-sm leading-6 text-slate-300">
             <p>Your Score reflects how your predictions perform.</p>
-            <p>Correct calls earn positive score. Wrong calls reduce your score.</p>
+            <p>Strong calls help your Score. Poor calls can hold it back.</p>
             <p>Rankings are based on overall Score.</p>
           </div>
         </div>

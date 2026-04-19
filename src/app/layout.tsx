@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, Sora } from "next/font/google";
 import Link from "next/link";
+import Script from "next/script";
 import { AppProviders } from "@/components/providers/app-providers";
 import { EnvironmentBanner } from "@/components/environment-banner";
 import { SiteNav } from "@/components/site-nav";
 import "./globals.css";
+
+const GOOGLE_ANALYTICS_ID = "G-8FBVV30SY6";
 
 const sora = Sora({
   variable: "--font-sora",
@@ -33,6 +36,18 @@ export default function RootLayout({
       className={`${sora.variable} ${ibmPlexSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ANALYTICS_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){window.dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GOOGLE_ANALYTICS_ID}');
+          `}
+        </Script>
         <AppProviders>
           <EnvironmentBanner />
           <SiteNav />

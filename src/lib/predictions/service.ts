@@ -288,6 +288,20 @@ function validatePredictionText(thesisTitle: string, thesis: string): void {
   }
 }
 
+function validateUpdatedPredictionText(thesisTitle: string, thesis: string): void {
+  if (!thesisTitle) {
+    throw new Error("title is required");
+  }
+
+  if (thesisTitle.length > MAX_PREDICTION_THESIS_TITLE_LENGTH) {
+    throw new Error(`title must be <= ${MAX_PREDICTION_THESIS_TITLE_LENGTH} chars`);
+  }
+
+  if (thesis.length > MAX_PREDICTION_THESIS_LENGTH) {
+    throw new Error(`thesis must be <= ${MAX_PREDICTION_THESIS_LENGTH} chars`);
+  }
+}
+
 function validateTimeHorizonInput(raw: unknown, baseDate: string): PredictionTimeHorizon | null {
   if (raw === null || raw === undefined || raw === "") {
     return null;
@@ -356,7 +370,7 @@ export function validateUpdatePredictionInput(raw: unknown, baseDate: string): U
   const thesisTitle = typeof input.thesisTitle === "string" ? sanitizePredictionThesisTitle(input.thesisTitle) : "";
   const thesis = typeof input.thesis === "string" ? sanitizePredictionThesis(input.thesis) : "";
 
-  validatePredictionText(thesisTitle, thesis);
+  validateUpdatedPredictionText(thesisTitle, thesis);
 
   return {
     thesisTitle,

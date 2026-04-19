@@ -69,18 +69,6 @@ function scoreText(score: number): string {
   return `${sign}${(score / 100).toFixed(2)}%`;
 }
 
-function compactDate(value: string): string {
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-}
-
 function statusFilterLabel(status: ProfileStatusFilter): string {
   if (status === "LIVE") {
     return "Live";
@@ -131,9 +119,8 @@ export function AnalystProfilePage({
   const preferredName = payload?.profile.nickname ?? payload?.profile.displayName ?? "Analyst";
   const badgePath = `/api/users/${userId}/badge.svg`;
   const profilePath = `/analysts/${userId}`;
-  const livePredictions = payload
-    ? payload.profile.stats.openingPredictions + payload.profile.stats.openPredictions + payload.profile.stats.closingPredictions
-    : 0;
+  const settledCalls = payload?.profile.stats.closedPredictions ?? 0;
+  const isProvisional = settledCalls < 5;
   const profileAuthor = payload
     ? {
         userId,
@@ -405,6 +392,21 @@ export function AnalystProfilePage({
                   {countText(payload.profile.stats.followersCount, "follower")}
                 </Link>
               </nav>
+              <div className="mt-3 grid gap-1 text-sm text-slate-200">
+                <p>
+                  <span className="text-slate-400">Score: </span>
+                  <span className="font-semibold text-cyan-100">{basisPointText(payload.profile.stats.totalScore)}</span>
+                </p>
+                <p>
+                  <span className="text-slate-400">Calls: </span>
+                  <span className="font-semibold text-cyan-100">{payload.profile.stats.totalPredictions.toLocaleString()}</span>
+                </p>
+                <p>
+                  <span className="text-slate-400">Level: </span>
+                  <span className="font-semibold text-cyan-100">1</span>
+                </p>
+                {isProvisional ? <p className="text-slate-300">Provisional</p> : null}
+              </div>
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
@@ -509,33 +511,6 @@ export function AnalystProfilePage({
         ) : (
           <p className="mt-2 text-sm text-slate-300">{payload.profile.bio || "No bio yet."}</p>
         )}
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-          <div className="rounded-xl border border-white/10 p-3">
-            <p className="text-slate-400">Total Score</p>
-            <p className="font-semibold text-cyan-100">{basisPointText(payload.profile.stats.totalScore)}</p>
-          </div>
-          <div className="rounded-xl border border-white/10 p-3">
-            <p className="text-slate-400">
-              Latest Move
-              {payload.profile.latestDailyScore ? ` / ${compactDate(payload.profile.latestDailyScore.date)}` : ""}
-            </p>
-            <p className="font-semibold text-cyan-100">
-              {payload.profile.latestDailyScore ? basisPointText(payload.profile.latestDailyScore.dailyScoreChange) : "N/A"}
-            </p>
-          </div>
-          <div className="rounded-xl border border-white/10 p-3">
-            <p className="text-slate-400">Total</p>
-            <p className="font-semibold text-cyan-100">{payload.profile.stats.totalPredictions}</p>
-          </div>
-          <div className="rounded-xl border border-white/10 p-3">
-            <p className="text-slate-400">Live</p>
-            <p className="font-semibold text-cyan-100">{livePredictions}</p>
-          </div>
-          <div className="rounded-xl border border-white/10 p-3">
-            <p className="text-slate-400">Final</p>
-            <p className="font-semibold text-cyan-100">{payload.profile.stats.closedPredictions}</p>
-          </div>
-        </div>
       </section>
 
       {shareOpen ? (

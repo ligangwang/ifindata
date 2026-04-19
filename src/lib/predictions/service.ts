@@ -1,6 +1,5 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
-import { readUserAnalytics } from "@/lib/predictions/user-analytics";
 import {
   isPredictionDirection,
   isPredictionTimeHorizonUnit,
@@ -62,6 +61,11 @@ function isPublicProfile(data: Record<string, unknown> | undefined): boolean {
   }
 
   return (settings as Record<string, unknown>).isPublic !== false;
+}
+
+function numberFromStats(stats: Record<string, unknown>, key: string): number {
+  const value = stats[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 function getCurrentEasternDate(): string {
@@ -204,11 +208,10 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
         ? userData.stats as Record<string, unknown>
         : {};
       const canShowStats = isPublicProfile(userData);
-      const analytics = canShowStats ? await readUserAnalytics(db, id, stats) : null;
       return [id, {
         nickname,
-        totalScore: analytics ? analytics.score : null,
-        totalPredictions: analytics ? analytics.settledCalls : null,
+        totalScore: canShowStats ? numberFromStats(stats, "totalScore") : null,
+        totalPredictions: canShowStats ? numberFromStats(stats, "settledCalls") || numberFromStats(stats, "closedPredictions") : null,
       }] as const;
     }),
   );

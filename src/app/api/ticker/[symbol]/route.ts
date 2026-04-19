@@ -1,7 +1,6 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeTicker, sanitizePredictionThesis, sanitizePredictionThesisTitle, type Prediction } from "@/lib/predictions/types";
-import { readUserAnalytics } from "@/lib/predictions/user-analytics";
 
 const PUBLIC_PREDICTION_STATUSES = ["OPENING", "OPEN", "CLOSING", "CLOSED"] as const;
 
@@ -58,6 +57,11 @@ function isPublicProfile(data: Record<string, unknown> | undefined): boolean {
   }
 
   return (settings as Record<string, unknown>).isPublic !== false;
+}
+
+function numberFromStats(stats: Record<string, unknown>, key: string): number {
+  const value = stats[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 async function listTickerPredictions(
@@ -166,11 +170,10 @@ async function applyAuthorInfo(
         ? userData.stats as Record<string, unknown>
         : {};
       const canShowStats = isPublicProfile(userData);
-      const analytics = canShowStats ? await readUserAnalytics(db, userId, stats) : null;
       return [userId, {
         nickname: rawNickname || null,
-        totalScore: analytics ? analytics.score : null,
-        totalPredictions: analytics ? analytics.settledCalls : null,
+        totalScore: canShowStats ? numberFromStats(stats, "totalScore") : null,
+        totalPredictions: canShowStats ? numberFromStats(stats, "settledCalls") || numberFromStats(stats, "closedPredictions") : null,
       }] as const;
     }),
   );

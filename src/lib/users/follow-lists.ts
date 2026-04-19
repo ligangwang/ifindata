@@ -1,5 +1,3 @@
-import { readUserAnalytics } from "@/lib/predictions/user-analytics";
-
 export type FollowListKind = "followers" | "following";
 
 export type FollowListItem = {
@@ -69,17 +67,11 @@ export async function listFollowUsers(
     : [];
   const usersById = new Map(userSnapshots.map((doc) => [doc.id, doc.data() as Record<string, unknown> | undefined]));
 
-  const items = await Promise.all(selected.map(async (doc, index) => {
+  const items = selected.map((doc, index) => {
     const relationshipData = doc.data() as Record<string, unknown>;
     const relatedUserId = userIds[index] ?? doc.id;
     const userData = usersById.get(relatedUserId);
     const stats = statsFromUser(userData);
-    const statsSource = userData?.stats && typeof userData.stats === "object"
-      ? userData.stats as Record<string, unknown>
-      : {};
-    const analytics = relatedUserId
-      ? await readUserAnalytics(db, relatedUserId, statsSource)
-      : null;
     const createdAt = stringOrNull(relationshipData.createdAt);
 
     return {
@@ -87,12 +79,12 @@ export async function listFollowUsers(
       displayName: stringOrNull(userData?.displayName) ?? stringOrNull(relationshipData.displayName),
       nickname: stringOrNull(userData?.nickname) ?? stringOrNull(relationshipData.nickname),
       photoURL: stringOrNull(userData?.photoURL) ?? stringOrNull(relationshipData.photoURL),
-      totalScore: analytics?.score ?? stats.totalScore,
+      totalScore: stats.totalScore,
       followersCount: stats.followersCount,
       followingCount: stats.followingCount,
       followedAt: createdAt ?? "",
     };
-  }));
+  });
 
   const nextCursor = hasMore && selected.length > 0 ? selected[selected.length - 1].get("createdAt") : null;
 

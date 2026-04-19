@@ -493,10 +493,6 @@ function finiteNumberOrNull(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function statusLabelFromStats(value: unknown): "ESTABLISHED" | "PROVEN" | null {
-  return value === "ESTABLISHED" || value === "PROVEN" ? value : null;
-}
-
 function buildMarkUpdate(
   price: EodPrice,
   mark: { returnValue: number; score: number; outcome: number; xpEarned: number; displayPercent: number },
@@ -662,7 +658,6 @@ async function writeUserDailyScoreSnapshots(
     const avgReturn = finiteNumberOrNull(stats.avgReturn) ?? 0;
     const winRate = finiteNumberOrNull(stats.winRate) ?? 0;
     const eligibleForLeaderboard = stats.eligibleForLeaderboard === true;
-    const statusLabel = statusLabelFromStats(stats.statusLabel);
     const previousTotalScore = previousDailySnapshot.empty
       ? null
       : finiteNumberOrNull(previousDailySnapshot.docs[0].get("totalScore"));
@@ -705,7 +700,6 @@ async function writeUserDailyScoreSnapshots(
       avgReturn,
       winRate,
       eligibleForLeaderboard,
-      statusLabel,
       totalPredictions: marks.length,
       openingPredictions,
       openPredictions,

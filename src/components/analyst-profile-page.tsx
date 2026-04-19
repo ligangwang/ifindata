@@ -48,7 +48,6 @@ type ProfilePayload = {
       settledCalls: number;
       totalXP: number;
       level: number;
-      statusLabel: "ESTABLISHED" | "PROVEN" | null;
       followersCount: number;
       followingCount: number;
     };
@@ -131,11 +130,6 @@ export function AnalystProfilePage({
   const badgePath = `/api/users/${userId}/badge.svg`;
   const profilePath = `/analysts/${userId}`;
   const settledCalls = payload?.profile.stats.settledCalls ?? payload?.profile.stats.closedPredictions ?? 0;
-  const statusLabel = payload?.profile.stats.statusLabel === "ESTABLISHED"
-    ? "Established"
-    : payload?.profile.stats.statusLabel === "PROVEN"
-      ? "Proven"
-      : null;
   const profileAuthor = payload
     ? {
         userId,
@@ -433,12 +427,6 @@ export function AnalystProfilePage({
                 <span className="text-slate-400">Calls: </span>
                 <span className="font-semibold text-cyan-100">{settledCalls.toLocaleString()}</span>
               </p>
-              {statusLabel ? (
-                <p className="text-xs">
-                  <span className="text-slate-400">Status: </span>
-                  <span className="font-semibold text-cyan-100">{statusLabel}</span>
-                </p>
-              ) : null}
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-2">

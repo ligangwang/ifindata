@@ -23,8 +23,6 @@ const ANALYST_LEVEL_NAMES = [
   "Master Analyst",
 ] as const;
 
-export type UserStatusLabel = "ESTABLISHED" | "PROVEN" | null;
-
 export type SettledPredictionAnalytics = {
   returnValue: number;
   predictionScore: number;
@@ -44,7 +42,6 @@ export type UserAnalytics = {
   avgReturn: number;
   winRate: number;
   eligibleForLeaderboard: boolean;
-  statusLabel: UserStatusLabel;
 };
 
 export function computePredictionReturn(
@@ -122,7 +119,6 @@ export function computeUserAnalytics(
       avgReturn: 0,
       winRate: 0,
       eligibleForLeaderboard: false,
-      statusLabel: null,
     };
   }
 
@@ -152,6 +148,5 @@ export function computeUserAnalytics(
     avgReturn: totalReturn / n,
     winRate: totalOutcome / n,
     eligibleForLeaderboard: n >= LEADERBOARD_MIN_CALLS,
-    statusLabel: n >= 20 ? "PROVEN" : n >= LEADERBOARD_MIN_CALLS ? "ESTABLISHED" : null,
   };
 }

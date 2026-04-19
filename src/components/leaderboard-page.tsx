@@ -14,7 +14,6 @@ type LeaderboardEntry = {
   settledCalls: number;
   totalXP: number;
   level: number;
-  statusLabel: "ESTABLISHED" | "PROVEN" | null;
 };
 
 type LeaderboardResponse = {
@@ -109,7 +108,6 @@ export function LeaderboardPage() {
                   <p className="truncate text-sm text-slate-100">{displayName}</p>
                   <p className="text-xs text-slate-400">
                     {analystLevelName(entry.level)} &middot; Level {entry.level} / {entry.settledCalls.toLocaleString()} settled
-                    {entry.statusLabel ? ` / ${entry.statusLabel === "PROVEN" ? "Proven" : "Established"}` : ""}
                   </p>
                 </div>
                 <p className="text-sm font-semibold text-emerald-200">{scoreText(entry.totalScore)}</p>

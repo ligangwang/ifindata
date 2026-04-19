@@ -424,7 +424,7 @@ export function AnalystProfilePage({
                 </span>
               </p>
               <p className="text-xs">
-                <span className="text-slate-400">Calls: </span>
+                <span className="text-slate-400">Settled: </span>
                 <span className="font-semibold text-cyan-100">{settledCalls.toLocaleString()}</span>
               </p>
             </div>

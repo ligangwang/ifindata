@@ -10,6 +10,19 @@ export const XP_MULTIPLIER = 0.2;
 export const LEVEL_FACTOR = 100;
 export const LEADERBOARD_MIN_CALLS = 5;
 
+const ANALYST_LEVEL_NAMES = [
+  "New Analyst",
+  "Junior Analyst",
+  "Rising Analyst",
+  "Developing Analyst",
+  "Skilled Analyst",
+  "Advanced Analyst",
+  "Senior Analyst",
+  "Expert Analyst",
+  "Elite Analyst",
+  "Master Analyst",
+] as const;
+
 export type UserStatusLabel = "ESTABLISHED" | "PROVEN" | null;
 
 export type SettledPredictionAnalytics = {
@@ -67,6 +80,11 @@ export function computeLevel(totalXP: number): number {
 
 export function nextLevelXP(level: number): number {
   return LEVEL_FACTOR * Math.max(1, level) ** 2;
+}
+
+export function analystLevelName(level: number): string {
+  const index = Math.max(1, Math.floor(level)) - 1;
+  return ANALYST_LEVEL_NAMES[Math.min(index, ANALYST_LEVEL_NAMES.length - 1)];
 }
 
 export function computeSettledPredictionAnalytics(

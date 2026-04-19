@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
+import { analystLevelName } from "@/lib/predictions/analytics";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type ProfileStatusFilter = "ALL" | "LIVE" | "FINAL";
@@ -423,7 +424,9 @@ export function AnalystProfilePage({
               </p>
               <p>
                 <span className="text-slate-400">Level: </span>
-                <span className="font-semibold text-cyan-100">{payload.profile.stats.level}</span>
+                <span className="font-semibold text-cyan-100">
+                  {payload.profile.stats.level} {analystLevelName(payload.profile.stats.level)}
+                </span>
               </p>
               <p>
                 <span className="text-slate-400">XP: </span>

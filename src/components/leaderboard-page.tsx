@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { analystLevelName } from "@/lib/predictions/analytics";
 
 type LeaderboardEntry = {
   userId: string;
@@ -107,7 +108,7 @@ export function LeaderboardPage() {
                 <div className="min-w-0">
                   <p className="truncate text-sm text-slate-100">{displayName}</p>
                   <p className="text-xs text-slate-400">
-                    Level {entry.level} / {entry.settledCalls.toLocaleString()} settled
+                    Level {entry.level} {analystLevelName(entry.level)} / {entry.settledCalls.toLocaleString()} settled
                     {entry.statusLabel ? ` / ${entry.statusLabel === "PROVEN" ? "Proven" : "Established"}` : ""}
                   </p>
                 </div>

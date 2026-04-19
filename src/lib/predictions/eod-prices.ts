@@ -569,6 +569,24 @@ function existingDailyPreviousScore(
   return fallbackPreviousScore ?? 0;
 }
 
+function existingDailyPreviousDisplayPercent(
+  data: FirebaseFirestore.DocumentData | undefined,
+  fallbackPreviousDisplayPercent: number | null,
+): number {
+  const previousDisplayPercent = finiteNumberOrNull(data?.previousDisplayPercent);
+  if (previousDisplayPercent !== null) {
+    return previousDisplayPercent;
+  }
+
+  const displayPercent = finiteNumberOrNull(data?.markDisplayPercent);
+  const displayPercentChange = finiteNumberOrNull(data?.displayPercentChange);
+  if (displayPercent !== null && displayPercentChange !== null) {
+    return displayPercent - displayPercentChange;
+  }
+
+  return fallbackPreviousDisplayPercent ?? 0;
+}
+
 function markSummaryFromDoc(doc: FirebaseFirestore.QueryDocumentSnapshot): {
   predictionId: string;
   ticker: string | null;
@@ -605,7 +623,7 @@ async function readPreviousPredictionDailyScore(
   db: FirebaseFirestore.Firestore,
   predictionId: string,
   tradingDate: string,
-): Promise<number | null> {
+): Promise<{ score: number | null; displayPercent: number | null }> {
   const snapshot = await db
     .collection("prediction_daily_marks")
     .where("predictionId", "==", predictionId)
@@ -615,10 +633,13 @@ async function readPreviousPredictionDailyScore(
     .get();
 
   if (snapshot.empty) {
-    return null;
+    return { score: null, displayPercent: null };
   }
 
-  return finiteNumberOrNull(snapshot.docs[0].get("score"));
+  return {
+    score: finiteNumberOrNull(snapshot.docs[0].get("score")),
+    displayPercent: finiteNumberOrNull(snapshot.docs[0].get("markDisplayPercent")),
+  };
 }
 
 async function writeUserDailyScoreSnapshots(
@@ -1130,6 +1151,8 @@ export async function runDailyEodMaintenance(
               score: 0,
               previousScore: 0,
               scoreChange: 0,
+              previousDisplayPercent: 0,
+              displayPercentChange: 0,
               isClosed: false,
               createdAt: dailyMarkSnapshot.get("createdAt") ?? nowIso,
               updatedAt: nowIso,
@@ -1164,14 +1187,18 @@ export async function runDailyEodMaintenance(
               }
             : {};
           const markUpdate = buildMarkUpdate(price, mark, nowIso);
-          const previousDailyScore = await readPreviousPredictionDailyScore(db, prediction.id, price.tradingDate);
+          const previousDaily = await readPreviousPredictionDailyScore(db, prediction.id, price.tradingDate);
           const dailyMarkRef = db
             .collection("prediction_daily_marks")
             .doc(predictionDailyMarkDocId(prediction.id, price.tradingDate));
           const dailyMarkSnapshot = await tx.get(dailyMarkRef);
           const previousScore = existingDailyPreviousScore(
             dailyMarkSnapshot.data(),
-            previousDailyScore,
+            previousDaily.score,
+          );
+          const previousDisplayPercent = existingDailyPreviousDisplayPercent(
+            dailyMarkSnapshot.data(),
+            previousDaily.displayPercent,
           );
           const snapshotStatus = dailySnapshotStatus(prediction, price.tradingDate);
           const nextStatus = (latestStatus === "CLOSING" && shouldMutatePrediction) || shouldCloseForOpenUntil
@@ -1198,6 +1225,8 @@ export async function runDailyEodMaintenance(
             score: mark.score,
             previousScore,
             scoreChange: mark.score - previousScore,
+            previousDisplayPercent,
+            displayPercentChange: mark.displayPercent - previousDisplayPercent,
             isClosed: nextStatus === "CLOSED",
             createdAt: dailyMarkSnapshot.get("createdAt") ?? nowIso,
             updatedAt: nowIso,

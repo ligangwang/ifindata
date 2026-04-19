@@ -9,6 +9,7 @@ type DailyCallHighlight = {
   ticker: string | null;
   direction: "UP" | "DOWN" | null;
   dailyScoreChange: number;
+  dailyReturnChange: number | null;
   totalScore: number;
   returnSinceEntry: number | null;
   status: "LIVE" | "SETTLED";
@@ -135,6 +136,7 @@ async function topDailyCalls(db: FirebaseFirestore.Firestore, date: string): Pro
       ticker: asString(data.ticker),
       direction: directionValue(data.direction),
       dailyScoreChange: asNumber(data.scoreChange),
+      dailyReturnChange: asNumberOrNull(data.displayPercentChange) ?? asNumberOrNull(data.markDisplayPercent),
       totalScore: asNumber(data.score),
       returnSinceEntry: asNumberOrNull(data.markDisplayPercent),
       status: statusValue(data.status),

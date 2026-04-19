@@ -12,8 +12,8 @@ function parseLimit(raw: string | null): number {
   return Math.max(1, Math.min(50, Math.trunc(parsed)));
 }
 
-function isPredictionStatus(value: string | null): value is Exclude<PredictionStatus, "CANCELED"> | "ACTIVE" | "LIVE" | "FINAL" {
-  return value === "ACTIVE" || value === "LIVE" || value === "FINAL" || value === "OPENING" || value === "OPEN" || value === "CLOSING" || value === "CLOSED";
+function isPredictionStatus(value: string | null): value is Exclude<PredictionStatus, "CANCELED"> | "ACTIVE" | "LIVE" | "FINAL" | "SETTLED" {
+  return value === "ACTIVE" || value === "LIVE" || value === "FINAL" || value === "SETTLED" || value === "OPENING" || value === "OPEN" || value === "CLOSING" || value === "CLOSED";
 }
 
 export async function GET(request: NextRequest) {
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
 
   if (statusParam && !isPredictionStatus(statusParam)) {
-    return NextResponse.json({ error: "status must be LIVE, FINAL, ACTIVE, OPENING, OPEN, CLOSING, or CLOSED" }, { status: 400 });
+    return NextResponse.json({ error: "status must be LIVE, SETTLED, ACTIVE, OPENING, OPEN, CLOSING, or CLOSED" }, { status: 400 });
   }
 
   const includePrivate = includePrivateParam === "true";

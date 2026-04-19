@@ -131,14 +131,11 @@ export function AnalystProfilePage({
   const badgePath = `/api/users/${userId}/badge.svg`;
   const profilePath = `/analysts/${userId}`;
   const settledCalls = payload?.profile.stats.settledCalls ?? payload?.profile.stats.closedPredictions ?? 0;
-  const isProvisional = settledCalls < 5;
-  const statusLabel = isProvisional
-    ? "Provisional"
-    : payload?.profile.stats.statusLabel === "ESTABLISHED"
-      ? "Established"
-      : payload?.profile.stats.statusLabel === "PROVEN"
-        ? "Proven"
-        : null;
+  const statusLabel = payload?.profile.stats.statusLabel === "ESTABLISHED"
+    ? "Established"
+    : payload?.profile.stats.statusLabel === "PROVEN"
+      ? "Proven"
+      : null;
   const profileAuthor = payload
     ? {
         userId,
@@ -413,29 +410,31 @@ export function AnalystProfilePage({
                 </nav>
               </div>
             </div>
-            <div className="mt-4 grid gap-1 text-sm text-slate-200">
-              <p>
+            <div className="mt-4 grid gap-2 text-slate-200">
+              <p className="text-base">
                 <span className="text-slate-400">Score: </span>
-                <span className="font-semibold text-cyan-100">{scoreValueText(payload.profile.stats.totalScore)}</span>
+                <span className="text-xl font-semibold text-cyan-100">
+                  {settledCalls >= 5 ? scoreValueText(payload.profile.stats.totalScore) : <>&mdash;</>}
+                </span>
               </p>
-              <p>
-                <span className="text-slate-400">Calls: </span>
-                <span className="font-semibold text-cyan-100">{settledCalls.toLocaleString()}</span>
-              </p>
-              <p>
+              <p className="text-sm">
                 <span className="text-slate-400">Level: </span>
                 <span className="font-semibold text-cyan-100">
                   {analystLevelName(payload.profile.stats.level)} &middot; Level {payload.profile.stats.level}
                 </span>
               </p>
-              <p>
+              <p className="text-xs">
                 <span className="text-slate-400">XP: </span>
                 <span className="font-semibold text-cyan-100">
                   {xpProgressText(payload.profile.stats.totalXP, payload.profile.stats.level)}
                 </span>
               </p>
+              <p className="text-xs">
+                <span className="text-slate-400">Calls: </span>
+                <span className="font-semibold text-cyan-100">{settledCalls.toLocaleString()}</span>
+              </p>
               {statusLabel ? (
-                <p>
+                <p className="text-xs">
                   <span className="text-slate-400">Status: </span>
                   <span className="font-semibold text-cyan-100">{statusLabel}</span>
                 </p>
@@ -542,7 +541,9 @@ export function AnalystProfilePage({
             </div>
           </div>
         ) : (
-          <p className="mt-2 text-sm text-slate-300">{payload.profile.bio || "No bio yet."}</p>
+          <p className="mt-2 text-sm text-slate-300">
+            {payload.profile.bio || "Add a bio to tell others what you analyze"}
+          </p>
         )}
       </section>
 

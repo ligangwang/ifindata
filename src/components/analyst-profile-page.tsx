@@ -425,7 +425,7 @@ export function AnalystProfilePage({
               <p>
                 <span className="text-slate-400">Level: </span>
                 <span className="font-semibold text-cyan-100">
-                  {payload.profile.stats.level} {analystLevelName(payload.profile.stats.level)}
+                  {analystLevelName(payload.profile.stats.level)} &middot; Level {payload.profile.stats.level}
                 </span>
               </p>
               <p>

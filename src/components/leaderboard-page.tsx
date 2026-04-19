@@ -108,7 +108,7 @@ export function LeaderboardPage() {
                 <div className="min-w-0">
                   <p className="truncate text-sm text-slate-100">{displayName}</p>
                   <p className="text-xs text-slate-400">
-                    Level {entry.level} {analystLevelName(entry.level)} / {entry.settledCalls.toLocaleString()} settled
+                    {analystLevelName(entry.level)} &middot; Level {entry.level} / {entry.settledCalls.toLocaleString()} settled
                     {entry.statusLabel ? ` / ${entry.statusLabel === "PROVEN" ? "Proven" : "Established"}` : ""}
                   </p>
                 </div>

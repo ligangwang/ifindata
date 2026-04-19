@@ -25,7 +25,7 @@ type Prediction = {
   createdAt: string;
   markPrice?: number | null;
   markPriceDate?: string | null;
-  markDisplayPercent?: number | null;
+  markReturnValue?: number | null;
   commentCount: number;
   result: {
     score: number;

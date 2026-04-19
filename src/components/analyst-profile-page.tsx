@@ -21,11 +21,11 @@ type Prediction = {
   status: PredictionStatus;
   markPrice?: number | null;
   markPriceDate?: string | null;
-  markDisplayPercent?: number | null;
+  markReturnValue?: number | null;
   commentCount: number;
   result: {
     score: number;
-    displayPercent?: number | null;
+    returnValue: number;
   } | null;
 };
 
@@ -74,9 +74,9 @@ function xpProgressText(totalXP: number, level: number): string {
 }
 
 function resultReturnText(result: NonNullable<Prediction["result"]>): string {
-  const displayPercent = typeof result.displayPercent === "number" ? result.displayPercent : result.score / 100;
-  const sign = displayPercent > 0 ? "+" : "";
-  return `${sign}${displayPercent.toFixed(2)}%`;
+  const returnPercent = result.returnValue * 100;
+  const sign = returnPercent > 0 ? "+" : "";
+  return `${sign}${returnPercent.toFixed(2)}%`;
 }
 
 function statusFilterLabel(status: ProfileStatusFilter): string {

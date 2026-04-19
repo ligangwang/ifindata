@@ -475,7 +475,7 @@ function computeMark(
   direction: unknown,
   entryPrice: number,
   markPrice: number,
-): { returnValue: number; score: number; outcome: number; xpEarned: number; displayPercent: number } | null {
+): { returnValue: number; score: number; outcome: number; xpEarned: number } | null {
   if (!isPredictionDirection(direction)) {
     return null;
   }
@@ -487,7 +487,6 @@ function computeMark(
     score,
     outcome: computePredictionOutcome(returnValue),
     xpEarned: computePredictionXp(score),
-    displayPercent: returnValue * 100,
   };
 }
 
@@ -502,7 +501,7 @@ function statusLabelFromStats(value: unknown): "ESTABLISHED" | "PROVEN" | null {
 
 function buildMarkUpdate(
   price: EodPrice,
-  mark: { returnValue: number; score: number; outcome: number; xpEarned: number; displayPercent: number },
+  mark: { returnValue: number; score: number; outcome: number; xpEarned: number },
   nowIso: string,
 ) {
   return {
@@ -514,14 +513,13 @@ function buildMarkUpdate(
     markReturnValue: mark.returnValue,
     markScore: mark.score,
     markPredictionScore: mark.score,
-    markDisplayPercent: mark.displayPercent,
     scoreAppliedToUser: null,
   };
 }
 
 function buildResult(
   price: EodPrice,
-  mark: { returnValue: number; score: number; outcome: number; xpEarned: number; displayPercent: number },
+  mark: { returnValue: number; score: number; outcome: number; xpEarned: number },
 ): PredictionResult {
   return {
     exitPrice: price.close,
@@ -531,7 +529,6 @@ function buildResult(
     predictionScore: mark.score,
     outcome: mark.outcome,
     xpEarned: mark.xpEarned,
-    displayPercent: mark.displayPercent,
   };
 }
 
@@ -633,7 +630,7 @@ async function readPreviousPredictionDailyScore(
     .get();
 
   if (snapshot.empty) {
-    return { score: null, displayPercent: null };
+    return { score: null, returnValue: null };
   }
 
   return {
@@ -1147,7 +1144,6 @@ export async function runDailyEodMaintenance(
               markReturnValue: 0,
               markScore: 0,
               markPredictionScore: 0,
-              markDisplayPercent: 0,
               score: 0,
               previousScore: 0,
               scoreChange: 0,
@@ -1221,7 +1217,6 @@ export async function runDailyEodMaintenance(
             markReturnValue: mark.returnValue,
             markScore: mark.score,
             markPredictionScore: mark.score,
-            markDisplayPercent: mark.displayPercent,
             score: mark.score,
             previousScore,
             scoreChange: mark.score - previousScore,

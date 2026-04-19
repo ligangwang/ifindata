@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatTickerSymbol } from "@/components/prediction-ui";
+import { useAuth } from "@/components/providers/auth-provider";
 
 type DailyCallHighlight = {
   predictionId: string;
@@ -130,10 +131,13 @@ function dailyReturnText(value: number | null): string {
 }
 
 export function DailyScoresPage() {
+  const { user, loading: authLoading, getIdToken } = useAuth();
   const [payload, setPayload] = useState<DailyScoresResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [adminStatus, setAdminStatus] = useState<{ userId: string; isAdmin: boolean } | null>(null);
+  const canShareOnX = Boolean(user && adminStatus?.userId === user.uid && adminStatus.isAdmin);
 
   const apiPath = useMemo(() => {
     if (typeof window === "undefined") {
@@ -174,6 +178,50 @@ export function DailyScoresPage() {
     };
   }, [apiPath]);
 
+  useEffect(() => {
+    if (authLoading || !user) {
+      setAdminStatus(null);
+      return;
+    }
+
+    let cancelled = false;
+    const userId = user.uid;
+
+    async function loadAdminStatus() {
+      try {
+        const token = await getIdToken(true);
+
+        if (!token) {
+          if (!cancelled) {
+            setAdminStatus({ userId, isAdmin: false });
+          }
+          return;
+        }
+
+        const response = await fetch("/api/admin/me", {
+          headers: {
+            authorization: `Bearer ${token}`,
+          },
+        });
+        const body = (await response.json().catch(() => ({}))) as { isAdmin?: boolean };
+
+        if (!cancelled) {
+          setAdminStatus({ userId, isAdmin: response.ok && body.isAdmin === true });
+        }
+      } catch {
+        if (!cancelled) {
+          setAdminStatus({ userId, isAdmin: false });
+        }
+      }
+    }
+
+    void loadAdminStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, getIdToken, user]);
+
   async function copyDailyLink() {
     if (!payload) {
       return;
@@ -208,14 +256,16 @@ export function DailyScoresPage() {
           </div>
           {payload ? (
             <div className="flex flex-wrap gap-2">
-              <a
-                href={xShareUrl(payload)}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
-              >
-                Share on X
-              </a>
+              {canShareOnX ? (
+                <a
+                  href={xShareUrl(payload)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
+                >
+                  Share on X
+                </a>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void copyDailyLink()}

@@ -25,6 +25,7 @@ type Prediction = {
   commentCount: number;
   result: {
     score: number;
+    displayPercent?: number | null;
   } | null;
 };
 
@@ -43,6 +44,10 @@ type ProfilePayload = {
       closedPredictions: number;
       canceledPredictions: number;
       totalScore: number;
+      settledCalls: number;
+      totalXP: number;
+      level: number;
+      statusLabel: "ESTABLISHED" | "PROVEN" | null;
       followersCount: number;
       followingCount: number;
     };
@@ -59,14 +64,19 @@ type ProfilePayload = {
   nextCursor: string | null;
 };
 
-function basisPointText(score: number): string {
+function scoreValueText(score: number): string {
   const sign = score > 0 ? "+" : "";
-  return `${sign}${Math.round(score)} bp`;
+  return `${sign}${Math.round(score)}`;
 }
 
-function scoreText(score: number): string {
-  const sign = score > 0 ? "+" : "";
-  return `${sign}${(score / 100).toFixed(2)}%`;
+function xpProgressText(totalXP: number, level: number): string {
+  return `XP ${Math.round(totalXP).toLocaleString()} / ${(100 * Math.max(1, level) ** 2).toLocaleString()}`;
+}
+
+function resultReturnText(result: NonNullable<Prediction["result"]>): string {
+  const displayPercent = typeof result.displayPercent === "number" ? result.displayPercent : result.score / 100;
+  const sign = displayPercent > 0 ? "+" : "";
+  return `${sign}${displayPercent.toFixed(2)}%`;
 }
 
 function statusFilterLabel(status: ProfileStatusFilter): string {
@@ -119,7 +129,7 @@ export function AnalystProfilePage({
   const preferredName = payload?.profile.nickname ?? payload?.profile.displayName ?? "Analyst";
   const badgePath = `/api/users/${userId}/badge.svg`;
   const profilePath = `/analysts/${userId}`;
-  const settledCalls = payload?.profile.stats.closedPredictions ?? 0;
+  const settledCalls = payload?.profile.stats.settledCalls ?? payload?.profile.stats.closedPredictions ?? 0;
   const isProvisional = settledCalls < 5;
   const profileAuthor = payload
     ? {
@@ -129,7 +139,7 @@ export function AnalystProfilePage({
         authorPhotoURL: payload.profile.photoURL,
         authorStats: {
           totalScore: payload.profile.stats.totalScore,
-          totalPredictions: payload.profile.stats.totalPredictions,
+          totalPredictions: settledCalls,
         },
       }
     : null;
@@ -395,17 +405,20 @@ export function AnalystProfilePage({
               <div className="mt-3 grid gap-1 text-sm text-slate-200">
                 <p>
                   <span className="text-slate-400">Score: </span>
-                  <span className="font-semibold text-cyan-100">{basisPointText(payload.profile.stats.totalScore)}</span>
+                  <span className="font-semibold text-cyan-100">{scoreValueText(payload.profile.stats.totalScore)}</span>
                 </p>
                 <p>
                   <span className="text-slate-400">Calls: </span>
-                  <span className="font-semibold text-cyan-100">{payload.profile.stats.totalPredictions.toLocaleString()}</span>
+                  <span className="font-semibold text-cyan-100">{settledCalls.toLocaleString()}</span>
                 </p>
                 <p>
                   <span className="text-slate-400">Level: </span>
-                  <span className="font-semibold text-cyan-100">1</span>
+                  <span className="font-semibold text-cyan-100">{payload.profile.stats.level}</span>
                 </p>
+                <p className="text-slate-300">{xpProgressText(payload.profile.stats.totalXP, payload.profile.stats.level)}</p>
                 {isProvisional ? <p className="text-slate-300">Provisional</p> : null}
+                {payload.profile.stats.statusLabel === "ESTABLISHED" ? <p className="text-slate-300">Established</p> : null}
+                {payload.profile.stats.statusLabel === "PROVEN" ? <p className="text-slate-300">Proven</p> : null}
               </div>
             </div>
           </div>
@@ -613,7 +626,7 @@ export function AnalystProfilePage({
                 <span>{formatTickerSymbol(prediction.ticker)}</span>
               </Link>
               {prediction.result ? (
-                <p className="mt-1 text-xs text-emerald-200">Result {scoreText(prediction.result.score)}</p>
+                <p className="mt-1 text-xs text-emerald-200">Result {resultReturnText(prediction.result)}</p>
               ) : null}
               <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} status={prediction.status} />
               {profileAuthor ? <PredictionAuthorSummary author={profileAuthor} /> : null}

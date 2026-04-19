@@ -1,5 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { readUserAnalytics } from "@/lib/predictions/user-analytics";
 import {
   isPredictionDirection,
   isPredictionTimeHorizonUnit,
@@ -53,11 +54,6 @@ const TIME_HORIZON_LIMITS: Record<PredictionTimeHorizonUnit, number> = {
   MONTHS: 120,
   YEARS: 10,
 };
-
-function numberFromStats(stats: Record<string, unknown> | undefined, key: string): number {
-  const value = stats?.[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
 
 function isPublicProfile(data: Record<string, unknown> | undefined): boolean {
   const settings = data?.settings;
@@ -204,12 +200,15 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
       const userSnapshot = await db.collection("users").doc(id).get();
       const userData = userSnapshot.data() as Record<string, unknown> | undefined;
       const nickname = typeof userData?.nickname === "string" ? userData.nickname : null;
-      const stats = userData?.stats as Record<string, unknown> | undefined;
+      const stats = userData?.stats && typeof userData.stats === "object"
+        ? userData.stats as Record<string, unknown>
+        : {};
       const canShowStats = isPublicProfile(userData);
+      const analytics = canShowStats ? await readUserAnalytics(db, id, stats) : null;
       return [id, {
         nickname,
-        totalScore: canShowStats ? numberFromStats(stats, "totalScore") : null,
-        totalPredictions: canShowStats ? numberFromStats(stats, "totalPredictions") : null,
+        totalScore: analytics ? analytics.score : null,
+        totalPredictions: analytics ? analytics.settledCalls : null,
       }] as const;
     }),
   );

@@ -1,4 +1,6 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { LEADERBOARD_MIN_CALLS } from "@/lib/predictions/analytics";
+import { readUserAnalytics } from "@/lib/predictions/user-analytics";
 import { NextRequest, NextResponse } from "next/server";
 
 type LeaderboardUser = {
@@ -7,10 +9,15 @@ type LeaderboardUser = {
   nickname: string | null;
   photoURL: string | null;
   totalScore: number;
+  settledCalls: number;
+  avgReturn: number;
+  totalXP: number;
+  level: number;
+  statusLabel: "ESTABLISHED" | "PROVEN" | null;
 };
 
-function asNumber(value: unknown): number {
-  return Number.isFinite(Number(value)) ? Number(value) : 0;
+function statusLabel(value: unknown): "ESTABLISHED" | "PROVEN" | null {
+  return value === "ESTABLISHED" || value === "PROVEN" ? value : null;
 }
 
 function parseLimit(raw: string | null): number {
@@ -29,8 +36,6 @@ export async function GET(request: NextRequest) {
   try {
     const snapshot = await db
       .collection("users")
-      .orderBy("stats.totalScore", "desc")
-      .limit(limit)
       .get();
 
     const users: LeaderboardUser[] = [];
@@ -38,7 +43,13 @@ export async function GET(request: NextRequest) {
     for (const doc of snapshot.docs) {
       const data = doc.data() as Record<string, unknown>;
       const stats = (data.stats as Record<string, unknown> | undefined) ?? {};
-      const totalScore = asNumber(stats.totalScore);
+      const analytics = await readUserAnalytics(db, doc.id, stats);
+      const totalScore = analytics.score;
+      const settledCalls = analytics.settledCalls;
+
+      if (settledCalls < LEADERBOARD_MIN_CALLS) {
+        continue;
+      }
 
       users.push({
         userId: doc.id,
@@ -46,13 +57,22 @@ export async function GET(request: NextRequest) {
         nickname: typeof data.nickname === "string" && data.nickname.trim() ? data.nickname.trim() : null,
         photoURL: (data.photoURL as string | null | undefined) ?? null,
         totalScore,
+        settledCalls,
+        avgReturn: analytics.avgReturn,
+        totalXP: analytics.totalXP,
+        level: analytics.level,
+        statusLabel: statusLabel(analytics.statusLabel),
       });
     }
 
-    users.sort((a, b) => b.totalScore - a.totalScore);
+    users.sort((a, b) =>
+      b.totalScore - a.totalScore ||
+      b.settledCalls - a.settledCalls ||
+      b.avgReturn - a.avgReturn,
+    );
 
     return NextResponse.json({
-      items: users,
+      items: users.slice(0, limit),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch leaderboard";

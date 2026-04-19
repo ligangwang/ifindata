@@ -1,16 +1,28 @@
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { listPredictions } from "@/lib/predictions/service";
+import { readUserAnalytics } from "@/lib/predictions/user-analytics";
 import { NextRequest, NextResponse } from "next/server";
 
 type UserStats = {
   totalPredictions: number;
+  totalCalls: number;
   openingPredictions: number;
   openPredictions: number;
   closingPredictions: number;
   closedPredictions: number;
   canceledPredictions: number;
   totalScore: number;
+  settledCalls: number;
+  totalXP: number;
+  level: number;
+  avgPredictionScore: number;
+  consistency: number;
+  coverage: number;
+  avgReturn: number;
+  winRate: number;
+  eligibleForLeaderboard: boolean;
+  statusLabel: "ESTABLISHED" | "PROVEN" | null;
   followersCount: number;
   followingCount: number;
 };
@@ -21,19 +33,61 @@ type LatestDailyScore = {
   dailyMarkedPredictions: number;
 } | null;
 
+function statusLabel(value: unknown): "ESTABLISHED" | "PROVEN" | null {
+  return value === "ESTABLISHED" || value === "PROVEN" ? value : null;
+}
+
 function coerceStats(raw: unknown): UserStats {
   const source = (raw ?? {}) as Record<string, unknown>;
 
   return {
     totalPredictions: Number(source.totalPredictions ?? 0),
+    totalCalls: Number(source.totalCalls ?? source.totalPredictions ?? 0),
     openingPredictions: Number(source.openingPredictions ?? 0),
     openPredictions: Number(source.openPredictions ?? 0),
     closingPredictions: Number(source.closingPredictions ?? 0),
     closedPredictions: Number(source.closedPredictions ?? 0),
     canceledPredictions: Number(source.canceledPredictions ?? 0),
     totalScore: Number(source.totalScore ?? 0),
+    settledCalls: Number(source.settledCalls ?? source.closedPredictions ?? 0),
+    totalXP: Number(source.totalXP ?? 0),
+    level: Math.max(1, Number(source.level ?? 1)),
+    avgPredictionScore: Number(source.avgPredictionScore ?? 0),
+    consistency: Number(source.consistency ?? 0),
+    coverage: Number(source.coverage ?? 0),
+    avgReturn: Number(source.avgReturn ?? 0),
+    winRate: Number(source.winRate ?? 0),
+    eligibleForLeaderboard: source.eligibleForLeaderboard === true,
+    statusLabel: statusLabel(source.statusLabel),
     followersCount: Number(source.followersCount ?? 0),
     followingCount: Number(source.followingCount ?? 0),
+  };
+}
+
+async function coerceStatsWithAnalytics(
+  db: FirebaseFirestore.Firestore,
+  userId: string,
+  raw: unknown,
+): Promise<UserStats> {
+  const stats = coerceStats(raw);
+  const source = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+  const analytics = await readUserAnalytics(db, userId, source);
+
+  return {
+    ...stats,
+    totalCalls: analytics.totalCalls,
+    closedPredictions: analytics.settledCalls,
+    settledCalls: analytics.settledCalls,
+    totalScore: analytics.score,
+    totalXP: analytics.totalXP,
+    level: analytics.level,
+    avgPredictionScore: analytics.avgPredictionScore,
+    consistency: analytics.consistency,
+    coverage: analytics.coverage,
+    avgReturn: analytics.avgReturn,
+    winRate: analytics.winRate,
+    eligibleForLeaderboard: analytics.eligibleForLeaderboard,
+    statusLabel: analytics.statusLabel,
   };
 }
 
@@ -118,12 +172,23 @@ export async function GET(
         nickname: null,
         stats: {
           totalPredictions: 0,
+          totalCalls: 0,
           openingPredictions: 0,
           openPredictions: 0,
           closingPredictions: 0,
           closedPredictions: 0,
           canceledPredictions: 0,
           totalScore: 0,
+          settledCalls: 0,
+          totalXP: 0,
+          level: 1,
+          avgPredictionScore: 0,
+          consistency: 0,
+          coverage: 0,
+          avgReturn: 0,
+          winRate: 0,
+          eligibleForLeaderboard: false,
+          statusLabel: null,
           followersCount: 0,
           followingCount: 0,
         },
@@ -139,6 +204,8 @@ export async function GET(
         // If set fails, continue anyway - we have the data to return
       }
 
+      const stats = await coerceStatsWithAnalytics(db, id, profileData.stats);
+
       return NextResponse.json({
         profile: {
           id,
@@ -146,7 +213,7 @@ export async function GET(
           photoURL: profileData.photoURL,
           nickname: profileData.nickname,
           bio: profileData.bio,
-          stats: profileData.stats,
+          stats,
           latestDailyScore,
           settings: profileData.settings,
         },
@@ -165,6 +232,8 @@ export async function GET(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    const stats = await coerceStatsWithAnalytics(db, id, userData.stats);
+
     return NextResponse.json({
       profile: {
         id,
@@ -172,7 +241,7 @@ export async function GET(
         photoURL: userData.photoURL ?? null,
         nickname: typeof userData.nickname === "string" ? userData.nickname : null,
         bio: userData.bio ?? "",
-        stats: coerceStats(userData.stats),
+        stats,
         latestDailyScore,
         settings: {
           isPublic,

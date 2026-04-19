@@ -1,8 +1,10 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { readUserAnalytics } from "@/lib/predictions/user-analytics";
 import { NextRequest } from "next/server";
 
 type UserStats = {
   totalPredictions: number;
+  settledCalls: number;
   totalScore: number;
   followersCount: number;
 };
@@ -25,6 +27,7 @@ function coerceStats(raw: unknown): UserStats {
 
   return {
     totalPredictions: Number(source.totalPredictions ?? 0),
+    settledCalls: Number(source.settledCalls ?? source.closedPredictions ?? 0),
     totalScore: Number(source.totalScore ?? 0),
     followersCount: Number(source.followersCount ?? 0),
   };
@@ -37,10 +40,10 @@ function truncate(value: string, maxLength: number): string {
   return `${value.slice(0, Math.max(0, maxLength - 1))}...`;
 }
 
-function formatBasisPoints(score: number): string {
+function formatScore(score: number): string {
   const rounded = Math.round(score);
   const sign = rounded > 0 ? "+" : "";
-  return `${sign}${rounded.toLocaleString("en-US")} bp`;
+  return `${sign}${rounded.toLocaleString("en-US")}`;
 }
 
 function formatCount(value: number): string {
@@ -64,7 +67,7 @@ function buildBadgeSvg(input: {
   totalPredictions: number;
 }): string {
   const displayName = escapeXml(truncate(input.displayName, 28));
-  const score = escapeXml(formatBasisPoints(input.score));
+  const score = escapeXml(formatScore(input.score));
   const followers = escapeXml(formatCount(input.followersCount));
   const predictions = escapeXml(formatCount(input.totalPredictions));
   const scoreFill = scoreColor(input.score);
@@ -94,7 +97,7 @@ function buildBadgeSvg(input: {
   <text x="264" y="120" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#e0f2fe">${followers}</text>
   <text x="264" y="137" font-family="Arial, Helvetica, sans-serif" font-size="11" fill="#94a3b8">followers</text>
   <text x="334" y="120" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#e0f2fe">${predictions}</text>
-  <text x="334" y="137" font-family="Arial, Helvetica, sans-serif" font-size="11" fill="#94a3b8">predictions</text>
+  <text x="334" y="137" font-family="Arial, Helvetica, sans-serif" font-size="11" fill="#94a3b8">settled</text>
   <rect x="18" y="162" width="384" height="2" rx="1" fill="url(#accent)" opacity="0.8"/>
 </svg>`;
 }
@@ -115,13 +118,15 @@ export async function GET(
 
     const data = snapshot.data() as Record<string, unknown>;
     const stats = coerceStats(data.stats);
+    const statsSource = data.stats && typeof data.stats === "object" ? data.stats as Record<string, unknown> : {};
+    const analytics = await readUserAnalytics(db, id, statsSource);
     const nickname = readString(data.nickname);
     const displayName = nickname ? `@${nickname}` : readString(data.displayName) ?? "YouAnalyst Analyst";
     const svg = buildBadgeSvg({
       displayName,
-      score: stats.totalScore,
+      score: analytics.score,
       followersCount: stats.followersCount,
-      totalPredictions: stats.totalPredictions,
+      totalPredictions: analytics.settledCalls,
     });
 
     return new Response(svg, {

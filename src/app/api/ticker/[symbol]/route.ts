@@ -1,6 +1,7 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeTicker, sanitizePredictionThesis, sanitizePredictionThesisTitle, type Prediction } from "@/lib/predictions/types";
+import { readUserAnalytics } from "@/lib/predictions/user-analytics";
 
 const PUBLIC_PREDICTION_STATUSES = ["OPENING", "OPEN", "CLOSING", "CLOSED"] as const;
 
@@ -48,11 +49,6 @@ function mapPredictionDoc(doc: FirebaseFirestore.QueryDocumentSnapshot) {
     thesisTitle: sanitizePredictionThesisTitle(data.thesisTitle),
     thesis: sanitizePredictionThesis(data.thesis),
   };
-}
-
-function numberFromStats(stats: Record<string, unknown> | undefined, key: string): number {
-  const value = stats?.[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 function isPublicProfile(data: Record<string, unknown> | undefined): boolean {
@@ -166,12 +162,15 @@ async function applyAuthorInfo(
       const userSnapshot = await db.collection("users").doc(userId).get();
       const userData = userSnapshot.data() as Record<string, unknown> | undefined;
       const rawNickname = typeof userData?.nickname === "string" ? userData.nickname.trim() : "";
-      const stats = userData?.stats as Record<string, unknown> | undefined;
+      const stats = userData?.stats && typeof userData.stats === "object"
+        ? userData.stats as Record<string, unknown>
+        : {};
       const canShowStats = isPublicProfile(userData);
+      const analytics = canShowStats ? await readUserAnalytics(db, userId, stats) : null;
       return [userId, {
         nickname: rawNickname || null,
-        totalScore: canShowStats ? numberFromStats(stats, "totalScore") : null,
-        totalPredictions: canShowStats ? numberFromStats(stats, "totalPredictions") : null,
+        totalScore: analytics ? analytics.score : null,
+        totalPredictions: analytics ? analytics.settledCalls : null,
       }] as const;
     }),
   );

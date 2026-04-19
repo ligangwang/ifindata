@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { formatMarkPercent, formatPredictionStatus, formatPredictionThesisTitle, formatScorePercent, formatTickerSymbol, markToneClass, PredictionAuthorSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { formatMarkPercent, formatPredictionStatus, formatPredictionThesisTitle, formatTickerSymbol, markToneClass, PredictionAuthorSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import {
   MAX_PREDICTION_THESIS_LENGTH,
   MAX_PREDICTION_THESIS_TITLE_LENGTH,
@@ -40,6 +40,7 @@ type PredictionDetail = {
   result: {
     score: number;
     exitPrice: number;
+    displayPercent?: number | null;
   } | null;
 };
 
@@ -88,6 +89,12 @@ function formatDetailDate(value: string | null | undefined): string {
 
 function formatDetailStatus(status: PredictionStatus): string {
   return status === "CLOSING" ? "Close pending" : formatPredictionStatus(status);
+}
+
+function formatResultReturn(result: NonNullable<PredictionDetail["result"]>): string {
+  const displayPercent = typeof result.displayPercent === "number" ? result.displayPercent : result.score / 100;
+  const sign = displayPercent > 0 ? "+" : "";
+  return `${sign}${displayPercent.toFixed(2)}%`;
 }
 
 export function PredictionDetailPage({ predictionId }: { predictionId: string }) {
@@ -482,7 +489,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
 
         {prediction.result ? (
           <div className="mt-4 rounded-xl border border-emerald-400/35 bg-emerald-900/20 p-3 text-sm text-emerald-50">
-            Closed at {prediction.result.exitPrice.toFixed(2)} with score {formatScorePercent(prediction.result.score)}.
+            Closed at {prediction.result.exitPrice.toFixed(2)} with return {formatResultReturn(prediction.result)}.
           </div>
         ) : null}
       </section>

@@ -19,12 +19,23 @@ export type PredictionTimeHorizon = {
 
 export type UserStats = {
   totalPredictions: number;
+  totalCalls?: number;
   openingPredictions: number;
   openPredictions: number;
   closingPredictions: number;
   closedPredictions: number;
   canceledPredictions: number;
   totalScore: number;
+  settledCalls?: number;
+  totalXP?: number;
+  level?: number;
+  avgPredictionScore?: number;
+  consistency?: number;
+  coverage?: number;
+  avgReturn?: number;
+  winRate?: number;
+  eligibleForLeaderboard?: boolean;
+  statusLabel?: "ESTABLISHED" | "PROVEN" | null;
 };
 
 export type UserProfile = {
@@ -48,6 +59,9 @@ export type PredictionResult = {
   exitPriceSource: string;
   returnValue: number;
   score: number;
+  predictionScore?: number;
+  outcome?: number;
+  xpEarned?: number;
   displayPercent: number;
 };
 
@@ -78,8 +92,12 @@ export type Prediction = {
   markPriceCapturedAt?: string | null;
   markReturnValue?: number | null;
   markScore?: number | null;
+  markPredictionScore?: number | null;
   markDisplayPercent?: number | null;
   scoreAppliedToUser?: number | null;
+  predictionScore?: number | null;
+  xpEarned?: number | null;
+  outcome?: number | null;
   closeRequestedAt?: string | null;
   closeTargetDate?: string | null;
   closedAt: string | null;
@@ -172,9 +190,9 @@ export function computeReturnValue(
 }
 
 export function computeScoreFromReturn(returnValue: number): number {
-  return Math.round(returnValue * 10000);
+  return Math.round(1000 * Math.tanh(returnValue / 0.30));
 }
 
-export function computeDisplayPercent(score: number): number {
-  return score / 100;
+export function computeDisplayPercent(returnValue: number): number {
+  return returnValue * 100;
 }

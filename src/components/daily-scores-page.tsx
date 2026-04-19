@@ -85,10 +85,6 @@ function directionArrow(direction: "UP" | "DOWN" | null): string {
   return "";
 }
 
-function directionTone(direction: "UP" | "DOWN" | null): string {
-  return direction === "DOWN" ? "text-rose-300" : "text-emerald-300";
-}
-
 function absoluteUrl(path: string): string {
   if (typeof window === "undefined") {
     return path;
@@ -318,7 +314,7 @@ export function DailyScoresPage() {
           <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="font-[var(--font-sora)] text-4xl font-semibold text-cyan-100">
-                <span aria-hidden="true" className={`mr-2 ${directionTone(callOfTheDay.direction)}`}>
+                <span aria-hidden="true" className="mr-2">
                   {directionArrow(callOfTheDay.direction)}
                 </span>
                 {formatTickerSymbol(callOfTheDay.ticker)}
@@ -357,12 +353,14 @@ export function DailyScoresPage() {
               >
                 <span className="text-sm font-semibold text-cyan-200">#{index + 1}</span>
                 <span className="min-w-0 text-sm text-slate-100">
-                  {directionArrow(call.direction) ? (
-                    <span aria-hidden="true" className={`mr-1 font-semibold ${directionTone(call.direction)}`}>
-                      {directionArrow(call.direction)}
-                    </span>
-                  ) : null}
-                  <span className="font-semibold">{formatTickerSymbol(call.ticker)}</span>
+                  <span className="font-semibold text-cyan-200">
+                    {directionArrow(call.direction) ? (
+                      <span aria-hidden="true" className="mr-1">
+                        {directionArrow(call.direction)}
+                      </span>
+                    ) : null}
+                    {formatTickerSymbol(call.ticker)}
+                  </span>
                   <span className="text-slate-500"> / </span>
                   <span>{userName(call)}</span>
                 </span>

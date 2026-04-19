@@ -22,7 +22,6 @@ type UserStats = {
   avgReturn: number;
   winRate: number;
   eligibleForLeaderboard: boolean;
-  statusLabel: "ESTABLISHED" | "PROVEN" | null;
   followersCount: number;
   followingCount: number;
 };
@@ -32,10 +31,6 @@ type LatestDailyScore = {
   dailyScoreChange: number;
   dailyMarkedPredictions: number;
 } | null;
-
-function statusLabel(value: unknown): "ESTABLISHED" | "PROVEN" | null {
-  return value === "ESTABLISHED" || value === "PROVEN" ? value : null;
-}
 
 function coerceStats(raw: unknown): UserStats {
   const source = (raw ?? {}) as Record<string, unknown>;
@@ -58,7 +53,6 @@ function coerceStats(raw: unknown): UserStats {
     avgReturn: Number(source.avgReturn ?? 0),
     winRate: Number(source.winRate ?? 0),
     eligibleForLeaderboard: source.eligibleForLeaderboard === true,
-    statusLabel: statusLabel(source.statusLabel),
     followersCount: Number(source.followersCount ?? 0),
     followingCount: Number(source.followingCount ?? 0),
   };
@@ -87,12 +81,11 @@ async function coerceStatsWithAnalytics(
     avgReturn: analytics.avgReturn,
     winRate: analytics.winRate,
     eligibleForLeaderboard: analytics.eligibleForLeaderboard,
-    statusLabel: analytics.statusLabel,
   };
 }
 
-function isPredictionStatus(value: string | null): value is "LIVE" | "FINAL" | "OPENING" | "OPEN" | "CLOSING" | "CLOSED" {
-  return value === "LIVE" || value === "FINAL" || value === "OPENING" || value === "OPEN" || value === "CLOSING" || value === "CLOSED";
+function isPredictionStatus(value: string | null): value is "LIVE" | "FINAL" | "SETTLED" | "OPENING" | "OPEN" | "CLOSING" | "CLOSED" {
+  return value === "LIVE" || value === "FINAL" || value === "SETTLED" || value === "OPENING" || value === "OPEN" || value === "CLOSING" || value === "CLOSED";
 }
 
 async function readLatestDailyScore(userId: string): Promise<LatestDailyScore> {
@@ -188,7 +181,6 @@ export async function GET(
           avgReturn: 0,
           winRate: 0,
           eligibleForLeaderboard: false,
-          statusLabel: null,
           followersCount: 0,
           followingCount: 0,
         },

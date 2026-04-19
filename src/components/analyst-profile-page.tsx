@@ -5,9 +5,10 @@ import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
+import { analystLevelName } from "@/lib/predictions/analytics";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
-type ProfileStatusFilter = "ALL" | "LIVE" | "FINAL";
+type ProfileStatusFilter = "ALL" | "LIVE" | "SETTLED";
 
 type Prediction = {
   id: string;
@@ -47,7 +48,6 @@ type ProfilePayload = {
       settledCalls: number;
       totalXP: number;
       level: number;
-      statusLabel: "ESTABLISHED" | "PROVEN" | null;
       followersCount: number;
       followingCount: number;
     };
@@ -70,7 +70,7 @@ function scoreValueText(score: number): string {
 }
 
 function xpProgressText(totalXP: number, level: number): string {
-  return `XP ${Math.round(totalXP).toLocaleString()} / ${(100 * Math.max(1, level) ** 2).toLocaleString()}`;
+  return `${Math.round(totalXP).toLocaleString()} / ${(100 * Math.max(1, level) ** 2).toLocaleString()}`;
 }
 
 function resultReturnText(result: NonNullable<Prediction["result"]>): string {
@@ -83,8 +83,8 @@ function statusFilterLabel(status: ProfileStatusFilter): string {
   if (status === "LIVE") {
     return "Live";
   }
-  if (status === "FINAL") {
-    return "Final";
+  if (status === "SETTLED") {
+    return "Settled";
   }
   return "All";
 }
@@ -130,7 +130,6 @@ export function AnalystProfilePage({
   const badgePath = `/api/users/${userId}/badge.svg`;
   const profilePath = `/analysts/${userId}`;
   const settledCalls = payload?.profile.stats.settledCalls ?? payload?.profile.stats.closedPredictions ?? 0;
-  const isProvisional = settledCalls < 5;
   const profileAuthor = payload
     ? {
         userId,
@@ -374,52 +373,60 @@ export function AnalystProfilePage({
     <main className="mx-auto grid w-full max-w-5xl gap-4 px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            {payload.profile.photoURL ? (
-              <Image
-                src={payload.profile.photoURL}
-                alt={`${preferredName} avatar`}
-                width={48}
-                height={48}
-                className="h-12 w-12 rounded-full border border-white/15 object-cover"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-slate-800 text-sm text-cyan-200">
-                {preferredName.slice(0, 1).toUpperCase()}
+          <div>
+            <div className="flex items-center gap-3">
+              {payload.profile.photoURL ? (
+                <Image
+                  src={payload.profile.photoURL}
+                  alt={`${preferredName} avatar`}
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 rounded-full border border-white/15 object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-slate-800 text-sm text-cyan-200">
+                  {preferredName.slice(0, 1).toUpperCase()}
+                </div>
+              )}
+              <div>
+                <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
+                  {payload.profile.nickname ? `@${payload.profile.nickname}` : preferredName}
+                </h1>
+                <nav className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400" aria-label="Profile follow lists">
+                  <Link href={`/analysts/${userId}/following`} className="hover:text-cyan-200">
+                    {countText(payload.profile.stats.followingCount, "following", "following")}
+                  </Link>
+                  <span aria-hidden="true">/</span>
+                  <Link href={`/analysts/${userId}/followers`} className="hover:text-cyan-200">
+                    {countText(payload.profile.stats.followersCount, "follower")}
+                  </Link>
+                </nav>
               </div>
-            )}
-            <div>
-              <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
-                {payload.profile.nickname ? `@${payload.profile.nickname}` : preferredName}
-              </h1>
-              <nav className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400" aria-label="Profile follow lists">
-                <Link href={`/analysts/${userId}/following`} className="hover:text-cyan-200">
-                  {countText(payload.profile.stats.followingCount, "following", "following")}
-                </Link>
-                <span aria-hidden="true">/</span>
-                <Link href={`/analysts/${userId}/followers`} className="hover:text-cyan-200">
-                  {countText(payload.profile.stats.followersCount, "follower")}
-                </Link>
-              </nav>
-              <div className="mt-3 grid gap-1 text-sm text-slate-200">
-                <p>
-                  <span className="text-slate-400">Score: </span>
-                  <span className="font-semibold text-cyan-100">{scoreValueText(payload.profile.stats.totalScore)}</span>
-                </p>
-                <p>
-                  <span className="text-slate-400">Calls: </span>
-                  <span className="font-semibold text-cyan-100">{settledCalls.toLocaleString()}</span>
-                </p>
-                <p>
-                  <span className="text-slate-400">Level: </span>
-                  <span className="font-semibold text-cyan-100">{payload.profile.stats.level}</span>
-                </p>
-                <p className="text-slate-300">{xpProgressText(payload.profile.stats.totalXP, payload.profile.stats.level)}</p>
-                {isProvisional ? <p className="text-slate-300">Provisional</p> : null}
-                {payload.profile.stats.statusLabel === "ESTABLISHED" ? <p className="text-slate-300">Established</p> : null}
-                {payload.profile.stats.statusLabel === "PROVEN" ? <p className="text-slate-300">Proven</p> : null}
-              </div>
+            </div>
+            <div className="mt-4 grid gap-2 text-slate-200">
+              <p className="text-base">
+                <span className="text-slate-400">Score: </span>
+                <span className="text-xl font-semibold text-cyan-100">
+                  {settledCalls >= 5 ? scoreValueText(payload.profile.stats.totalScore) : <>&mdash;</>}
+                </span>
+              </p>
+              <p className="text-sm">
+                <span className="text-slate-400">Level: </span>
+                <span className="font-semibold text-cyan-100">
+                  Level {payload.profile.stats.level} &middot; {analystLevelName(payload.profile.stats.level)}
+                </span>
+              </p>
+              <p className="text-xs">
+                <span className="text-slate-400">XP: </span>
+                <span className="font-semibold text-cyan-100">
+                  {xpProgressText(payload.profile.stats.totalXP, payload.profile.stats.level)}
+                </span>
+              </p>
+              <p className="text-xs">
+                <span className="text-slate-400">Settled: </span>
+                <span className="font-semibold text-cyan-100">{settledCalls.toLocaleString()}</span>
+              </p>
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
@@ -522,7 +529,9 @@ export function AnalystProfilePage({
             </div>
           </div>
         ) : (
-          <p className="mt-2 text-sm text-slate-300">{payload.profile.bio || "No bio yet."}</p>
+          <p className="mt-2 text-sm text-slate-300">
+            {payload.profile.bio || "Add a bio to tell others what you analyze"}
+          </p>
         )}
       </section>
 
@@ -597,7 +606,7 @@ export function AnalystProfilePage({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Prediction history</h2>
           <div className="inline-flex rounded-full border border-slate-700 bg-slate-800/70 p-1 text-xs">
-            {(["ALL", "LIVE", "FINAL"] as const).map((option) => (
+            {(["ALL", "LIVE", "SETTLED"] as const).map((option) => (
               <button
                 key={option}
                 type="button"

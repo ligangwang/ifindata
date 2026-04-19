@@ -35,7 +35,6 @@ export type UserStats = {
   avgReturn?: number;
   winRate?: number;
   eligibleForLeaderboard?: boolean;
-  statusLabel?: "ESTABLISHED" | "PROVEN" | null;
 };
 
 export type UserProfile = {

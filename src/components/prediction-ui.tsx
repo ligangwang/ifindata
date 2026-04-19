@@ -213,7 +213,7 @@ export function formatPredictionStatus(status: PredictionStatus): string {
     case "CLOSING":
       return "Live";
     case "CLOSED":
-      return "Final";
+      return "Settled";
     case "CANCELED":
       return "Canceled";
   }

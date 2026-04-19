@@ -36,9 +36,9 @@ export function formatScorePercent(score: number): string {
   return formatSignedPercent(score / 100);
 }
 
-function formatBasisPoints(score: number): string {
+function formatScoreValue(score: number): string {
   const sign = score > 0 ? "+" : "";
-  return `${sign}${Math.round(score).toLocaleString()} bp`;
+  return `${sign}${Math.round(score).toLocaleString()}`;
 }
 
 export function formatTickerSymbol(ticker: string | null | undefined): string {
@@ -321,9 +321,9 @@ export function PredictionAuthorSummary({ author, className = "" }: { author: Pr
       {hasStats ? (
         <>
           <span className="text-slate-500">&middot;</span>
-          <span>{formatBasisPoints(totalScore)}</span>
+          <span>Score {formatScoreValue(totalScore)}</span>
           <span className="text-slate-500">&middot;</span>
-          <span>{totalPredictions.toLocaleString()} calls</span>
+          <span>{totalPredictions.toLocaleString()} settled</span>
         </>
       ) : null}
     </Link>

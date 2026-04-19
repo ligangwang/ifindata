@@ -50,11 +50,6 @@ function mapPredictionDoc(doc: FirebaseFirestore.QueryDocumentSnapshot) {
   };
 }
 
-function numberFromStats(stats: Record<string, unknown> | undefined, key: string): number {
-  const value = stats?.[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
 function isPublicProfile(data: Record<string, unknown> | undefined): boolean {
   const settings = data?.settings;
   if (!settings || typeof settings !== "object") {
@@ -62,6 +57,11 @@ function isPublicProfile(data: Record<string, unknown> | undefined): boolean {
   }
 
   return (settings as Record<string, unknown>).isPublic !== false;
+}
+
+function numberFromStats(stats: Record<string, unknown>, key: string): number {
+  const value = stats[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 async function listTickerPredictions(
@@ -166,12 +166,14 @@ async function applyAuthorInfo(
       const userSnapshot = await db.collection("users").doc(userId).get();
       const userData = userSnapshot.data() as Record<string, unknown> | undefined;
       const rawNickname = typeof userData?.nickname === "string" ? userData.nickname.trim() : "";
-      const stats = userData?.stats as Record<string, unknown> | undefined;
+      const stats = userData?.stats && typeof userData.stats === "object"
+        ? userData.stats as Record<string, unknown>
+        : {};
       const canShowStats = isPublicProfile(userData);
       return [userId, {
         nickname: rawNickname || null,
         totalScore: canShowStats ? numberFromStats(stats, "totalScore") : null,
-        totalPredictions: canShowStats ? numberFromStats(stats, "totalPredictions") : null,
+        totalPredictions: canShowStats ? numberFromStats(stats, "settledCalls") || numberFromStats(stats, "closedPredictions") : null,
       }] as const;
     }),
   );

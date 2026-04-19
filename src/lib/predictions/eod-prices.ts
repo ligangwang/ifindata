@@ -1,9 +1,13 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
-  computeDisplayPercent,
-  computeReturnValue,
-  computeScoreFromReturn,
+  computePredictionOutcome,
+  computePredictionReturn,
+  computePredictionScore,
+  computePredictionXp,
+} from "@/lib/predictions/analytics";
+import { recomputeUserAnalytics } from "@/lib/predictions/user-analytics";
+import {
   isPredictionDirection,
   normalizeTicker,
   type PredictionResult,
@@ -468,22 +472,20 @@ function computeMark(
   direction: unknown,
   entryPrice: number,
   markPrice: number,
-): { returnValue: number; score: number; displayPercent: number } | null {
+): { returnValue: number; score: number; outcome: number; xpEarned: number; displayPercent: number } | null {
   if (!isPredictionDirection(direction)) {
     return null;
   }
 
-  const returnValue = computeReturnValue(direction, entryPrice, markPrice);
-  const score = computeScoreFromReturn(returnValue);
+  const returnValue = computePredictionReturn(direction, entryPrice, markPrice);
+  const score = computePredictionScore(returnValue);
   return {
     returnValue,
     score,
-    displayPercent: computeDisplayPercent(score),
+    outcome: computePredictionOutcome(returnValue),
+    xpEarned: computePredictionXp(score),
+    displayPercent: returnValue * 100,
   };
-}
-
-function previousAppliedScore(value: unknown): number {
-  return Number.isFinite(Number(value)) ? Number(value) : 0;
 }
 
 function finiteNumberOrNull(value: unknown): number | null {
@@ -491,7 +493,15 @@ function finiteNumberOrNull(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function buildMarkUpdate(price: EodPrice, mark: { returnValue: number; score: number; displayPercent: number }, nowIso: string) {
+function statusLabelFromStats(value: unknown): "ESTABLISHED" | "PROVEN" | null {
+  return value === "ESTABLISHED" || value === "PROVEN" ? value : null;
+}
+
+function buildMarkUpdate(
+  price: EodPrice,
+  mark: { returnValue: number; score: number; outcome: number; xpEarned: number; displayPercent: number },
+  nowIso: string,
+) {
   return {
     updatedAt: nowIso,
     markPrice: price.close,
@@ -500,17 +510,24 @@ function buildMarkUpdate(price: EodPrice, mark: { returnValue: number; score: nu
     markPriceCapturedAt: price.loadedAt,
     markReturnValue: mark.returnValue,
     markScore: mark.score,
+    markPredictionScore: mark.score,
     markDisplayPercent: mark.displayPercent,
-    scoreAppliedToUser: mark.score,
+    scoreAppliedToUser: null,
   };
 }
 
-function buildResult(price: EodPrice, mark: { returnValue: number; score: number; displayPercent: number }): PredictionResult {
+function buildResult(
+  price: EodPrice,
+  mark: { returnValue: number; score: number; outcome: number; xpEarned: number; displayPercent: number },
+): PredictionResult {
   return {
     exitPrice: price.close,
     exitPriceSource: price.source,
     returnValue: mark.returnValue,
     score: mark.score,
+    predictionScore: mark.score,
+    outcome: mark.outcome,
+    xpEarned: mark.xpEarned,
     displayPercent: mark.displayPercent,
   };
 }
@@ -632,14 +649,31 @@ async function writeUserDailyScoreSnapshots(
       continue;
     }
 
+    const userData = userSnapshot.data() as Record<string, unknown>;
+    const stats = (userData.stats as Record<string, unknown> | undefined) ?? {};
+    const totalScore = finiteNumberOrNull(stats.totalScore) ?? 0;
+    const totalCalls = finiteNumberOrNull(stats.totalCalls ?? stats.totalPredictions) ?? 0;
+    const settledCalls = finiteNumberOrNull(stats.settledCalls ?? stats.closedPredictions) ?? 0;
+    const totalXP = finiteNumberOrNull(stats.totalXP) ?? 0;
+    const level = finiteNumberOrNull(stats.level) ?? 1;
+    const avgPredictionScore = finiteNumberOrNull(stats.avgPredictionScore) ?? 0;
+    const consistency = finiteNumberOrNull(stats.consistency) ?? 0;
+    const coverage = finiteNumberOrNull(stats.coverage) ?? 0;
+    const avgReturn = finiteNumberOrNull(stats.avgReturn) ?? 0;
+    const winRate = finiteNumberOrNull(stats.winRate) ?? 0;
+    const eligibleForLeaderboard = stats.eligibleForLeaderboard === true;
+    const statusLabel = statusLabelFromStats(stats.statusLabel);
     const previousTotalScore = previousDailySnapshot.empty
       ? null
       : finiteNumberOrNull(previousDailySnapshot.docs[0].get("totalScore"));
+    const previousTotalXP = previousDailySnapshot.empty
+      ? null
+      : finiteNumberOrNull(previousDailySnapshot.docs[0].get("totalXP"));
     const marks = dailyMarkSnapshot.docs
       .map(markSummaryFromDoc)
       .filter((mark): mark is NonNullable<ReturnType<typeof markSummaryFromDoc>> => mark !== null);
-    const dailyScoreChange = marks.reduce((sum, mark) => sum + mark.scoreChange, 0);
-    const totalScore = (previousTotalScore ?? 0) + dailyScoreChange;
+    const dailyScoreChange = totalScore - (previousTotalScore ?? 0);
+    const dailyXPChange = totalXP - (previousTotalXP ?? 0);
     const bestMark = marks.reduce<typeof marks[number] | null>(
       (best, mark) => (!best || mark.scoreChange > best.scoreChange ? mark : best),
       null,
@@ -659,6 +693,19 @@ async function writeUserDailyScoreSnapshots(
       totalScore,
       previousTotalScore,
       dailyScoreChange,
+      totalCalls,
+      settledCalls,
+      totalXP,
+      previousTotalXP,
+      dailyXPChange,
+      level,
+      avgPredictionScore,
+      consistency,
+      coverage,
+      avgReturn,
+      winRate,
+      eligibleForLeaderboard,
+      statusLabel,
       totalPredictions: marks.length,
       openingPredictions,
       openPredictions,
@@ -982,6 +1029,7 @@ export async function runDailyEodMaintenance(
       skippedUsers: 0,
     };
     const usersNeedingDailyScores = new Set<string>();
+    const usersNeedingAnalytics = new Set<string>();
 
     if (markPredictions) {
       for (const prediction of predictionsToProcess) {
@@ -1073,6 +1121,7 @@ export async function runDailyEodMaintenance(
               markPriceCapturedAt: price.loadedAt,
               markReturnValue: 0,
               markScore: 0,
+              markPredictionScore: 0,
               markDisplayPercent: 0,
               score: 0,
               previousScore: 0,
@@ -1084,6 +1133,7 @@ export async function runDailyEodMaintenance(
             marking.opened += 1;
             dailySnapshots.predictionMarks += 1;
             usersNeedingDailyScores.add(prediction.userId);
+            usersNeedingAnalytics.add(prediction.userId);
             return;
           }
 
@@ -1110,7 +1160,6 @@ export async function runDailyEodMaintenance(
               }
             : {};
           const markUpdate = buildMarkUpdate(price, mark, nowIso);
-          const scoreDelta = mark.score - previousAppliedScore(latest.scoreAppliedToUser);
           const previousDailyScore = await readPreviousPredictionDailyScore(db, prediction.id, price.tradingDate);
           const dailyMarkRef = db
             .collection("prediction_daily_marks")
@@ -1139,6 +1188,7 @@ export async function runDailyEodMaintenance(
             markPriceCapturedAt: price.loadedAt,
             markReturnValue: mark.returnValue,
             markScore: mark.score,
+            markPredictionScore: mark.score,
             markDisplayPercent: mark.displayPercent,
             score: mark.score,
             previousScore,
@@ -1157,6 +1207,7 @@ export async function runDailyEodMaintenance(
             }
             dailySnapshots.predictionMarks += 1;
             usersNeedingDailyScores.add(prediction.userId);
+            usersNeedingAnalytics.add(prediction.userId);
             return;
           }
 
@@ -1167,18 +1218,21 @@ export async function runDailyEodMaintenance(
               ...entryUpdate,
               status: "CLOSED",
               closedAt: nowIso,
+              predictionScore: mark.score,
+              outcome: mark.outcome,
+              xpEarned: mark.xpEarned,
               result,
             });
             tx.update(db.collection("users").doc(prediction.userId), {
               updatedAt: nowIso,
               "stats.closingPredictions": FieldValue.increment(-1),
               "stats.closedPredictions": FieldValue.increment(1),
-              "stats.totalScore": FieldValue.increment(scoreDelta),
             });
             marking.marked += 1;
             marking.closed += 1;
             dailySnapshots.predictionMarks += 1;
             usersNeedingDailyScores.add(prediction.userId);
+            usersNeedingAnalytics.add(prediction.userId);
             return;
           }
 
@@ -1190,18 +1244,21 @@ export async function runDailyEodMaintenance(
               status: "CLOSED",
               closeTargetDate: price.tradingDate,
               closedAt: nowIso,
+              predictionScore: mark.score,
+              outcome: mark.outcome,
+              xpEarned: mark.xpEarned,
               result,
             });
             tx.update(db.collection("users").doc(prediction.userId), {
               updatedAt: nowIso,
               "stats.openPredictions": FieldValue.increment(-1),
               "stats.closedPredictions": FieldValue.increment(1),
-              "stats.totalScore": FieldValue.increment(scoreDelta),
             });
             marking.marked += 1;
             marking.closed += 1;
             dailySnapshots.predictionMarks += 1;
             usersNeedingDailyScores.add(prediction.userId);
+            usersNeedingAnalytics.add(prediction.userId);
             return;
           }
 
@@ -1209,15 +1266,18 @@ export async function runDailyEodMaintenance(
             tx.update(prediction.ref, {
               ...markUpdate,
               ...entryUpdate,
+              predictionScore: mark.score,
+              outcome: mark.outcome,
+              xpEarned: mark.xpEarned,
               result: buildResult(price, mark),
             });
             tx.update(db.collection("users").doc(prediction.userId), {
               updatedAt: nowIso,
-              "stats.totalScore": FieldValue.increment(scoreDelta),
             });
             marking.marked += 1;
             dailySnapshots.predictionMarks += 1;
             usersNeedingDailyScores.add(prediction.userId);
+            usersNeedingAnalytics.add(prediction.userId);
             return;
           }
 
@@ -1227,12 +1287,21 @@ export async function runDailyEodMaintenance(
           });
           tx.update(db.collection("users").doc(prediction.userId), {
             updatedAt: nowIso,
-            "stats.totalScore": FieldValue.increment(scoreDelta),
           });
           marking.marked += 1;
           dailySnapshots.predictionMarks += 1;
           usersNeedingDailyScores.add(prediction.userId);
+          usersNeedingAnalytics.add(prediction.userId);
         });
+      }
+    }
+
+    if (!dryRun && usersNeedingAnalytics.size > 0) {
+      for (const userId of Array.from(usersNeedingAnalytics).sort()) {
+        const recomputed = await recomputeUserAnalytics(db, userId, nowIso);
+        if (!recomputed) {
+          dailySnapshots.skippedUsers += 1;
+        }
       }
     }
 
@@ -1244,7 +1313,7 @@ export async function runDailyEodMaintenance(
         nowIso,
       );
       dailySnapshots.userScores = written.userScores;
-      dailySnapshots.skippedUsers = written.skippedUsers;
+      dailySnapshots.skippedUsers += written.skippedUsers;
     }
 
     const result: DailyEodMaintenanceResult = {

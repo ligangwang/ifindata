@@ -302,7 +302,7 @@ export function DailyScoresPage() {
 
       <section className="mt-4 rounded-xl border border-white/10 bg-slate-900/55 p-5">
         <p className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">
-          Think you can beat today's top call?
+          Think you can beat today&apos;s top call?
         </p>
         <p className="mt-1 text-sm text-slate-300">Make your prediction on YouAnalyst.</p>
         <div className="mt-4 flex flex-wrap gap-2">

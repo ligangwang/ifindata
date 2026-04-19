@@ -123,6 +123,7 @@ type EodPredictionRecord = {
   timeHorizonTargetDate: string | null;
   closeTargetDate: string | null;
   markPriceDate: string | null;
+  createdAt: string | null;
   status: PredictionStatus;
 };
 
@@ -442,6 +443,7 @@ function toEodPredictionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapshot
   const entryTargetDate = typeof data.entryTargetDate === "string" ? data.entryTargetDate : null;
   const timeHorizonTargetDate = timeHorizonTargetDateFromValue(data.timeHorizon);
   const closeTargetDate = typeof data.closeTargetDate === "string" ? data.closeTargetDate : null;
+  const createdAt = typeof data.createdAt === "string" ? data.createdAt : null;
   const entryPrice = data.entryPrice === null || data.entryPrice === undefined ? null : Number(data.entryPrice);
 
   if (!ticker || !userId || !isProcessableStatus(data.status)) {
@@ -464,6 +466,7 @@ function toEodPredictionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapshot
     timeHorizonTargetDate,
     closeTargetDate,
     markPriceDate,
+    createdAt,
     status: data.status,
   };
 }
@@ -1108,6 +1111,7 @@ export async function runDailyEodMaintenance(
             });
             tx.set(dailyMarkRef, {
               predictionId: prediction.id,
+              predictionCreatedAt: prediction.createdAt,
               userId: prediction.userId,
               ticker: prediction.ticker,
               direction: latest.direction,
@@ -1175,6 +1179,7 @@ export async function runDailyEodMaintenance(
             : snapshotStatus;
           tx.set(dailyMarkRef, {
             predictionId: prediction.id,
+            predictionCreatedAt: prediction.createdAt,
             userId: prediction.userId,
             ticker: prediction.ticker,
             direction: latest.direction,

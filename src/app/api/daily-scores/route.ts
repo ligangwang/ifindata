@@ -48,8 +48,8 @@ function statusValue(value: unknown): "LIVE" | "SETTLED" {
   return value === "CLOSED" ? "SETTLED" : "LIVE";
 }
 
-async function latestDailyScoreDate(): Promise<string | null> {
-  const snapshot = await getAdminFirestore()
+async function latestDailyScoreDate(db: FirebaseFirestore.Firestore): Promise<string | null> {
+  const snapshot = await db
     .collection("prediction_daily_marks")
     .orderBy("date", "desc")
     .limit(1)
@@ -62,30 +62,37 @@ async function latestDailyScoreDate(): Promise<string | null> {
   return asString(snapshot.docs[0].get("date"));
 }
 
-async function readUserProfile(userId: string): Promise<UserProfileSummary> {
-  const snapshot = await getAdminFirestore().collection("users").doc(userId).get();
-  const data = (snapshot.data() ?? {}) as Record<string, unknown>;
+async function readUserProfiles(
+  db: FirebaseFirestore.Firestore,
+  userIds: string[],
+): Promise<Map<string, UserProfileSummary>> {
+  const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+  const profiles = new Map<string, UserProfileSummary>();
 
-  return {
-    displayName: asString(data.displayName),
-    nickname: asString(data.nickname),
-  };
-}
-
-async function readPredictionCreatedAt(predictionId: string): Promise<string> {
-  if (!predictionId) {
-    return "";
+  if (uniqueIds.length === 0) {
+    return profiles;
   }
 
-  const snapshot = await getAdminFirestore().collection("predictions").doc(predictionId).get();
-  return asString(snapshot.get("createdAt")) ?? "";
+  const snapshots = await db.getAll(...uniqueIds.map((userId) => db.collection("users").doc(userId)));
+
+  snapshots.forEach((snapshot, index) => {
+    const data = (snapshot.data() ?? {}) as Record<string, unknown>;
+
+    profiles.set(uniqueIds[index], {
+      displayName: asString(data.displayName),
+      nickname: asString(data.nickname),
+    });
+  });
+
+  return profiles;
 }
 
 async function topDailyCallCandidates(
+  db: FirebaseFirestore.Firestore,
   date: string,
   order: "desc" | "asc",
 ): Promise<FirebaseFirestore.QueryDocumentSnapshot[]> {
-  const snapshot = await getAdminFirestore()
+  const snapshot = await db
     .collection("prediction_daily_marks")
     .where("date", "==", date)
     .orderBy("scoreChange", order)
@@ -95,10 +102,10 @@ async function topDailyCallCandidates(
   return snapshot.docs;
 }
 
-async function topDailyCalls(date: string): Promise<DailyCallHighlight[]> {
+async function topDailyCalls(db: FirebaseFirestore.Firestore, date: string): Promise<DailyCallHighlight[]> {
   const [positiveCandidates, negativeCandidates] = await Promise.all([
-    topDailyCallCandidates(date, "desc"),
-    topDailyCallCandidates(date, "asc"),
+    topDailyCallCandidates(db, date, "desc"),
+    topDailyCallCandidates(db, date, "asc"),
   ]);
   const docsById = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
 
@@ -106,30 +113,34 @@ async function topDailyCalls(date: string): Promise<DailyCallHighlight[]> {
     docsById.set(doc.id, doc);
   }
 
-  const calls = await Promise.all(Array.from(docsById.values()).map(async (doc) => {
+  const candidateDocs = Array.from(docsById.values());
+  const candidateData = candidateDocs.map((doc) => {
     const data = doc.data() as Record<string, unknown>;
-    const predictionId = asString(data.predictionId) ?? doc.id.split("_")[0] ?? "";
-    const userId = asString(data.userId) ?? "";
-    const [profile, createdAt] = await Promise.all([
-      userId ? readUserProfile(userId) : Promise.resolve({ displayName: null, nickname: null }),
-      readPredictionCreatedAt(predictionId),
-    ]);
+
+    return {
+      data,
+      predictionId: asString(data.predictionId) ?? doc.id.split("_")[0] ?? "",
+      userId: asString(data.userId) ?? "",
+    };
+  });
+
+  const rankedCalls = candidateData.map((candidate) => {
+    const { data, predictionId, userId } = candidate;
 
     return {
       predictionId,
       userId,
-      ...profile,
+      displayName: null,
+      nickname: null,
       ticker: asString(data.ticker),
       direction: directionValue(data.direction),
       dailyScoreChange: asNumber(data.scoreChange),
       totalScore: asNumber(data.score),
       returnSinceEntry: asNumberOrNull(data.markDisplayPercent),
       status: statusValue(data.status),
-      createdAt,
+      createdAt: asString(data.predictionCreatedAt) ?? asString(data.createdAt) ?? "",
     };
-  }));
-
-  return calls
+  })
     .filter((call) => call.predictionId && call.dailyScoreChange !== 0)
     .sort((a, b) => {
       const positiveDelta = Number(b.dailyScoreChange > 0) - Number(a.dailyScoreChange > 0);
@@ -148,12 +159,20 @@ async function topDailyCalls(date: string): Promise<DailyCallHighlight[]> {
         a.predictionId.localeCompare(b.predictionId);
     })
     .slice(0, TOP_CALL_LIMIT);
+
+  const profilesByUserId = await readUserProfiles(db, rankedCalls.map((call) => call.userId));
+
+  return rankedCalls.map((call) => ({
+    ...call,
+    ...(profilesByUserId.get(call.userId) ?? { displayName: null, nickname: null }),
+  }));
 }
 
 export async function GET(request: NextRequest) {
   try {
+    const db = getAdminFirestore();
     const requestedDate = request.nextUrl.searchParams.get("date");
-    const date = isIsoDate(requestedDate) ? requestedDate : await latestDailyScoreDate();
+    const date = isIsoDate(requestedDate) ? requestedDate : await latestDailyScoreDate(db);
 
     if (!date) {
       return NextResponse.json({
@@ -163,7 +182,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const topCalls = await topDailyCalls(date);
+    const topCalls = await topDailyCalls(db, date);
 
     return NextResponse.json({
       date,

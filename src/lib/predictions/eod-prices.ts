@@ -30,6 +30,7 @@ export type DailyEodMaintenanceInput = {
   loadPrices?: boolean;
   markPredictions?: boolean;
   rollForward?: boolean;
+  recompute?: boolean;
 };
 
 export type EodPrice = {
@@ -53,6 +54,7 @@ export type EodPrice = {
 
 export type DailyEodMaintenanceResult = {
   dryRun: boolean;
+  recompute: boolean;
   runDate: string;
   latestTradingDate: string | null;
   candidatePredictions: number;
@@ -883,6 +885,7 @@ export async function runDailyEodMaintenance(
 ): Promise<DailyEodMaintenanceResult> {
   const db = getAdminFirestore();
   const dryRun = input.dryRun === true;
+  const recompute = input.recompute === true;
   const loadPrices = input.loadPrices !== false;
   const markPredictions = input.markPredictions !== false;
   const runDate = resolveRunDate(input.runDate);
@@ -922,6 +925,7 @@ export async function runDailyEodMaintenance(
   console.info("[daily-eod-maintenance] Starting run", {
     runDate,
     dryRun,
+    recompute,
     loadPrices,
     markPredictions,
     limit,
@@ -937,6 +941,7 @@ export async function runDailyEodMaintenance(
       completedAt: null,
       failedAt: null,
       error: null,
+      recompute,
     }, { merge: true });
   }
 
@@ -1182,14 +1187,18 @@ export async function runDailyEodMaintenance(
             .collection("prediction_daily_marks")
             .doc(predictionDailyMarkDocId(prediction.id, price.tradingDate));
           const dailyMarkSnapshot = await tx.get(dailyMarkRef);
-          const previousScore = existingDailyPreviousScore(
-            dailyMarkSnapshot.data(),
-            previousDaily.score,
-          );
-          const previousReturnValue = existingDailyPreviousReturnValue(
-            dailyMarkSnapshot.data(),
-            previousDaily.returnValue,
-          );
+          const previousScore = recompute
+            ? previousDaily.score ?? 0
+            : existingDailyPreviousScore(
+                dailyMarkSnapshot.data(),
+                previousDaily.score,
+              );
+          const previousReturnValue = recompute
+            ? previousDaily.returnValue ?? 0
+            : existingDailyPreviousReturnValue(
+                dailyMarkSnapshot.data(),
+                previousDaily.returnValue,
+              );
           const snapshotStatus = dailySnapshotStatus(prediction, price.tradingDate);
           const nextStatus = (latestStatus === "CLOSING" && shouldMutatePrediction) || shouldCloseForOpenUntil
             ? "CLOSED"
@@ -1341,6 +1350,7 @@ export async function runDailyEodMaintenance(
 
     const result: DailyEodMaintenanceResult = {
       dryRun,
+      recompute,
       runDate,
       latestTradingDate,
       candidatePredictions: candidatePredictions.length,
@@ -1358,6 +1368,7 @@ export async function runDailyEodMaintenance(
         status: "COMPLETED",
         completedAt: new Date().toISOString(),
         error: null,
+        recompute,
       }, { merge: true });
     }
     console.info("[daily-eod-maintenance] Completed run", result);

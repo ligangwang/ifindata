@@ -10,6 +10,7 @@ type DailyEodMaintenanceRequest = {
   loadPrices?: unknown;
   markPredictions?: unknown;
   rollForward?: unknown;
+  recompute?: unknown;
 };
 
 function readString(value: unknown): string | undefined {
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
       loadPrices: readBoolean(payload.loadPrices),
       markPredictions: readBoolean(payload.markPredictions),
       rollForward: readBoolean(payload.rollForward),
+      recompute: readBoolean(payload.recompute),
     });
 
     return NextResponse.json({

@@ -47,6 +47,7 @@ type ListPredictionsResult = {
 
 const PUBLIC_PREDICTION_STATUSES: PredictionStatus[] = ["OPENING", "OPEN", "CLOSING", "CLOSED"];
 const ACTIVE_PREDICTION_STATUSES: PredictionStatus[] = ["OPENING", "OPEN", "CLOSING"];
+const ACTIVE_TICKER_LOCK_COLLECTION = "prediction_active_tickers";
 const CANCEL_WINDOW_MS = 5 * 60 * 1000;
 const TIME_HORIZON_LIMITS: Record<PredictionTimeHorizonUnit, number> = {
   DAYS: 3650,
@@ -125,6 +126,14 @@ function computeTimeHorizonTargetDate(baseDate: string, value: number, unit: Pre
 
 function eodRunDocId(runDate: string, market = "US"): string {
   return [market, runDate].join("_");
+}
+
+function activeTickerLockDocId(userId: string, ticker: string): string {
+  return [userId, ticker].join("__");
+}
+
+function activeTickerLockRef(db: FirebaseFirestore.Firestore, userId: string, ticker: string) {
+  return db.collection(ACTIVE_TICKER_LOCK_COLLECTION).doc(activeTickerLockDocId(userId, ticker));
 }
 
 function targetDateFromRunStatus(today: string, status: unknown): string {
@@ -386,6 +395,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
   const nowIso = new Date().toISOString();
   const predictionRef = db.collection("predictions").doc();
   const userRef = db.collection("users").doc(user.uid);
+  const tickerLockRef = activeTickerLockRef(db, user.uid, input.ticker);
 
 
   await db.runTransaction(async (tx) => {
@@ -399,9 +409,15 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
 
     const duplicateKey = [user.uid, input.ticker, entryTargetDate].join("__");
     const uniqueRef = db.collection("prediction_uniques").doc(duplicateKey);
-    const uniqueSnapshot = await tx.get(uniqueRef);
+    const [uniqueSnapshot, tickerLockSnapshot] = await Promise.all([
+      tx.get(uniqueRef),
+      tx.get(tickerLockRef),
+    ]);
     if (uniqueSnapshot.exists) {
       throw new Error("Duplicate prediction exists for the same user, ticker, and entry target date.");
+    }
+    if (tickerLockSnapshot.exists) {
+      throw new Error("Duplicate open prediction exists for this ticker.");
     }
 
     const userData = userSnapshot.data() ?? {};
@@ -456,6 +472,14 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       entryTargetDate,
       createdAt: nowIso,
     });
+    tx.set(tickerLockRef, {
+      predictionId: predictionRef.id,
+      userId: user.uid,
+      ticker: input.ticker,
+      status: "OPENING",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    });
 
     // If user is still 'user', promote to 'analyst' on first prediction
     if ((userData.role ?? "user") === "user") {
@@ -505,6 +529,8 @@ export async function closePrediction(predictionId: string, user: AuthedUser) {
       throw new Error("Only OPEN predictions can be closed.");
     }
 
+    const tickerLockRef = activeTickerLockRef(db, user.uid, prediction.ticker);
+    const tickerLockSnapshot = await tx.get(tickerLockRef);
     tx.update(predictionRef, {
       status: "CLOSING",
       updatedAt: nowIso,
@@ -516,6 +542,9 @@ export async function closePrediction(predictionId: string, user: AuthedUser) {
       "stats.openPredictions": FieldValue.increment(-1),
       "stats.closingPredictions": FieldValue.increment(1),
     });
+    if (!tickerLockSnapshot.exists || tickerLockSnapshot.get("predictionId") === predictionId) {
+      tx.delete(tickerLockRef);
+    }
   });
 
   return { closed: false, status: "CLOSING" as const };
@@ -600,6 +629,8 @@ export async function cancelPrediction(predictionId: string, user: AuthedUser) {
         throw new Error("Create cancel window expired.");
       }
 
+      const tickerLockRef = activeTickerLockRef(db, user.uid, prediction.ticker);
+      const tickerLockSnapshot = await tx.get(tickerLockRef);
       nextStatus = "CANCELED";
       tx.update(predictionRef, {
         status: "CANCELED",
@@ -612,12 +643,21 @@ export async function cancelPrediction(predictionId: string, user: AuthedUser) {
         "stats.openingPredictions": FieldValue.increment(-1),
         "stats.canceledPredictions": FieldValue.increment(1),
       });
+      if (!tickerLockSnapshot.exists || tickerLockSnapshot.get("predictionId") === predictionId) {
+        tx.delete(tickerLockRef);
+      }
       return;
     }
 
     if (prediction.status === "CLOSING") {
       if (!hasCancelWindow(prediction.closeRequestedAt)) {
         throw new Error("Close cancel window expired.");
+      }
+
+      const tickerLockRef = activeTickerLockRef(db, user.uid, prediction.ticker);
+      const tickerLockSnapshot = await tx.get(tickerLockRef);
+      if (tickerLockSnapshot.exists && tickerLockSnapshot.get("predictionId") !== predictionId) {
+        throw new Error("Duplicate open prediction exists for this ticker.");
       }
 
       nextStatus = "OPEN";
@@ -632,6 +672,14 @@ export async function cancelPrediction(predictionId: string, user: AuthedUser) {
         "stats.closingPredictions": FieldValue.increment(-1),
         "stats.openPredictions": FieldValue.increment(1),
       });
+      tx.set(tickerLockRef, {
+        predictionId,
+        userId: user.uid,
+        ticker: prediction.ticker,
+        status: "OPEN",
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      }, { merge: true });
       return;
     }
 

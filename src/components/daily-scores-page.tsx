@@ -93,10 +93,22 @@ function predictionPath(predictionId: string): string {
 function shareText(payload: DailyScoresResponse): string {
   const call = payload.callOfTheDay;
   if (!call) {
-    return `Best Calls Today on YouAnalyst for ${dateLabel(payload.date)}.`;
+    return [
+      "Think you're good at stocks?",
+      "",
+      "Every prediction is tracked on YouAnalyst.",
+      "Leaderboard decides who's actually good.",
+    ].join("\n");
   }
 
-  return `Best Calls Today on YouAnalyst: ${directionArrow(call.direction)} ${formatTickerSymbol(call.ticker)} by ${userName(call)} ${dailyReturnText(call.dailyReturnChange)} today.`;
+  return [
+    "Top call today on YouAnalyst:",
+    "",
+    `${directionArrow(call.direction)} ${formatTickerSymbol(call.ticker)} ${dailyReturnText(call.dailyReturnChange)}`,
+    "",
+    "Every prediction is tracked.",
+    "Leaderboard decides who's actually good.",
+  ].join("\n");
 }
 
 function xShareUrl(payload: DailyScoresResponse): string {

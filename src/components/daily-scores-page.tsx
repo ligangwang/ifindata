@@ -31,16 +31,6 @@ function scoreText(score: number): string {
   return `${sign}${Math.round(score)}`;
 }
 
-function scoreTone(score: number): string {
-  if (score > 0) {
-    return "text-emerald-300";
-  }
-  if (score < 0) {
-    return "text-rose-300";
-  }
-  return "text-slate-300";
-}
-
 function returnTone(returnValue: number | null): string {
   if (returnValue === null) {
     return "text-slate-300";
@@ -146,7 +136,7 @@ export function DailyScoresPage() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [adminStatus, setAdminStatus] = useState<{ userId: string; isAdmin: boolean } | null>(null);
-  const canShareOnX = Boolean(user && adminStatus?.userId === user.uid && adminStatus.isAdmin);
+  const canShareOnX = Boolean(!authLoading && user && adminStatus?.userId === user.uid && adminStatus.isAdmin);
 
   const apiPath = useMemo(() => {
     if (typeof window === "undefined") {
@@ -189,7 +179,6 @@ export function DailyScoresPage() {
 
   useEffect(() => {
     if (authLoading || !user) {
-      setAdminStatus(null);
       return;
     }
 

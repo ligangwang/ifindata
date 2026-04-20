@@ -12,6 +12,7 @@ type LeaderboardEntry = {
   photoURL: string | null;
   totalScore: number;
   settledCalls: number;
+  liveCalls?: number;
   totalXP: number;
   level: number;
 };
@@ -144,7 +145,11 @@ export function LeaderboardPage() {
           <div className="mt-4 grid gap-2">
             {emergingItems.map((entry) => {
               const displayName = entry.nickname ? `@${entry.nickname}` : entry.displayName ?? "Anonymous";
-              const callText = entry.settledCalls === 1 ? "1 call" : `${entry.settledCalls.toLocaleString()} calls`;
+              const settledText = entry.settledCalls === 1
+                ? "1 settled"
+                : `${entry.settledCalls.toLocaleString()} settled`;
+              const liveCalls = entry.liveCalls ?? 0;
+              const liveText = liveCalls === 1 ? "1 live" : `${liveCalls.toLocaleString()} live`;
 
               return (
                 <Link
@@ -153,7 +158,7 @@ export function LeaderboardPage() {
                   className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm hover:border-cyan-300/60"
                 >
                   <span className="truncate font-medium text-cyan-200">{displayName}</span>
-                  <span className="shrink-0 text-slate-300">{callText}</span>
+                  <span className="shrink-0 text-slate-300">{settledText} &middot; {liveText}</span>
                 </Link>
               );
             })}

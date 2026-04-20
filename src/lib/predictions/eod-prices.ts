@@ -21,6 +21,7 @@ const MAX_LIMIT = 1000;
 const POSITION_SCAN_PAGE_SIZE = 500;
 const ROLL_FORWARD_PRICE_SCAN_PAGE_SIZE = 1000;
 const TWELVE_DATA_CHUNK_SIZE = 8;
+const ACTIVE_TICKER_LOCK_COLLECTION = "prediction_active_tickers";
 
 export type DailyEodMaintenanceInput = {
   runDate?: string;
@@ -218,6 +219,14 @@ function predictionDailyMarkDocId(predictionId: string, tradingDate: string): st
 
 function userDailyScoreDocId(userId: string, tradingDate: string): string {
   return [userId, tradingDate].join("_");
+}
+
+function activeTickerLockDocId(userId: string, ticker: string): string {
+  return [userId, ticker].join("__");
+}
+
+function activeTickerLockRef(db: FirebaseFirestore.Firestore, userId: string, ticker: string) {
+  return db.collection(ACTIVE_TICKER_LOCK_COLLECTION).doc(activeTickerLockDocId(userId, ticker));
 }
 
 function toCachedEodPrice(data: FirebaseFirestore.DocumentData | undefined): EodPrice | null {
@@ -1110,7 +1119,20 @@ export async function runDailyEodMaintenance(
             const dailyMarkRef = db
               .collection("prediction_daily_marks")
               .doc(predictionDailyMarkDocId(prediction.id, price.tradingDate));
-            const dailyMarkSnapshot = await tx.get(dailyMarkRef);
+            const tickerLockRef = activeTickerLockRef(db, prediction.userId, prediction.ticker);
+            const [dailyMarkSnapshot, tickerLockSnapshot] = await Promise.all([
+              tx.get(dailyMarkRef),
+              tx.get(tickerLockRef),
+            ]);
+            if (tickerLockSnapshot.exists && tickerLockSnapshot.get("predictionId") !== prediction.id) {
+              marking.skipped += 1;
+              console.warn("[daily-eod-maintenance] Skipped opening prediction because ticker lock belongs to another prediction", {
+                runDate,
+                predictionId: prediction.id,
+                lockedPredictionId: tickerLockSnapshot.get("predictionId"),
+              });
+              return;
+            }
 
             tx.update(prediction.ref, {
               updatedAt: nowIso,
@@ -1126,6 +1148,14 @@ export async function runDailyEodMaintenance(
               "stats.openingPredictions": FieldValue.increment(-1),
               "stats.openPredictions": FieldValue.increment(1),
             });
+            tx.set(tickerLockRef, {
+              predictionId: prediction.id,
+              userId: prediction.userId,
+              ticker: prediction.ticker,
+              status: "OPEN",
+              createdAt: nowIso,
+              updatedAt: nowIso,
+            }, { merge: true });
             tx.set(dailyMarkRef, {
               predictionId: prediction.id,
               predictionCreatedAt: prediction.createdAt,
@@ -1187,6 +1217,12 @@ export async function runDailyEodMaintenance(
             .collection("prediction_daily_marks")
             .doc(predictionDailyMarkDocId(prediction.id, price.tradingDate));
           const dailyMarkSnapshot = await tx.get(dailyMarkRef);
+          const openUntilTickerLockRef = shouldCloseForOpenUntil
+            ? activeTickerLockRef(db, prediction.userId, prediction.ticker)
+            : null;
+          const openUntilTickerLockSnapshot = openUntilTickerLockRef
+            ? await tx.get(openUntilTickerLockRef)
+            : null;
           const previousScore = recompute
             ? previousDaily.score ?? 0
             : existingDailyPreviousScore(
@@ -1286,6 +1322,12 @@ export async function runDailyEodMaintenance(
               "stats.openPredictions": FieldValue.increment(-1),
               "stats.closedPredictions": FieldValue.increment(1),
             });
+            if (
+              openUntilTickerLockRef &&
+              (!openUntilTickerLockSnapshot?.exists || openUntilTickerLockSnapshot.get("predictionId") === prediction.id)
+            ) {
+              tx.delete(openUntilTickerLockRef);
+            }
             marking.marked += 1;
             marking.closed += 1;
             dailySnapshots.predictionMarks += 1;

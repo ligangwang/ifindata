@@ -12,12 +12,14 @@ type LeaderboardEntry = {
   photoURL: string | null;
   totalScore: number;
   settledCalls: number;
+  liveCalls?: number;
   totalXP: number;
   level: number;
 };
 
 type LeaderboardResponse = {
   items: LeaderboardEntry[];
+  emergingItems?: LeaderboardEntry[];
 };
 
 function scoreText(score: number): string {
@@ -73,6 +75,8 @@ export function LeaderboardPage() {
     );
   }
 
+  const emergingItems = payload.emergingItems ?? [];
+
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
@@ -115,9 +119,52 @@ export function LeaderboardPage() {
             );
           })}
 
-          {payload.items.length === 0 ? <p className="text-sm text-slate-300">No analysts yet.</p> : null}
+          {payload.items.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/15 p-5">
+              <p className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">No ranked analysts yet.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Be the first to complete 5 settled calls and take the #1 spot.
+              </p>
+              <Link
+                href="/predictions/new"
+                className="mt-4 inline-flex rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+              >
+                Make your first prediction
+              </Link>
+            </div>
+          ) : null}
         </div>
       </section>
+
+      {emergingItems.length > 0 ? (
+        <section className="mt-4 rounded-2xl border border-white/10 bg-slate-900/55 p-5">
+          <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">
+            Emerging Analysts
+          </h2>
+          <p className="mt-1 text-sm text-slate-400">Not ranked yet</p>
+          <div className="mt-4 grid gap-2">
+            {emergingItems.map((entry) => {
+              const displayName = entry.nickname ? `@${entry.nickname}` : entry.displayName ?? "Anonymous";
+              const settledText = entry.settledCalls === 1
+                ? "1 settled"
+                : `${entry.settledCalls.toLocaleString()} settled`;
+              const liveCalls = entry.liveCalls ?? 0;
+              const liveText = liveCalls === 1 ? "1 live" : `${liveCalls.toLocaleString()} live`;
+
+              return (
+                <Link
+                  key={entry.userId}
+                  href={`/analysts/${entry.userId}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm hover:border-cyan-300/60"
+                >
+                  <span className="truncate font-medium text-cyan-200">{displayName}</span>
+                  <span className="shrink-0 text-slate-300">{settledText} &middot; {liveText}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

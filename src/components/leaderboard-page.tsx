@@ -18,6 +18,7 @@ type LeaderboardEntry = {
 
 type LeaderboardResponse = {
   items: LeaderboardEntry[];
+  emergingItems?: LeaderboardEntry[];
 };
 
 function scoreText(score: number): string {
@@ -72,6 +73,8 @@ export function LeaderboardPage() {
       </main>
     );
   }
+
+  const emergingItems = payload.emergingItems ?? [];
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-8">
@@ -131,6 +134,32 @@ export function LeaderboardPage() {
           ) : null}
         </div>
       </section>
+
+      {emergingItems.length > 0 ? (
+        <section className="mt-4 rounded-2xl border border-white/10 bg-slate-900/55 p-5">
+          <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">
+            Emerging Analysts
+          </h2>
+          <p className="mt-1 text-sm text-slate-400">Not ranked yet</p>
+          <div className="mt-4 grid gap-2">
+            {emergingItems.map((entry) => {
+              const displayName = entry.nickname ? `@${entry.nickname}` : entry.displayName ?? "Anonymous";
+              const callText = entry.settledCalls === 1 ? "1 call" : `${entry.settledCalls.toLocaleString()} calls`;
+
+              return (
+                <Link
+                  key={entry.userId}
+                  href={`/analysts/${entry.userId}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm hover:border-cyan-300/60"
+                >
+                  <span className="truncate font-medium text-cyan-200">{displayName}</span>
+                  <span className="shrink-0 text-slate-300">{callText}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

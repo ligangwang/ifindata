@@ -16,6 +16,7 @@ type LeaderboardUser = {
 };
 
 const LEADERBOARD_CANDIDATE_MULTIPLIER = 5;
+const EMERGING_ANALYST_LIMIT = 5;
 
 function parseLimit(raw: string | null): number {
   const parsed = Number(raw ?? "50");
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest) {
       .get();
 
     const users: LeaderboardUser[] = [];
+    const emergingUsers: LeaderboardUser[] = [];
 
     for (const doc of snapshot.docs) {
       const data = doc.data() as Record<string, unknown>;
@@ -47,11 +49,7 @@ export async function GET(request: NextRequest) {
       const totalScore = analytics.score;
       const settledCalls = analytics.settledCalls;
 
-      if (settledCalls < LEADERBOARD_MIN_CALLS) {
-        continue;
-      }
-
-      users.push({
+      const user = {
         userId: doc.id,
         displayName: (data.displayName as string | null | undefined) ?? null,
         nickname: typeof data.nickname === "string" && data.nickname.trim() ? data.nickname.trim() : null,
@@ -61,7 +59,16 @@ export async function GET(request: NextRequest) {
         avgReturn: analytics.avgReturn,
         totalXP: analytics.totalXP,
         level: analytics.level,
-      });
+      };
+
+      if (settledCalls < LEADERBOARD_MIN_CALLS) {
+        if (settledCalls > 0) {
+          emergingUsers.push(user);
+        }
+        continue;
+      }
+
+      users.push(user);
     }
 
     users.sort((a, b) =>
@@ -69,9 +76,15 @@ export async function GET(request: NextRequest) {
       b.settledCalls - a.settledCalls ||
       b.avgReturn - a.avgReturn,
     );
+    emergingUsers.sort((a, b) =>
+      b.settledCalls - a.settledCalls ||
+      b.totalScore - a.totalScore ||
+      b.avgReturn - a.avgReturn,
+    );
 
     return NextResponse.json({
       items: users.slice(0, limit),
+      emergingItems: emergingUsers.slice(0, EMERGING_ANALYST_LIMIT),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch leaderboard";

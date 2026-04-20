@@ -20,6 +20,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { FirebaseError } from "firebase/app";
 import { getFirebaseServices, isFirebaseConfigured } from "@/lib/firebase/client";
 
 type AuthContextValue = {
@@ -46,10 +47,41 @@ type AuthProviderProps = {
 };
 
 function toMessage(error: unknown, fallback: string): string {
+  if (error instanceof FirebaseError) {
+    switch (error.code) {
+      case "auth/email-already-in-use":
+        return "This email already has an account. Sign in instead.";
+      case "auth/invalid-email":
+        return "Enter a valid email address.";
+      case "auth/invalid-credential":
+      case "auth/user-not-found":
+      case "auth/wrong-password":
+        return "Email or password is incorrect.";
+      case "auth/weak-password":
+        return "Use a stronger password with at least 6 characters.";
+      case "auth/too-many-requests":
+        return "Too many attempts. Wait a moment and try again.";
+      case "auth/popup-closed-by-user":
+        return "Google sign-in was canceled. Try again when you're ready.";
+      case "auth/account-exists-with-different-credential":
+        return "This email already uses a different sign-in method.";
+      case "auth/network-request-failed":
+        return "Network problem. Check your connection and try again.";
+      case "auth/operation-not-allowed":
+        return "This sign-in method is not enabled yet.";
+      default:
+        return fallback;
+    }
+  }
+
   if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
   return fallback;
+}
+
+function friendlyError(error: unknown, fallback: string): Error {
+  return new Error(toMessage(error, fallback));
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
@@ -125,8 +157,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         shouldCompleteProfile: additionalUserInfo?.isNewUser ?? false,
       };
     } catch (nextError) {
-      setError(toMessage(nextError, "Google sign-in failed."));
-      throw nextError;
+      const friendly = friendlyError(nextError, "Google sign-in failed.");
+      setError(friendly.message);
+      throw friendly;
     }
   }, [bootstrapUserProfile, configured]);
 
@@ -149,8 +182,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           shouldCompleteProfile: false,
         };
       } catch (nextError) {
-        setError(toMessage(nextError, "Email sign-in failed."));
-        throw nextError;
+        const friendly = friendlyError(nextError, "Email sign-in failed.");
+        setError(friendly.message);
+        throw friendly;
       }
     },
     [bootstrapUserProfile, configured],
@@ -175,8 +209,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           shouldCompleteProfile: true,
         };
       } catch (nextError) {
-        setError(toMessage(nextError, "Email account creation failed."));
-        throw nextError;
+        const friendly = friendlyError(nextError, "Email account creation failed.");
+        setError(friendly.message);
+        throw friendly;
       }
     },
     [bootstrapUserProfile, configured],
@@ -194,8 +229,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await firebaseSignOut(auth);
       setUser(null);
     } catch (nextError) {
-      setError(toMessage(nextError, "Sign-out failed."));
-      throw nextError;
+      const friendly = friendlyError(nextError, "Sign-out failed.");
+      setError(friendly.message);
+      throw friendly;
     }
   }, [configured]);
 

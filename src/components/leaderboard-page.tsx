@@ -115,7 +115,20 @@ export function LeaderboardPage() {
             );
           })}
 
-          {payload.items.length === 0 ? <p className="text-sm text-slate-300">No analysts yet.</p> : null}
+          {payload.items.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/15 p-5">
+              <p className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">No ranked analysts yet.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Be the first to complete 5 settled calls and take the #1 spot.
+              </p>
+              <Link
+                href="/predictions/new"
+                className="mt-4 inline-flex rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+              >
+                Make your first prediction
+              </Link>
+            </div>
+          ) : null}
         </div>
       </section>
     </main>

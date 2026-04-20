@@ -102,9 +102,10 @@ function shareText(payload: DailyScoresResponse): string {
   }
 
   return [
-    "Top call today on YouAnalyst:",
+    "Think you're good at stocks?",
     "",
-    `${directionArrow(call.direction)} ${formatTickerSymbol(call.ticker)} ${dailyReturnText(call.dailyReturnChange)}`,
+    "Today's top call:",
+    `${directionArrow(call.direction)} ${formatTickerSymbol(call.ticker)} ${dailyReturnText(call.dailyReturnChange)} 📈`,
     "",
     "Every prediction is tracked.",
     "Leaderboard decides who's actually good.",

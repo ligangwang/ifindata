@@ -39,6 +39,11 @@ on:
         required: true
         default: false
         type: boolean
+      recompute:
+        description: Rebuild daily deltas from prior daily marks
+        required: true
+        default: false
+        type: boolean
       dry_run:
         description: Run without Firestore writes
         required: true
@@ -113,6 +118,7 @@ jobs:
           LOAD_PRICES: ${{ inputs.load_prices }}
           MARK_PREDICTIONS: ${{ inputs.mark_predictions }}
           ROLL_FORWARD: ${{ inputs.roll_forward }}
+          RECOMPUTE: ${{ inputs.recompute }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
@@ -138,12 +144,14 @@ jobs:
             --argjson loadPrices "$LOAD_PRICES" \
             --argjson markPredictions "$MARK_PREDICTIONS" \
             --argjson rollForward "$ROLL_FORWARD" \
+            --argjson recompute "$RECOMPUTE" \
             --argjson dryRun "$DRY_RUN" \
             '{
               limit: $limit,
               loadPrices: $loadPrices,
               markPredictions: $markPredictions,
               rollForward: $rollForward,
+              recompute: $recompute,
               dryRun: $dryRun
             }
             + (if $runDate == "" then {} else { runDate: $runDate } end)

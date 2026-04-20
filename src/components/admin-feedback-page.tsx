@@ -159,19 +159,7 @@ export function AdminFeedbackPage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8">
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="mb-2 text-sm font-medium text-cyan-200">Admin</p>
-          <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">Feedback submissions</h1>
-          <p className="mt-2 text-sm text-slate-300">Review the latest notes sent from the public feedback page.</p>
-        </div>
-        <Link
-          href="/feedback"
-          className="w-fit rounded-xl border border-cyan-400/35 px-4 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-500/15"
-        >
-          Submit feedback
-        </Link>
-      </div>
+      <p className="mb-3 text-sm font-medium text-cyan-200">Admin</p>
 
       <section className="mb-4 grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-cyan-500/25 bg-slate-900/70 p-4">
@@ -193,6 +181,19 @@ export function AdminFeedbackPage() {
           </p>
         </div>
       </section>
+
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">Feedback submissions</h1>
+          <p className="mt-2 text-sm text-slate-300">Review the latest notes sent from the public feedback page.</p>
+        </div>
+        <Link
+          href="/feedback"
+          className="w-fit rounded-xl border border-cyan-400/35 px-4 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-500/15"
+        >
+          Submit feedback
+        </Link>
+      </div>
 
       <section className="rounded-2xl border border-white/10 bg-slate-900/70 shadow-[0_8px_40px_rgba(8,47,73,0.35)]">
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">

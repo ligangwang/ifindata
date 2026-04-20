@@ -90,34 +90,40 @@ function predictionPath(predictionId: string): string {
   return `/predictions/${predictionId}`;
 }
 
-function shareText(payload: DailyScoresResponse): string {
+function shareText(payload: DailyScoresResponse, url: string): string {
   const call = payload.callOfTheDay;
   if (!call) {
     return [
       "Think you're good at stocks?",
       "",
       "Every prediction is tracked on YouAnalyst.",
-      "Leaderboard decides who's actually good.",
+      "Leaderboard decides who\u2019s actually good.",
+      "",
+      "Prove it:",
+      url,
     ].join("\n");
   }
 
   return [
     "Think you're good at stocks?",
     "",
-    "Someone nailed today's top call:",
-    `${directionArrow(call.direction)} ${formatTickerSymbol(call.ticker)} ${dailyReturnText(call.dailyReturnChange)} 📈`,
+    "Someone nailed today\u2019s top call:",
+    `${directionArrow(call.direction)} ${formatTickerSymbol(call.ticker)} ${dailyReturnText(call.dailyReturnChange)} \uD83D\uDCCA`,
     "",
     "Every prediction is tracked.",
     "No edits. No hiding.",
     "",
-    "Leaderboard decides who's actually good.",
+    "Leaderboard decides who\u2019s actually good.",
+    "",
+    "Prove it:",
+    url,
   ].join("\n");
 }
 
 function xShareUrl(payload: DailyScoresResponse): string {
-  const text = shareText(payload);
   const url = absoluteUrl(dailyPath(payload.date));
-  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+  const text = shareText(payload, url);
+  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
 }
 
 function callDescription(call: DailyCallHighlight): string {

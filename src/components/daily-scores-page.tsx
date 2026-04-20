@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatTickerSymbol } from "@/components/prediction-ui";
+import { useAuth } from "@/components/providers/auth-provider";
 
 type DailyCallHighlight = {
   predictionId: string;
@@ -30,11 +31,14 @@ function scoreText(score: number): string {
   return `${sign}${Math.round(score)}`;
 }
 
-function scoreTone(score: number): string {
-  if (score > 0) {
+function returnTone(returnValue: number | null): string {
+  if (returnValue === null) {
+    return "text-slate-300";
+  }
+  if (returnValue > 0) {
     return "text-emerald-300";
   }
-  if (score < 0) {
+  if (returnValue < 0) {
     return "text-rose-300";
   }
   return "text-slate-300";
@@ -69,10 +73,6 @@ function directionArrow(direction: "UP" | "DOWN" | null): string {
     return "\u2193";
   }
   return "";
-}
-
-function directionTone(direction: "UP" | "DOWN" | null): string {
-  return direction === "DOWN" ? "text-rose-300" : "text-emerald-300";
 }
 
 function absoluteUrl(path: string): string {
@@ -130,10 +130,13 @@ function dailyReturnText(value: number | null): string {
 }
 
 export function DailyScoresPage() {
+  const { user, loading: authLoading, getIdToken } = useAuth();
   const [payload, setPayload] = useState<DailyScoresResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [adminStatus, setAdminStatus] = useState<{ userId: string; isAdmin: boolean } | null>(null);
+  const canShareOnX = Boolean(!authLoading && user && adminStatus?.userId === user.uid && adminStatus.isAdmin);
 
   const apiPath = useMemo(() => {
     if (typeof window === "undefined") {
@@ -174,6 +177,49 @@ export function DailyScoresPage() {
     };
   }, [apiPath]);
 
+  useEffect(() => {
+    if (authLoading || !user) {
+      return;
+    }
+
+    let cancelled = false;
+    const userId = user.uid;
+
+    async function loadAdminStatus() {
+      try {
+        const token = await getIdToken(true);
+
+        if (!token) {
+          if (!cancelled) {
+            setAdminStatus({ userId, isAdmin: false });
+          }
+          return;
+        }
+
+        const response = await fetch("/api/admin/me", {
+          headers: {
+            authorization: `Bearer ${token}`,
+          },
+        });
+        const body = (await response.json().catch(() => ({}))) as { isAdmin?: boolean };
+
+        if (!cancelled) {
+          setAdminStatus({ userId, isAdmin: response.ok && body.isAdmin === true });
+        }
+      } catch {
+        if (!cancelled) {
+          setAdminStatus({ userId, isAdmin: false });
+        }
+      }
+    }
+
+    void loadAdminStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, getIdToken, user]);
+
   async function copyDailyLink() {
     if (!payload) {
       return;
@@ -208,14 +254,16 @@ export function DailyScoresPage() {
           </div>
           {payload ? (
             <div className="flex flex-wrap gap-2">
-              <a
-                href={xShareUrl(payload)}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
-              >
-                Share on X
-              </a>
+              {canShareOnX ? (
+                <a
+                  href={xShareUrl(payload)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
+                >
+                  Share on X
+                </a>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void copyDailyLink()}
@@ -255,7 +303,7 @@ export function DailyScoresPage() {
           <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="font-[var(--font-sora)] text-4xl font-semibold text-cyan-100">
-                <span aria-hidden="true" className={`mr-2 ${directionTone(callOfTheDay.direction)}`}>
+                <span aria-hidden="true" className="mr-2">
                   {directionArrow(callOfTheDay.direction)}
                 </span>
                 {formatTickerSymbol(callOfTheDay.ticker)}
@@ -264,7 +312,7 @@ export function DailyScoresPage() {
               <p className="mt-3 text-sm text-slate-400">{callDescription(callOfTheDay)}</p>
             </div>
             <div className="sm:text-right">
-              <p className={`text-4xl font-semibold ${scoreTone(callOfTheDay.dailyScoreChange)}`}>
+              <p className={`text-4xl font-semibold ${returnTone(callOfTheDay.dailyReturnChange)}`}>
                 {dailyReturnText(callOfTheDay.dailyReturnChange)}
               </p>
               <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">today</p>
@@ -294,17 +342,19 @@ export function DailyScoresPage() {
               >
                 <span className="text-sm font-semibold text-cyan-200">#{index + 1}</span>
                 <span className="min-w-0 text-sm text-slate-100">
-                  {directionArrow(call.direction) ? (
-                    <span aria-hidden="true" className={`mr-1 font-semibold ${directionTone(call.direction)}`}>
-                      {directionArrow(call.direction)}
-                    </span>
-                  ) : null}
-                  <span className="font-semibold">{formatTickerSymbol(call.ticker)}</span>
+                  <span className="font-semibold text-cyan-200">
+                    {directionArrow(call.direction) ? (
+                      <span aria-hidden="true" className="mr-1">
+                        {directionArrow(call.direction)}
+                      </span>
+                    ) : null}
+                    {formatTickerSymbol(call.ticker)}
+                  </span>
                   <span className="text-slate-500"> / </span>
                   <span>{userName(call)}</span>
                 </span>
                 <span className="text-right">
-                  <span className={`block text-sm font-semibold ${scoreTone(call.dailyScoreChange)}`}>
+                  <span className={`block text-sm font-semibold ${returnTone(call.dailyReturnChange)}`}>
                     {dailyReturnText(call.dailyReturnChange)}
                   </span>
                   <span className="block text-[11px] text-slate-500">{scoreText(call.dailyScoreChange)} score</span>

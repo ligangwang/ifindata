@@ -80,6 +80,11 @@ function toMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function isDismissedPopupError(error: unknown): boolean {
+  return error instanceof FirebaseError &&
+    (error.code === "auth/popup-closed-by-user" || error.code === "auth/cancelled-popup-request");
+}
+
 function friendlyError(error: unknown, fallback: string): Error {
   return new Error(toMessage(error, fallback));
 }
@@ -157,6 +162,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         shouldCompleteProfile: additionalUserInfo?.isNewUser ?? false,
       };
     } catch (nextError) {
+      if (isDismissedPopupError(nextError)) {
+        setError(null);
+        throw nextError;
+      }
+
       const friendly = friendlyError(nextError, "Google sign-in failed.");
       setError(friendly.message);
       throw friendly;

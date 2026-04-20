@@ -3,7 +3,6 @@ export const PREDICTION_STATUSES = ["OPENING", "OPEN", "CLOSING", "CLOSED", "CAN
 export const PREDICTION_VISIBILITIES = ["PUBLIC", "PRIVATE"] as const;
 export const PREDICTION_TIME_HORIZON_UNITS = ["DAYS", "MONTHS", "YEARS"] as const;
 export const MAX_PREDICTION_THESIS_TITLE_LENGTH = 120;
-export const MIN_PREDICTION_THESIS_LENGTH = 50;
 export const MAX_PREDICTION_THESIS_LENGTH = 10000;
 
 export type PredictionDirection = (typeof PREDICTION_DIRECTIONS)[number];

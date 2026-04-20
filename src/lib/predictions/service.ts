@@ -6,7 +6,6 @@ import {
   isPredictionVisibility,
   MAX_PREDICTION_THESIS_TITLE_LENGTH,
   MAX_PREDICTION_THESIS_LENGTH,
-  MIN_PREDICTION_THESIS_LENGTH,
   normalizeTicker,
   sanitizePredictionThesis,
   sanitizePredictionThesisTitle,
@@ -288,10 +287,6 @@ function validatePredictionText(thesisTitle: string, thesis: string): void {
 
   if (thesisTitle.length > MAX_PREDICTION_THESIS_TITLE_LENGTH) {
     throw new Error(`title must be <= ${MAX_PREDICTION_THESIS_TITLE_LENGTH} chars`);
-  }
-
-  if (thesis.length < MIN_PREDICTION_THESIS_LENGTH) {
-    throw new Error(`thesis must be at least ${MIN_PREDICTION_THESIS_LENGTH} chars`);
   }
 
   if (thesis.length > MAX_PREDICTION_THESIS_LENGTH) {

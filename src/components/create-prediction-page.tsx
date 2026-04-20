@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { TickerSearchInput } from "@/components/ticker-search-input";
-import { MAX_PREDICTION_THESIS_LENGTH, MAX_PREDICTION_THESIS_TITLE_LENGTH, MIN_PREDICTION_THESIS_LENGTH, type PredictionTimeHorizonUnit } from "@/lib/predictions/types";
+import { MAX_PREDICTION_THESIS_LENGTH, MAX_PREDICTION_THESIS_TITLE_LENGTH, type PredictionTimeHorizonUnit } from "@/lib/predictions/types";
 
 function isValidTickerFormat(ticker: string): boolean {
   if (!ticker || ticker.length === 0 || ticker.length > 12) {
@@ -31,9 +31,7 @@ export function CreatePredictionPage() {
   const isValidThesisTitle =
     trimmedThesisTitleLength > 0 &&
     trimmedThesisTitleLength <= MAX_PREDICTION_THESIS_TITLE_LENGTH;
-  const isValidThesis =
-    trimmedThesisLength >= MIN_PREDICTION_THESIS_LENGTH &&
-    trimmedThesisLength <= MAX_PREDICTION_THESIS_LENGTH;
+  const isValidThesis = trimmedThesisLength <= MAX_PREDICTION_THESIS_LENGTH;
   const parsedTimeHorizonValue = Number(timeHorizonValue);
   const isValidTimeHorizon =
     timeHorizonUnit === "NONE" ||
@@ -42,11 +40,9 @@ export function CreatePredictionPage() {
     ? "Ticker must be 1-12 letters, numbers, dots, or hyphens."
     : null;
   const thesisErrorMessage =
-    thesis && trimmedThesisLength < MIN_PREDICTION_THESIS_LENGTH
-      ? `Thesis must be at least ${MIN_PREDICTION_THESIS_LENGTH} characters.`
-      : trimmedThesisLength > MAX_PREDICTION_THESIS_LENGTH
-        ? `Thesis must be ${MAX_PREDICTION_THESIS_LENGTH} characters or fewer.`
-        : null;
+    trimmedThesisLength > MAX_PREDICTION_THESIS_LENGTH
+      ? `Thesis must be ${MAX_PREDICTION_THESIS_LENGTH} characters or fewer.`
+      : null;
   const thesisTitleErrorMessage =
     thesisTitle && trimmedThesisTitleLength > MAX_PREDICTION_THESIS_TITLE_LENGTH
       ? `Title must be ${MAX_PREDICTION_THESIS_TITLE_LENGTH} characters or fewer.`
@@ -92,7 +88,7 @@ export function CreatePredictionPage() {
     }
 
     if (!isValidThesis) {
-      setError(thesisErrorMessage ?? `Thesis must be at least ${MIN_PREDICTION_THESIS_LENGTH} characters.`);
+      setError(thesisErrorMessage ?? `Thesis must be ${MAX_PREDICTION_THESIS_LENGTH} characters or fewer.`);
       return;
     }
 
@@ -241,18 +237,16 @@ export function CreatePredictionPage() {
               value={thesis}
               onChange={(event) => setThesis(event.target.value)}
               rows={10}
-              minLength={MIN_PREDICTION_THESIS_LENGTH}
               maxLength={MAX_PREDICTION_THESIS_LENGTH}
-              required
               className="min-h-56 rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
               placeholder="Explain why this setup should work"
             />
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-              <p className={thesisErrorMessage ? "text-rose-300" : "text-slate-400"}>
-                Minimum {MIN_PREDICTION_THESIS_LENGTH} characters.
+              <p className="text-slate-400">
+                Optional.
               </p>
-              <p className={trimmedThesisLength < MIN_PREDICTION_THESIS_LENGTH ? "text-slate-400" : "text-emerald-300"}>
-                {trimmedThesisLength}/{MIN_PREDICTION_THESIS_LENGTH}
+              <p className={trimmedThesisLength > MAX_PREDICTION_THESIS_LENGTH ? "text-rose-300" : "text-slate-400"}>
+                {trimmedThesisLength}/{MAX_PREDICTION_THESIS_LENGTH}
               </p>
             </div>
             {thesisErrorMessage ? <p className="text-xs text-rose-300">{thesisErrorMessage}</p> : null}

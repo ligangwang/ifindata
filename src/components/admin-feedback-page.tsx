@@ -22,6 +22,12 @@ type FeedbackSubmission = {
   updatedAt: string;
 };
 
+type AdminStats = {
+  users: number;
+  predictions: number;
+  feedback: number;
+};
+
 const categoryLabels: Record<FeedbackCategory, string> = {
   FEATURE_REQUEST: "Feature request",
   BUG_REPORT: "Bug report",
@@ -48,8 +54,18 @@ function submitterLabel(submission: FeedbackSubmission): string {
   return submission.userDisplayName || submission.userEmail || submission.contactEmail || "Anonymous";
 }
 
+function formatCount(value: number): string {
+  return Math.max(0, Math.round(value)).toLocaleString();
+}
+
+function countFromPayload(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export function AdminFeedbackPage() {
   const { user, loading, getIdToken } = useAuth();
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [submissions, setSubmissions] = useState<FeedbackSubmission[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,46 +83,64 @@ export function AdminFeedbackPage() {
       return;
     }
 
-    if (!user) {
-      setSubmissions([]);
-      setError("Sign in with an admin account to view feedback.");
-      return;
-    }
-
     let cancelled = false;
 
-    async function loadSubmissions() {
+    async function loadAdminData() {
+      await Promise.resolve();
+      if (cancelled) {
+        return;
+      }
+
       setLoadingSubmissions(true);
       setError(null);
 
       try {
+        if (!user) {
+          throw new Error("Sign in with an admin account to view feedback.");
+        }
+
         const token = await getIdToken();
 
         if (!token) {
           throw new Error("Sign in with an admin account to view feedback.");
         }
 
-        const response = await fetch("/api/feedback", {
-          headers: {
-            authorization: `Bearer ${token}`,
-          },
-        });
+        const headers = {
+          authorization: `Bearer ${token}`,
+        };
+        const [statsResponse, feedbackResponse] = await Promise.all([
+          fetch("/api/admin/stats", { headers }),
+          fetch("/api/feedback", { headers }),
+        ]);
 
-        const payload = (await response.json().catch(() => ({}))) as {
+        const statsPayload = (await statsResponse.json().catch(() => ({}))) as Partial<AdminStats> & {
+          error?: string;
+        };
+        const feedbackPayload = (await feedbackResponse.json().catch(() => ({}))) as {
           submissions?: FeedbackSubmission[];
           error?: string;
         };
 
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to load feedback.");
+        if (!statsResponse.ok) {
+          throw new Error(statsPayload.error ?? "Unable to load admin stats.");
+        }
+
+        if (!feedbackResponse.ok) {
+          throw new Error(feedbackPayload.error ?? "Unable to load feedback.");
         }
 
         if (!cancelled) {
-          setSubmissions(payload.submissions ?? []);
+          setStats({
+            users: countFromPayload(statsPayload.users),
+            predictions: countFromPayload(statsPayload.predictions),
+            feedback: countFromPayload(statsPayload.feedback),
+          });
+          setSubmissions(feedbackPayload.submissions ?? []);
         }
       } catch (nextError) {
         if (!cancelled) {
           setError(nextError instanceof Error ? nextError.message : "Unable to load feedback.");
+          setStats(null);
           setSubmissions([]);
         }
       } finally {
@@ -116,7 +150,7 @@ export function AdminFeedbackPage() {
       }
     }
 
-    void loadSubmissions();
+    void loadAdminData();
 
     return () => {
       cancelled = true;
@@ -138,6 +172,27 @@ export function AdminFeedbackPage() {
           Submit feedback
         </Link>
       </div>
+
+      <section className="mb-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-cyan-500/25 bg-slate-900/70 p-4">
+          <p className="text-xs uppercase text-slate-500">Users</p>
+          <p className="mt-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
+            {stats ? formatCount(stats.users) : <>&mdash;</>}
+          </p>
+        </div>
+        <div className="rounded-xl border border-cyan-500/25 bg-slate-900/70 p-4">
+          <p className="text-xs uppercase text-slate-500">Predictions</p>
+          <p className="mt-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
+            {stats ? formatCount(stats.predictions) : <>&mdash;</>}
+          </p>
+        </div>
+        <div className="rounded-xl border border-cyan-500/25 bg-slate-900/70 p-4">
+          <p className="text-xs uppercase text-slate-500">Feedback</p>
+          <p className="mt-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
+            {stats ? formatCount(stats.feedback) : <>&mdash;</>}
+          </p>
+        </div>
+      </section>
 
       <section className="rounded-2xl border border-white/10 bg-slate-900/70 shadow-[0_8px_40px_rgba(8,47,73,0.35)]">
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">

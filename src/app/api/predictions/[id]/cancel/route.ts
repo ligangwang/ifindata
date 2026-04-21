@@ -11,7 +11,7 @@ function statusFromError(message: string): number {
     return 403;
   }
 
-  if (/can only cancel|only created|only created or closing|window expired/i.test(message)) {
+  if (/can only cancel|only created|only created or closing|window expired|duplicate open prediction/i.test(message)) {
     return 400;
   }
 

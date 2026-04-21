@@ -289,6 +289,10 @@ function validatePredictionText(thesisTitle: string, thesis: string): void {
     throw new Error(`title must be <= ${MAX_PREDICTION_THESIS_TITLE_LENGTH} chars`);
   }
 
+  if (!thesis) {
+    throw new Error("thesis is required");
+  }
+
   if (thesis.length > MAX_PREDICTION_THESIS_LENGTH) {
     throw new Error(`thesis must be <= ${MAX_PREDICTION_THESIS_LENGTH} chars`);
   }
@@ -301,6 +305,10 @@ function validateUpdatedPredictionText(thesisTitle: string, thesis: string): voi
 
   if (thesisTitle.length > MAX_PREDICTION_THESIS_TITLE_LENGTH) {
     throw new Error(`title must be <= ${MAX_PREDICTION_THESIS_TITLE_LENGTH} chars`);
+  }
+
+  if (!thesis) {
+    throw new Error("thesis is required");
   }
 
   if (thesis.length > MAX_PREDICTION_THESIS_LENGTH) {

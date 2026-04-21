@@ -40,13 +40,13 @@ export default function HowItWorksPage() {
         <div>
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Track the mark</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            We update your prediction daily using end-of-day prices.
+            New predictions wait for their first completed end-of-day price to set the entry. After that, we update them daily.
           </p>
         </div>
         <div>
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Close when ready</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Close your prediction anytime. The next end-of-day update locks the settled result.
+            When you close a live prediction, the exit request is locked and final settlement happens at the next end-of-day update, which runs around 8:00 PM ET on trading days.
           </p>
         </div>
       </section>

@@ -162,7 +162,7 @@ export function SiteNav() {
                 className="hidden h-8 w-auto md:block"
               />
             </Link>
-            <nav className="hidden items-center gap-4 text-sm text-slate-200 md:flex">
+            <nav className="hidden items-center gap-4 text-[15px] text-slate-200 md:flex">
               <Link href="/predictions" className="hover:text-cyan-200">Feed</Link>
               <Link href="/daily" className="hover:text-cyan-200">Daily</Link>
               <Link href="/leaderboard" className="hover:text-cyan-200">Leaderboard</Link>
@@ -193,7 +193,7 @@ export function SiteNav() {
           </div>
         </div>
 
-        <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 text-sm text-slate-200 md:hidden">
+        <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 text-[15px] text-slate-200 md:hidden">
           <Link href="/predictions/new" className="shrink-0 rounded-full bg-cyan-500 px-3 py-1.5 font-semibold text-slate-950 hover:bg-cyan-400">
             Predict
           </Link>

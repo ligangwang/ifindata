@@ -37,8 +37,7 @@ export function formatScorePercent(score: number): string {
 }
 
 function formatScoreValue(score: number): string {
-  const sign = score > 0 ? "+" : "";
-  return `${sign}${Math.round(score).toLocaleString()}`;
+  return `${Math.round(score).toLocaleString()}`;
 }
 
 export function formatTickerSymbol(ticker: string | null | undefined): string {

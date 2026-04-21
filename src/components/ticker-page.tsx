@@ -121,17 +121,17 @@ export function TickerPage({ ticker }: { ticker: string }) {
       </section>
 
       <section className="mt-4 rounded-2xl border border-white/15 bg-slate-950/55 p-5">
-        <h2 className="mb-3 font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Predictions</h2>
+        <h2 className="mb-3 font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Predictions</h2>
         <div className="grid gap-2">
           {payload.items.map((prediction) => (
             <article
               key={prediction.id}
-              className="rounded-xl border border-white/10 p-3 hover:border-cyan-300/60"
+              className="rounded-xl border border-white/10 p-4 hover:border-cyan-300/60"
             >
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <Link
                   href={`/ticker/${payload.ticker}`}
-                  className="flex w-fit items-center gap-1 text-sm font-semibold text-cyan-200 hover:text-cyan-100"
+                  className="flex w-fit items-center gap-1 text-base font-semibold text-cyan-200 hover:text-cyan-100"
                   aria-label={`${prediction.direction === "UP" ? "Up" : "Down"} prediction for ${payload.ticker}`}
                 >
                   <span aria-hidden="true">{prediction.direction === "UP" ? "\u2191" : "\u2193"}</span>

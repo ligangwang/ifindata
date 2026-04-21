@@ -80,7 +80,7 @@ export function LeaderboardPage() {
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
-        <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">Leaderboard</h1>
+        <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">Leaderboard</h1>
         <p className="mb-4 text-sm text-slate-300">Analysts ranked by settled-call performance.</p>
 
         <div className="grid gap-2">

@@ -108,10 +108,10 @@ export function PredictionsFeed() {
               key={item.id}
               className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition"
             >
-              <div className="mb-2 flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <Link
                   href={`/ticker/${item.ticker}`}
-                  className="flex w-fit items-center gap-1 font-semibold text-cyan-200 hover:text-cyan-100"
+                  className="flex w-fit items-center gap-1 text-base font-semibold text-cyan-200 hover:text-cyan-100"
                   aria-label={`${item.direction === "UP" ? "Up" : "Down"} prediction for ${item.ticker}`}
                 >
                   <span aria-hidden="true">{item.direction === "UP" ? "\u2191" : "\u2193"}</span>

@@ -8,6 +8,7 @@ import {
 } from "@/lib/predictions/analytics";
 import { recomputeUserAnalytics } from "@/lib/predictions/user-analytics";
 import {
+  canonicalPredictionStatus,
   isPredictionDirection,
   normalizeTicker,
   type PredictionResult,
@@ -119,6 +120,7 @@ type EodPredictionRecord = {
   id: string;
   userId: string;
   ticker: string;
+  storedStatus: string;
   direction: unknown;
   entryPrice: number | null;
   entryDate: string | null;
@@ -421,8 +423,8 @@ async function readRollForwardDates(db: FirebaseFirestore.Firestore, startDate: 
   return sortedDates.includes(startDate) ? sortedDates : [startDate, ...sortedDates];
 }
 
-function isProcessableStatus(value: unknown): value is PredictionStatus {
-  return value === "OPENING" || value === "OPEN" || value === "CLOSING" || value === "CLOSED";
+function isProcessableStatus(value: unknown): boolean {
+  return canonicalPredictionStatus(value) !== null || value === "OPENING" || value === "CLOSING" || value === "CLOSED";
 }
 
 function timeHorizonTargetDateFromValue(value: unknown): string | null {
@@ -442,7 +444,7 @@ function isOpenUntilDue(prediction: EodPredictionRecord, runDate: string): boole
 
 function isLatestOpenUntilDue(latest: Record<string, unknown>, runDate: string): boolean {
   const targetDate = timeHorizonTargetDateFromValue(latest.timeHorizon);
-  return latest.status === "OPEN" && typeof targetDate === "string" && targetDate <= runDate;
+  return canonicalPredictionStatus(latest.status) === "OPEN" && typeof targetDate === "string" && targetDate <= runDate;
 }
 
 function toEodPredictionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapshot): EodPredictionRecord | null {
@@ -456,8 +458,9 @@ function toEodPredictionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapshot
   const closeTargetDate = typeof data.closeTargetDate === "string" ? data.closeTargetDate : null;
   const createdAt = typeof data.createdAt === "string" ? data.createdAt : null;
   const entryPrice = data.entryPrice === null || data.entryPrice === undefined ? null : Number(data.entryPrice);
+  const status = canonicalPredictionStatus(data.status);
 
-  if (!ticker || !userId || !isProcessableStatus(data.status)) {
+  if (!ticker || !userId || !isProcessableStatus(data.status) || !status) {
     return null;
   }
 
@@ -470,6 +473,7 @@ function toEodPredictionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapshot
     id: snapshot.id,
     userId,
     ticker,
+    storedStatus: typeof data.status === "string" ? data.status : status,
     direction: data.direction,
     entryPrice,
     entryDate,
@@ -478,7 +482,7 @@ function toEodPredictionRecord(snapshot: FirebaseFirestore.QueryDocumentSnapshot
     closeTargetDate,
     markPriceDate,
     createdAt,
-    status: data.status,
+    status,
   };
 }
 
@@ -540,16 +544,16 @@ function buildResult(
 }
 
 function dailySnapshotStatus(prediction: EodPredictionRecord, tradingDate: string): PredictionStatus {
-  if (prediction.status === "CLOSED" && prediction.markPriceDate !== tradingDate) {
+  if (prediction.status === "SETTLED" && prediction.markPriceDate !== tradingDate) {
     return "OPEN";
   }
 
   if (isOpenUntilDue(prediction, tradingDate)) {
-    return "CLOSED";
+    return "SETTLED";
   }
 
-  if (prediction.status === "CLOSING" && prediction.closeTargetDate && prediction.closeTargetDate <= tradingDate) {
-    return "CLOSING";
+  if (prediction.storedStatus === "CLOSING" && prediction.closeTargetDate && prediction.closeTargetDate <= tradingDate) {
+    return "SETTLED";
   }
 
   return prediction.status;
@@ -610,7 +614,7 @@ function markSummaryFromDoc(doc: FirebaseFirestore.QueryDocumentSnapshot): {
   return {
     predictionId,
     ticker: typeof data.ticker === "string" ? data.ticker : null,
-    status: isProcessableStatus(data.status) ? data.status : null,
+    status: canonicalPredictionStatus(data.status),
     score,
     scoreChange,
   };
@@ -709,10 +713,10 @@ async function writeUserDailyScoreSnapshots(
       (worst, mark) => (!worst || mark.scoreChange < worst.scoreChange ? mark : worst),
       null,
     );
-    const openingPredictions = countMarksByStatus(marks, ["OPENING"]);
+    const openingPredictions = countMarksByStatus(marks, ["CREATED"]);
     const openPredictions = countMarksByStatus(marks, ["OPEN"]);
-    const closingPredictions = countMarksByStatus(marks, ["CLOSING"]);
-    const closedPredictions = countMarksByStatus(marks, ["CLOSED"]);
+    const closingPredictions = 0;
+    const closedPredictions = countMarksByStatus(marks, ["SETTLED"]);
 
     await userDailyRef.set({
       userId,
@@ -762,15 +766,15 @@ function isActionablePrediction(prediction: EodPredictionRecord, runDate: string
     return false;
   }
 
-  if (prediction.status === "OPENING") {
+  if (prediction.status === "CREATED") {
     return typeof prediction.entryTargetDate === "string" && prediction.entryTargetDate <= runDate;
   }
 
-  if (prediction.status === "CLOSING") {
+  if (prediction.storedStatus === "CLOSING") {
     return typeof prediction.closeTargetDate === "string" && prediction.closeTargetDate <= runDate;
   }
 
-  if (prediction.status === "CLOSED") {
+  if (prediction.status === "SETTLED") {
     return false;
   }
 
@@ -786,15 +790,15 @@ function shouldMutateLivePrediction(prediction: EodPredictionRecord, runDate: st
     return false;
   }
 
-  if (prediction.status === "OPENING") {
+  if (prediction.status === "CREATED") {
     return typeof prediction.entryTargetDate === "string" && prediction.entryTargetDate <= runDate;
   }
 
-  if (prediction.status === "CLOSING") {
+  if (prediction.storedStatus === "CLOSING") {
     return typeof prediction.closeTargetDate === "string" && prediction.closeTargetDate <= runDate;
   }
 
-  if (prediction.status === "CLOSED") {
+  if (prediction.status === "SETTLED") {
     return prediction.markPriceDate === runDate;
   }
 
@@ -810,11 +814,11 @@ function isDailySnapshotCandidate(prediction: EodPredictionRecord, runDate: stri
     return false;
   }
 
-  if (prediction.status === "CLOSED") {
+  if (prediction.status === "SETTLED") {
     return typeof prediction.markPriceDate === "string" && prediction.markPriceDate >= runDate;
   }
 
-  return prediction.status === "OPEN" || prediction.status === "CLOSING";
+  return prediction.status === "OPEN" || prediction.storedStatus === "CLOSING";
 }
 
 async function scanEodPredictions(
@@ -833,7 +837,7 @@ async function scanEodPredictions(
   while (predictionsToProcess.length < limit) {
     let query = db
       .collection("predictions")
-      .where("status", "in", ["OPENING", "OPEN", "CLOSING", "CLOSED"])
+      .where("status", "in", ["CREATED", "OPEN", "SETTLED", "OPENING", "CLOSING", "CLOSED"])
       .orderBy("__name__")
       .limit(POSITION_SCAN_PAGE_SIZE);
 
@@ -1078,9 +1082,9 @@ export async function runDailyEodMaintenance(
           const mutatesLiveScore = shouldMutateLivePrediction(prediction, runDate, manualTickers);
           if (!mutatesLiveScore) {
             dailySnapshots.predictionMarks += 1;
-          } else if (prediction.status === "OPENING") {
+          } else if (prediction.status === "CREATED") {
             marking.opened += 1;
-          } else if (prediction.status === "CLOSING" || isOpenUntilDue(prediction, runDate)) {
+          } else if (prediction.storedStatus === "CLOSING" || isOpenUntilDue(prediction, runDate)) {
             marking.marked += 1;
             marking.closed += 1;
           } else {
@@ -1103,7 +1107,12 @@ export async function runDailyEodMaintenance(
 
           const latest = predictionSnapshot.data() as Record<string, unknown>;
           const latestStatus = latest.status;
-          if (latestStatus !== prediction.status || !isProcessableStatus(latestStatus)) {
+          const canonicalLatestStatus = canonicalPredictionStatus(latestStatus);
+          if (
+            latestStatus !== prediction.storedStatus ||
+            !isProcessableStatus(latestStatus) ||
+            !canonicalLatestStatus
+          ) {
             marking.skipped += 1;
             console.warn("[daily-eod-maintenance] Skipped prediction because status changed", {
               runDate,
@@ -1115,7 +1124,7 @@ export async function runDailyEodMaintenance(
 
           const shouldMutatePrediction = shouldMutateLivePrediction(prediction, runDate, manualTickers);
           const shouldCloseForOpenUntil = shouldMutatePrediction && isLatestOpenUntilDue(latest, runDate);
-          if (latestStatus === "OPENING") {
+          if (canonicalLatestStatus === "CREATED") {
             const dailyMarkRef = db
               .collection("prediction_daily_marks")
               .doc(predictionDailyMarkDocId(prediction.id, price.tradingDate));
@@ -1236,8 +1245,8 @@ export async function runDailyEodMaintenance(
                 previousDaily.returnValue,
               );
           const snapshotStatus = dailySnapshotStatus(prediction, price.tradingDate);
-          const nextStatus = (latestStatus === "CLOSING" && shouldMutatePrediction) || shouldCloseForOpenUntil
-            ? "CLOSED"
+          const nextStatus = ((latestStatus === "CLOSING") && shouldMutatePrediction) || shouldCloseForOpenUntil
+            ? "SETTLED"
             : snapshotStatus;
           tx.set(dailyMarkRef, {
             predictionId: prediction.id,
@@ -1261,7 +1270,7 @@ export async function runDailyEodMaintenance(
             scoreChange: mark.score - previousScore,
             previousReturnValue,
             returnValueChange: mark.returnValue - previousReturnValue,
-            isClosed: nextStatus === "CLOSED",
+            isClosed: nextStatus === "SETTLED",
             createdAt: dailyMarkSnapshot.get("createdAt") ?? nowIso,
             updatedAt: nowIso,
           }, { merge: true });
@@ -1284,7 +1293,7 @@ export async function runDailyEodMaintenance(
             tx.update(prediction.ref, {
               ...markUpdate,
               ...entryUpdate,
-              status: "CLOSED",
+              status: "SETTLED",
               closedAt: nowIso,
               predictionScore: mark.score,
               outcome: mark.outcome,
@@ -1309,7 +1318,7 @@ export async function runDailyEodMaintenance(
             tx.update(prediction.ref, {
               ...markUpdate,
               ...entryUpdate,
-              status: "CLOSED",
+              status: "SETTLED",
               closeTargetDate: price.tradingDate,
               closedAt: nowIso,
               predictionScore: mark.score,
@@ -1336,7 +1345,7 @@ export async function runDailyEodMaintenance(
             return;
           }
 
-          if (latestStatus === "CLOSED") {
+          if (canonicalLatestStatus === "SETTLED") {
             tx.update(prediction.ref, {
               ...markUpdate,
               ...entryUpdate,

@@ -11,7 +11,7 @@ function statusFromError(message: string): number {
     return 403;
   }
 
-  if (/only open/i.test(message)) {
+  if (/only open|must remain open|missing an entry|no eod price|invalid/i.test(message)) {
     return 400;
   }
 

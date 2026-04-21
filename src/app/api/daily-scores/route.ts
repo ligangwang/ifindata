@@ -51,7 +51,7 @@ function directionValue(value: unknown): "UP" | "DOWN" | null {
 }
 
 function statusValue(value: unknown): "LIVE" | "SETTLED" {
-  return value === "CLOSED" ? "SETTLED" : "LIVE";
+  return value === "SETTLED" || value === "CLOSED" ? "SETTLED" : "LIVE";
 }
 
 async function latestDailyScoreDate(db: FirebaseFirestore.Firestore): Promise<string | null> {

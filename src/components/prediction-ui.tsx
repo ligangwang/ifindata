@@ -276,14 +276,14 @@ export function PredictionReturnSummary({
 
   if (href) {
     return (
-      <Link href={href} className="mt-1 block w-fit text-xs hover:opacity-85">
+      <Link href={href} className="mt-1 block w-fit text-sm hover:opacity-85">
         {content}
       </Link>
     );
   }
 
   return (
-    <p className="mt-1 text-xs">
+    <p className="mt-1 text-sm">
       {content}
     </p>
   );
@@ -301,7 +301,7 @@ export function PredictionAuthorSummary({ author, className = "" }: { author: Pr
   return (
     <Link
       href={`/analysts/${author.userId}`}
-      className={`mt-3 flex w-fit items-center gap-2 text-xs text-slate-300 hover:text-slate-100 ${className}`}
+      className={`mt-3 flex w-fit items-center gap-2 text-sm text-slate-300 hover:text-slate-100 ${className}`}
     >
       {author.authorPhotoURL ? (
         <Image
@@ -348,7 +348,7 @@ export function PredictionMarkSummary({ prediction }: { prediction: PredictionMa
     markPriceDate.length > 0;
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-400">
       {hasEntryData ? <span>Entry {entryPrice.toFixed(2)} @ {entryDate}</span> : null}
       {hasMarkData ? (
         <>

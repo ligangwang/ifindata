@@ -389,7 +389,7 @@ export function AnalystProfilePage({
                 </div>
               )}
               <div>
-                <h1 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
+                <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">
                   {payload.profile.nickname ? `@${payload.profile.nickname}` : preferredName}
                 </h1>
                 <nav className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400" aria-label="Profile follow lists">
@@ -603,7 +603,7 @@ export function AnalystProfilePage({
 
       <section className="rounded-2xl border border-white/15 bg-slate-950/55 p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Prediction history</h2>
+          <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Prediction history</h2>
           <div className="inline-flex rounded-full border border-slate-700 bg-slate-800/70 p-1 text-xs">
             {(["ALL", "LIVE", "SETTLED"] as const).map((option) => (
               <button
@@ -623,18 +623,18 @@ export function AnalystProfilePage({
           {payload.predictions.map((prediction) => (
             <article
               key={prediction.id}
-              className="rounded-xl border border-white/10 p-3 hover:border-cyan-300/60"
+              className="rounded-xl border border-white/10 p-4 hover:border-cyan-300/60"
             >
               <Link
                 href={`/ticker/${prediction.ticker}`}
-                className="flex w-fit items-center gap-1 text-sm font-semibold text-cyan-200 hover:text-cyan-100"
+                className="flex w-fit items-center gap-1 text-base font-semibold text-cyan-200 hover:text-cyan-100"
                 aria-label={`${prediction.direction === "UP" ? "Up" : "Down"} prediction for ${prediction.ticker}`}
               >
                 <span aria-hidden="true">{prediction.direction === "UP" ? "\u2191" : "\u2193"}</span>
                 <span>{formatTickerSymbol(prediction.ticker)}</span>
               </Link>
               {prediction.result ? (
-                <p className="mt-1 text-xs text-emerald-200">Result {resultReturnText(prediction.result)}</p>
+                <p className="mt-1 text-sm text-emerald-200">Result {resultReturnText(prediction.result)}</p>
               ) : null}
               <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} status={prediction.status} />
               {profileAuthor ? <PredictionAuthorSummary author={profileAuthor} /> : null}

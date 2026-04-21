@@ -337,7 +337,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
     <main className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="font-[var(--font-sora)] text-2xl font-semibold">
+          <h1 className="font-[var(--font-sora)] text-3xl font-semibold">
             <Link
               href={`/ticker/${prediction.ticker}`}
               className="flex w-fit items-center gap-1 text-cyan-200 hover:text-cyan-100"
@@ -466,7 +466,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           </div>
         ) : (
           <>
-            <h2 className="mb-2 font-[var(--font-sora)] text-xl font-semibold text-slate-100">
+            <h2 className="mb-2 font-[var(--font-sora)] text-2xl font-semibold text-slate-100">
               {formatPredictionThesisTitle(prediction.thesisTitle)}
             </h2>
             <p className="text-sm text-slate-200">

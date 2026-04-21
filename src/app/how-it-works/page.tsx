@@ -46,7 +46,7 @@ export default function HowItWorksPage() {
         <div>
           <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Close when ready</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Close your prediction anytime after at least one completed market day. We settle it using the latest completed end-of-day price.
+            When you close a live prediction, the exit request is locked and final settlement happens at the next end-of-day update, which runs around 8:00 PM ET on trading days.
           </p>
         </div>
       </section>

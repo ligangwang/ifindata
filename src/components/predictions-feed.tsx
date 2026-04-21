@@ -99,6 +99,11 @@ export function PredictionsFeed() {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-5">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-4 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
+        <div className="mb-4">
+          <h1 className="text-lg font-semibold tracking-tight text-white sm:text-xl">Latest Calls</h1>
+          <p className="mt-1 text-sm text-slate-300">Recent predictions from the community.</p>
+        </div>
+
         {loading ? <p className="text-sm text-slate-300">Loading feed...</p> : null}
         {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 

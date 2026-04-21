@@ -1,5 +1,5 @@
 export const PREDICTION_DIRECTIONS = ["UP", "DOWN"] as const;
-export const PREDICTION_STATUSES = ["OPENING", "OPEN", "CLOSING", "CLOSED", "CANCELED"] as const;
+export const PREDICTION_STATUSES = ["CREATED", "OPEN", "SETTLED", "CANCELED"] as const;
 export const PREDICTION_VISIBILITIES = ["PUBLIC", "PRIVATE"] as const;
 export const PREDICTION_TIME_HORIZON_UNITS = ["DAYS", "MONTHS", "YEARS"] as const;
 export const MAX_PREDICTION_THESIS_TITLE_LENGTH = 120;
@@ -191,4 +191,20 @@ export function computeScoreFromReturn(returnValue: number): number {
 
 export function computeDisplayPercent(returnValue: number): number {
   return returnValue * 100;
+}
+
+export function canonicalPredictionStatus(value: unknown): PredictionStatus | null {
+  if (value === "CREATED" || value === "OPEN" || value === "SETTLED" || value === "CANCELED") {
+    return value;
+  }
+  if (value === "OPENING") {
+    return "CREATED";
+  }
+  if (value === "CLOSED") {
+    return "SETTLED";
+  }
+  if (value === "CLOSING") {
+    return "OPEN";
+  }
+  return null;
 }

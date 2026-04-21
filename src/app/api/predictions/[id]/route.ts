@@ -1,6 +1,6 @@
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
 import { getAdminFirestore } from "@/lib/firebase/admin";
-import { sanitizePredictionThesis, sanitizePredictionThesisTitle } from "@/lib/predictions/types";
+import { canonicalPredictionStatus, sanitizePredictionThesis, sanitizePredictionThesisTitle } from "@/lib/predictions/types";
 import { updatePredictionDetails, validateUpdatePredictionInput } from "@/lib/predictions/service";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -60,6 +60,7 @@ export async function GET(
     return NextResponse.json({
       id: snapshot.id,
       ...prediction,
+      status: canonicalPredictionStatus(prediction.status) ?? "CREATED",
       authorDisplayName,
       authorNickname,
       thesisTitle: sanitizePredictionThesisTitle(typeof prediction.thesisTitle === "string" ? prediction.thesisTitle : ""),

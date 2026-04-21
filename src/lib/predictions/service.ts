@@ -181,8 +181,6 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
   } else if (status) {
     if (status === "CREATED") {
       query = query.where("status", "in", ["CREATED", "OPENING"]);
-    } else if (status === "SETTLED") {
-      query = query.where("status", "in", ["SETTLED", "CLOSED"]);
     } else {
       query = query.where("status", "==", status);
     }

@@ -84,8 +84,8 @@ async function coerceStatsWithAnalytics(
   };
 }
 
-function isPredictionStatus(value: string | null): value is "LIVE" | "FINAL" | "SETTLED" | "CREATED" | "OPEN" {
-  return value === "LIVE" || value === "FINAL" || value === "SETTLED" || value === "CREATED" || value === "OPEN";
+function isPredictionStatus(value: string | null): value is "LIVE" | "FINAL" | "SETTLED" | "CREATED" | "OPEN" | "CLOSING" {
+  return value === "LIVE" || value === "FINAL" || value === "SETTLED" || value === "CREATED" || value === "OPEN" || value === "CLOSING";
 }
 
 async function readLatestDailyScore(userId: string): Promise<LatestDailyScore> {

@@ -12,6 +12,10 @@ const lifecycle = [
     description: "Active and updated daily.",
   },
   {
+    status: "Settles at next close",
+    description: "Your exit request is locked. Final settlement happens at the next end-of-day update.",
+  },
+  {
     status: "Settled",
     description: "Settled result and score are locked.",
   },

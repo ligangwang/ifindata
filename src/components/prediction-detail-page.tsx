@@ -308,7 +308,9 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   const thesis = sanitizePredictionThesis(prediction.thesis);
   const isOwner = Boolean(user && user.uid === prediction.userId);
   const createdAtMs = Date.parse(prediction.createdAt);
+  const closeRequestedAtMs = Date.parse(prediction.closeRequestedAt ?? "");
   const createCancelWindowOpen = !Number.isNaN(createdAtMs) && now - createdAtMs <= 5 * 60 * 1000;
+  const closeCancelWindowOpen = !Number.isNaN(closeRequestedAtMs) && now - closeRequestedAtMs <= 5 * 60 * 1000;
   const isSettlementPending =
     prediction.status === "OPEN" &&
     Boolean(prediction.closeRequestedAt) &&
@@ -326,6 +328,8 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
       ? { action: "cancel" as const, label: "Cancel" }
       : isOwner && prediction.status === "OPEN" && !isSettlementPending
         ? { action: "close" as const, label: "Close" }
+        : isOwner && prediction.status === "CLOSING" && closeCancelWindowOpen
+          ? { action: "cancel" as const, label: "Cancel close" }
         : null;
   const statusLabel = isSettlementPending ? "Settles at next close" : formatPredictionStatus(prediction.status);
 
@@ -369,7 +373,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           </div>
         </div>
 
-        {isSettlementPending ? (
+        {prediction.status === "CLOSING" ? (
           <div className="mb-4 rounded-xl border border-cyan-400/15 bg-cyan-500/5 px-4 py-3 text-sm text-slate-300">
             <p>Your exit request is locked. Final settlement happens at the next end-of-day update.</p>
             {prediction.closeTargetDate ? (

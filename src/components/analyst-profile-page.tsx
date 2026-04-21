@@ -65,8 +65,7 @@ type ProfilePayload = {
 };
 
 function scoreValueText(score: number): string {
-  const sign = score > 0 ? "+" : "";
-  return `${sign}${Math.round(score)}`;
+  return `${Math.round(score)}`;
 }
 
 function xpProgressText(totalXP: number, level: number): string {

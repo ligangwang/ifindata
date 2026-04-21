@@ -408,7 +408,7 @@ export function AnalystProfilePage({
               <p className="text-base">
                 <span className="text-slate-400">Score: </span>
                 <span className="text-xl font-semibold text-cyan-100">
-                  {settledCalls >= 5 ? scoreValueText(payload.profile.stats.totalScore) : <>&mdash;</>}
+                  {scoreValueText(payload.profile.stats.totalScore)}
                 </span>
               </p>
               <p className="text-sm">

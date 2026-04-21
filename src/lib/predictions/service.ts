@@ -1,6 +1,5 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
-import { recomputeUserAnalytics } from "@/lib/predictions/user-analytics";
 import {
   canonicalPredictionStatus,
   isPredictionDirection,
@@ -517,12 +516,13 @@ export async function closePrediction(predictionId: string, user: AuthedUser) {
   const nowIso = new Date().toISOString();
   const predictionRef = db.collection("predictions").doc(predictionId);
   const userRef = db.collection("users").doc(user.uid);
-  const resultStatus: PredictionStatus = "SETTLED";
+  const resultStatus: PredictionStatus = "CLOSING";
 
   await db.runTransaction(async (tx) => {
-    const [predictionSnapshot, userSnapshot] = await Promise.all([
+    const [predictionSnapshot, userSnapshot, closeTargetDate] = await Promise.all([
       tx.get(predictionRef),
       tx.get(userRef),
+      resolveEodTargetDateInTransaction(tx, db),
     ]);
 
     if (!predictionSnapshot.exists) {
@@ -546,105 +546,29 @@ export async function closePrediction(predictionId: string, user: AuthedUser) {
     if (!prediction.entryDate) {
       throw new Error("Prediction is missing an entry date.");
     }
-
-    const latestPriceQuery = db
-      .collection("eod_prices")
-      .where("ticker", "==", prediction.ticker)
-      .orderBy("tradingDate", "desc")
-      .limit(1);
-    const latestPriceSnapshot = await tx.get(latestPriceQuery);
-    if (latestPriceSnapshot.empty) {
-      throw new Error("No EOD price is available yet for this ticker.");
-    }
-    const latestPriceDoc = latestPriceSnapshot.docs[0];
-    const tradingDate = latestPriceDoc.get("tradingDate");
-    const close = Number(latestPriceDoc.get("close"));
-    const source = latestPriceDoc.get("source");
-    const loadedAt = latestPriceDoc.get("loadedAt");
-    if (typeof tradingDate !== "string" || !Number.isFinite(close) || close <= 0) {
-      throw new Error("Latest EOD price is invalid.");
-    }
-    if (tradingDate <= prediction.entryDate) {
+    if (closeTargetDate <= prediction.entryDate) {
       throw new Error("Prediction must remain open through at least one completed market day before settlement.");
     }
 
-    const returnValue = prediction.direction === "UP"
-      ? (close - prediction.entryPrice) / prediction.entryPrice
-      : (prediction.entryPrice - close) / prediction.entryPrice;
-    const score = Math.round(1000 * Math.tanh(returnValue / 0.30));
-    const outcome = returnValue > 0 ? 1 : returnValue < 0 ? 0 : 0.5;
-    const xpEarned = Math.max(0, Math.round(50 + 0.2 * score));
-
     const tickerLockRef = activeTickerLockRef(db, user.uid, prediction.ticker);
-    const dailyMarkRef = db.collection("prediction_daily_marks").doc([predictionId, tradingDate].join("_"));
     const tickerLockSnapshot = await tx.get(tickerLockRef);
-    const dailyMarkSnapshot = await tx.get(dailyMarkRef);
     tx.update(predictionRef, {
-      status: "SETTLED",
+      status: "CLOSING",
       updatedAt: nowIso,
       closeRequestedAt: nowIso,
-      closeTargetDate: tradingDate,
-      closedAt: nowIso,
-      markPrice: close,
-      markPriceSource: typeof source === "string" ? source : null,
-      markPriceDate: tradingDate,
-      markPriceCapturedAt: typeof loadedAt === "string" ? loadedAt : nowIso,
-      markReturnValue: returnValue,
-      markScore: score,
-      markPredictionScore: score,
-      scoreAppliedToUser: null,
-      predictionScore: score,
-      outcome,
-      xpEarned,
-      result: {
-        exitPrice: close,
-        exitPriceSource: typeof source === "string" ? source : "eod",
-        returnValue,
-        score,
-        predictionScore: score,
-        outcome,
-        xpEarned,
-      },
+      closeTargetDate,
     });
-    tx.set(dailyMarkRef, {
-      predictionId,
-      predictionCreatedAt: prediction.createdAt,
-      userId: prediction.userId,
-      ticker: prediction.ticker,
-      direction: prediction.direction,
-      date: tradingDate,
-      runDate: tradingDate,
-      status: "SETTLED",
-      entryPrice: prediction.entryPrice,
-      markPrice: close,
-      markPriceSource: typeof source === "string" ? source : "eod",
-      markPriceDate: tradingDate,
-      markPriceCapturedAt: typeof loadedAt === "string" ? loadedAt : nowIso,
-      markReturnValue: returnValue,
-      markScore: score,
-      markPredictionScore: score,
-      score,
-      scoreChange: dailyMarkSnapshot.get("scoreChange") ?? 0,
-      previousScore: dailyMarkSnapshot.get("previousScore") ?? 0,
-      previousReturnValue: dailyMarkSnapshot.get("previousReturnValue") ?? 0,
-      returnValueChange: dailyMarkSnapshot.get("returnValueChange") ?? 0,
-      isClosed: true,
-      createdAt: dailyMarkSnapshot.get("createdAt") ?? nowIso,
-      updatedAt: nowIso,
-    }, { merge: true });
     tx.update(userRef, {
       updatedAt: nowIso,
       "stats.openPredictions": FieldValue.increment(-1),
-      "stats.closedPredictions": FieldValue.increment(1),
+      "stats.closingPredictions": FieldValue.increment(1),
     });
     if (!tickerLockSnapshot.exists || tickerLockSnapshot.get("predictionId") === predictionId) {
       tx.delete(tickerLockRef);
     }
   });
 
-  await recomputeUserAnalytics(db, user.uid, nowIso);
-
-  return { closed: true, status: resultStatus };
+  return { closed: false, status: resultStatus };
 }
 
 export async function updatePredictionDetails(predictionId: string, input: UpdatePredictionInput, user: AuthedUser) {
@@ -749,7 +673,41 @@ export async function cancelPrediction(predictionId: string, user: AuthedUser) {
       return;
     }
 
-    throw new Error("Only CREATED predictions can be canceled.");
+    if (status === "CLOSING") {
+      if (!hasCancelWindow(prediction.closeRequestedAt)) {
+        throw new Error("Close cancel window expired.");
+      }
+
+      const tickerLockRef = activeTickerLockRef(db, user.uid, prediction.ticker);
+      const tickerLockSnapshot = await tx.get(tickerLockRef);
+      if (tickerLockSnapshot.exists && tickerLockSnapshot.get("predictionId") !== predictionId) {
+        throw new Error("Duplicate open prediction exists for this ticker.");
+      }
+
+      nextStatus = "OPEN";
+      tx.update(predictionRef, {
+        status: "OPEN",
+        updatedAt: nowIso,
+        closeRequestedAt: null,
+        closeTargetDate: null,
+      });
+      tx.update(userRef, {
+        updatedAt: nowIso,
+        "stats.closingPredictions": FieldValue.increment(-1),
+        "stats.openPredictions": FieldValue.increment(1),
+      });
+      tx.set(tickerLockRef, {
+        predictionId,
+        userId: user.uid,
+        ticker: prediction.ticker,
+        status: "OPEN",
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      }, { merge: true });
+      return;
+    }
+
+    throw new Error("Only CREATED or CLOSING predictions can be canceled.");
   });
 
   return { status: nextStatus };

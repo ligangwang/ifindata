@@ -247,9 +247,7 @@ export function CreatePredictionPage() {
               placeholder="Explain why this setup should work"
             />
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-              <p className="text-slate-400">
-                Required.
-              </p>
+              {thesisErrorMessage ? <span /> : <p className="text-slate-400">Required.</p>}
               <p className={trimmedThesisLength > MAX_PREDICTION_THESIS_LENGTH ? "text-rose-300" : "text-slate-400"}>
                 {trimmedThesisLength}/{MAX_PREDICTION_THESIS_LENGTH}
               </p>

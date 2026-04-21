@@ -311,8 +311,13 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   const closeRequestedAtMs = Date.parse(prediction.closeRequestedAt ?? "");
   const createCancelWindowOpen = !Number.isNaN(createdAtMs) && now - createdAtMs <= 5 * 60 * 1000;
   const closeCancelWindowOpen = !Number.isNaN(closeRequestedAtMs) && now - closeRequestedAtMs <= 5 * 60 * 1000;
+  const isSettlementPending =
+    prediction.status === "OPEN" &&
+    Boolean(prediction.closeRequestedAt) &&
+    !prediction.result;
   const canEdit =
     isOwner &&
+    !isSettlementPending &&
     (prediction.status === "OPEN" || (prediction.status === "CREATED" && !createCancelWindowOpen));
   const returnText =
     typeof prediction.markReturnValue === "number"
@@ -321,11 +326,12 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   const ownerAction =
     isOwner && prediction.status === "CREATED" && createCancelWindowOpen
       ? { action: "cancel" as const, label: "Cancel" }
-      : isOwner && prediction.status === "OPEN"
+      : isOwner && prediction.status === "OPEN" && !isSettlementPending
         ? { action: "close" as const, label: "Close" }
         : isOwner && prediction.status === "CLOSING" && closeCancelWindowOpen
           ? { action: "cancel" as const, label: "Cancel close" }
         : null;
+  const statusLabel = isSettlementPending ? "Settles at next close" : formatPredictionStatus(prediction.status);
 
   return (
     <main className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-8">
@@ -343,7 +349,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           </h1>
           <div className="flex items-center gap-3">
             <span className="rounded-lg border border-cyan-400/30 px-2.5 py-1 text-xs font-medium text-cyan-100">
-              {formatPredictionStatus(prediction.status)}
+              {statusLabel}
             </span>
             {ownerAction ? (
               <button

@@ -31,7 +31,9 @@ export function CreatePredictionPage() {
   const isValidThesisTitle =
     trimmedThesisTitleLength > 0 &&
     trimmedThesisTitleLength <= MAX_PREDICTION_THESIS_TITLE_LENGTH;
-  const isValidThesis = trimmedThesisLength <= MAX_PREDICTION_THESIS_LENGTH;
+  const isValidThesis =
+    trimmedThesisLength > 0 &&
+    trimmedThesisLength <= MAX_PREDICTION_THESIS_LENGTH;
   const parsedTimeHorizonValue = Number(timeHorizonValue);
   const isValidTimeHorizon =
     timeHorizonUnit === "NONE" ||
@@ -40,9 +42,11 @@ export function CreatePredictionPage() {
     ? "Ticker must be 1-12 letters, numbers, dots, or hyphens."
     : null;
   const thesisErrorMessage =
-    trimmedThesisLength > MAX_PREDICTION_THESIS_LENGTH
-      ? `Thesis must be ${MAX_PREDICTION_THESIS_LENGTH} characters or fewer.`
-      : null;
+    trimmedThesisLength === 0
+      ? "Thesis is required."
+      : trimmedThesisLength > MAX_PREDICTION_THESIS_LENGTH
+        ? `Thesis must be ${MAX_PREDICTION_THESIS_LENGTH} characters or fewer.`
+        : null;
   const thesisTitleErrorMessage =
     thesisTitle && trimmedThesisTitleLength > MAX_PREDICTION_THESIS_TITLE_LENGTH
       ? `Title must be ${MAX_PREDICTION_THESIS_TITLE_LENGTH} characters or fewer.`
@@ -88,7 +92,7 @@ export function CreatePredictionPage() {
     }
 
     if (!isValidThesis) {
-      setError(thesisErrorMessage ?? `Thesis must be ${MAX_PREDICTION_THESIS_LENGTH} characters or fewer.`);
+      setError(thesisErrorMessage ?? "Thesis is required.");
       return;
     }
 
@@ -238,12 +242,13 @@ export function CreatePredictionPage() {
               onChange={(event) => setThesis(event.target.value)}
               rows={10}
               maxLength={MAX_PREDICTION_THESIS_LENGTH}
+              required
               className="min-h-56 rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
               placeholder="Explain why this setup should work"
             />
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-              <p className="text-slate-400">
-                Optional.
+              <p className={thesisErrorMessage ? "text-rose-300" : "text-slate-400"}>
+                Required.
               </p>
               <p className={trimmedThesisLength > MAX_PREDICTION_THESIS_LENGTH ? "text-rose-300" : "text-slate-400"}>
                 {trimmedThesisLength}/{MAX_PREDICTION_THESIS_LENGTH}

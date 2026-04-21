@@ -33,6 +33,7 @@ type PredictionDetail = {
   status: PredictionStatus;
   createdAt: string;
   closeRequestedAt?: string | null;
+  closeTargetDate?: string | null;
   markPrice?: number | null;
   markPriceDate?: string | null;
   markReturnValue?: number | null;
@@ -308,8 +309,13 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   const isOwner = Boolean(user && user.uid === prediction.userId);
   const createdAtMs = Date.parse(prediction.createdAt);
   const createCancelWindowOpen = !Number.isNaN(createdAtMs) && now - createdAtMs <= 5 * 60 * 1000;
+  const isSettlementPending =
+    prediction.status === "OPEN" &&
+    Boolean(prediction.closeRequestedAt) &&
+    !prediction.result;
   const canEdit =
     isOwner &&
+    !isSettlementPending &&
     (prediction.status === "OPEN" || (prediction.status === "CREATED" && !createCancelWindowOpen));
   const returnText =
     typeof prediction.markReturnValue === "number"
@@ -318,9 +324,10 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   const ownerAction =
     isOwner && prediction.status === "CREATED" && createCancelWindowOpen
       ? { action: "cancel" as const, label: "Cancel" }
-      : isOwner && prediction.status === "OPEN"
+      : isOwner && prediction.status === "OPEN" && !isSettlementPending
         ? { action: "close" as const, label: "Close" }
         : null;
+  const statusLabel = isSettlementPending ? "Settles at next close" : formatPredictionStatus(prediction.status);
 
   return (
     <main className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-8">
@@ -338,7 +345,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           </h1>
           <div className="flex items-center gap-3">
             <span className="rounded-lg border border-cyan-400/30 px-2.5 py-1 text-xs font-medium text-cyan-100">
-              {formatPredictionStatus(prediction.status)}
+              {statusLabel}
             </span>
             {ownerAction ? (
               <button
@@ -361,6 +368,20 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             ) : null}
           </div>
         </div>
+
+        {isSettlementPending ? (
+          <div className="mb-4 rounded-xl border border-cyan-400/15 bg-cyan-500/5 px-4 py-3 text-sm text-slate-300">
+            <p>Your exit request is locked. Final settlement happens at the next end-of-day update.</p>
+            {prediction.closeTargetDate ? (
+              <p className="mt-1 text-xs text-slate-400">
+                Expected settlement: {formatDetailDate(prediction.closeTargetDate)}
+              </p>
+            ) : null}
+            <p className="mt-1 text-xs text-slate-400">
+              Next EOD update runs around 8:00 PM ET on trading days.
+            </p>
+          </div>
+        ) : null}
 
         {editing ? (
           <div className="grid gap-3">

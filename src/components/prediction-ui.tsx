@@ -208,11 +208,10 @@ function daysSinceCall(entryDate: string | null | undefined, markPriceDate: stri
 
 export function formatPredictionStatus(status: PredictionStatus): string {
   switch (status) {
-    case "OPENING":
+    case "CREATED":
     case "OPEN":
-    case "CLOSING":
       return "Live";
-    case "CLOSED":
+    case "SETTLED":
       return "Settled";
     case "CANCELED":
       return "Canceled";
@@ -242,8 +241,8 @@ export function PredictionReturnSummary({
   const markReturnValue = typeof prediction.markReturnValue === "number" ? prediction.markReturnValue : null;
   const entryPrice = typeof prediction.entryPrice === "number" ? prediction.entryPrice : null;
   const sinceCallDays = daysSinceCall(prediction.entryDate, prediction.markPriceDate);
-  const isAwaitingEntry = status === "OPENING";
-  const isAwaitingFirstMark = (status === "OPEN" || status === "CLOSING") && entryPrice !== null && markReturnValue === null;
+  const isAwaitingEntry = status === "CREATED";
+  const isAwaitingFirstMark = status === "OPEN" && entryPrice !== null && markReturnValue === null;
   const hasReturn = !isAwaitingEntry && markReturnValue !== null && sinceCallDays !== null;
   const statusLabel = status ? formatPredictionStatus(status).toLowerCase() : null;
 

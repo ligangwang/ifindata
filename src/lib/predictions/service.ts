@@ -1,6 +1,8 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { recomputeUserAnalytics } from "@/lib/predictions/user-analytics";
 import {
+  canonicalPredictionStatus,
   isPredictionDirection,
   isPredictionTimeHorizonUnit,
   isPredictionVisibility,
@@ -24,7 +26,7 @@ type AuthedUser = {
   photoURL?: string | null;
 };
 
-type ListPredictionsInput = {
+  type ListPredictionsInput = {
   limit?: number;
   status?: PredictionStatus | "ACTIVE" | "LIVE" | "FINAL" | "SETTLED";
   userId?: string;
@@ -44,8 +46,8 @@ type ListPredictionsResult = {
   nextCursor: string | null;
 };
 
-const PUBLIC_PREDICTION_STATUSES: PredictionStatus[] = ["OPENING", "OPEN", "CLOSING", "CLOSED"];
-const ACTIVE_PREDICTION_STATUSES: PredictionStatus[] = ["OPENING", "OPEN", "CLOSING"];
+const PUBLIC_PREDICTION_STATUSES = ["CREATED", "OPEN", "SETTLED", "OPENING", "CLOSING", "CLOSED"] as const;
+const ACTIVE_PREDICTION_STATUSES = ["CREATED", "OPEN", "OPENING", "CLOSING"] as const;
 const ACTIVE_TICKER_LOCK_COLLECTION = "prediction_active_tickers";
 const CANCEL_WINDOW_MS = 5 * 60 * 1000;
 const TIME_HORIZON_LIMITS: Record<PredictionTimeHorizonUnit, number> = {
@@ -175,9 +177,15 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
   if (status === "ACTIVE" || status === "LIVE") {
     query = query.where("status", "in", ACTIVE_PREDICTION_STATUSES);
   } else if (status === "FINAL" || status === "SETTLED") {
-    query = query.where("status", "==", "CLOSED");
+    query = query.where("status", "in", ["SETTLED", "CLOSED"]);
   } else if (status) {
-    query = query.where("status", "==", status);
+    if (status === "CREATED") {
+      query = query.where("status", "in", ["CREATED", "OPENING"]);
+    } else if (status === "SETTLED") {
+      query = query.where("status", "in", ["SETTLED", "CLOSED"]);
+    } else {
+      query = query.where("status", "==", status);
+    }
   }
 
   query = query.orderBy("createdAt", "desc").limit(clampedLimit + 1);
@@ -194,13 +202,15 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
   const docs = snapshot.docs;
   const hasMore = docs.length > clampedLimit;
   const selected = hasMore ? docs.slice(0, clampedLimit) : docs;
-  const visibleSelected = selected.filter((doc) => PUBLIC_PREDICTION_STATUSES.includes(doc.get("status") as PredictionStatus));
+  const visibleSelected = selected.filter((doc) => PUBLIC_PREDICTION_STATUSES.includes(doc.get("status") as (typeof PUBLIC_PREDICTION_STATUSES)[number]));
   const items = visibleSelected.map((doc) => {
     const prediction = doc.data() as Prediction;
+    const status = canonicalPredictionStatus(prediction.status) ?? "CREATED";
 
     return {
       id: doc.id,
       ...prediction,
+      status,
       thesisTitle: sanitizePredictionThesisTitle(prediction.thesisTitle),
       thesis: sanitizePredictionThesis(prediction.thesis),
     };
@@ -448,7 +458,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       thesisTitle: sanitizePredictionThesisTitle(input.thesisTitle),
       thesis: sanitizePredictionThesis(input.thesis),
       timeHorizon,
-      status: "OPENING",
+      status: "CREATED",
       visibility: input.visibility ?? "PUBLIC",
       commentCount: 0,
       createdAt: nowIso,
@@ -479,7 +489,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       predictionId: predictionRef.id,
       userId: user.uid,
       ticker: input.ticker,
-      status: "OPENING",
+      status: "CREATED",
       createdAt: nowIso,
       updatedAt: nowIso,
     });
@@ -509,12 +519,12 @@ export async function closePrediction(predictionId: string, user: AuthedUser) {
   const nowIso = new Date().toISOString();
   const predictionRef = db.collection("predictions").doc(predictionId);
   const userRef = db.collection("users").doc(user.uid);
+  const resultStatus: PredictionStatus = "SETTLED";
 
   await db.runTransaction(async (tx) => {
-    const [predictionSnapshot, userSnapshot, closeTargetDate] = await Promise.all([
+    const [predictionSnapshot, userSnapshot] = await Promise.all([
       tx.get(predictionRef),
       tx.get(userRef),
-      resolveEodTargetDateInTransaction(tx, db),
     ]);
 
     if (!predictionSnapshot.exists) {
@@ -528,29 +538,115 @@ export async function closePrediction(predictionId: string, user: AuthedUser) {
     if (prediction.userId !== user.uid) {
       throw new Error("Forbidden");
     }
-    if (prediction.status !== "OPEN") {
+    const status = canonicalPredictionStatus(prediction.status);
+    if (status !== "OPEN") {
       throw new Error("Only OPEN predictions can be closed.");
     }
+    if (typeof prediction.entryPrice !== "number" || prediction.entryPrice <= 0) {
+      throw new Error("Prediction is missing an entry price.");
+    }
+    if (!prediction.entryDate) {
+      throw new Error("Prediction is missing an entry date.");
+    }
+
+    const latestPriceQuery = db
+      .collection("eod_prices")
+      .where("ticker", "==", prediction.ticker)
+      .orderBy("tradingDate", "desc")
+      .limit(1);
+    const latestPriceSnapshot = await tx.get(latestPriceQuery);
+    if (latestPriceSnapshot.empty) {
+      throw new Error("No EOD price is available yet for this ticker.");
+    }
+    const latestPriceDoc = latestPriceSnapshot.docs[0];
+    const tradingDate = latestPriceDoc.get("tradingDate");
+    const close = Number(latestPriceDoc.get("close"));
+    const source = latestPriceDoc.get("source");
+    const loadedAt = latestPriceDoc.get("loadedAt");
+    if (typeof tradingDate !== "string" || !Number.isFinite(close) || close <= 0) {
+      throw new Error("Latest EOD price is invalid.");
+    }
+    if (tradingDate <= prediction.entryDate) {
+      throw new Error("Prediction must remain open through at least one completed market day before settlement.");
+    }
+
+    const returnValue = prediction.direction === "UP"
+      ? (close - prediction.entryPrice) / prediction.entryPrice
+      : (prediction.entryPrice - close) / prediction.entryPrice;
+    const score = Math.round(1000 * Math.tanh(returnValue / 0.30));
+    const outcome = returnValue > 0 ? 1 : returnValue < 0 ? 0 : 0.5;
+    const xpEarned = Math.max(0, Math.round(50 + 0.2 * score));
 
     const tickerLockRef = activeTickerLockRef(db, user.uid, prediction.ticker);
+    const dailyMarkRef = db.collection("prediction_daily_marks").doc([predictionId, tradingDate].join("_"));
     const tickerLockSnapshot = await tx.get(tickerLockRef);
+    const dailyMarkSnapshot = await tx.get(dailyMarkRef);
     tx.update(predictionRef, {
-      status: "CLOSING",
+      status: "SETTLED",
       updatedAt: nowIso,
       closeRequestedAt: nowIso,
-      closeTargetDate,
+      closeTargetDate: tradingDate,
+      closedAt: nowIso,
+      markPrice: close,
+      markPriceSource: typeof source === "string" ? source : null,
+      markPriceDate: tradingDate,
+      markPriceCapturedAt: typeof loadedAt === "string" ? loadedAt : nowIso,
+      markReturnValue: returnValue,
+      markScore: score,
+      markPredictionScore: score,
+      scoreAppliedToUser: null,
+      predictionScore: score,
+      outcome,
+      xpEarned,
+      result: {
+        exitPrice: close,
+        exitPriceSource: typeof source === "string" ? source : "eod",
+        returnValue,
+        score,
+        predictionScore: score,
+        outcome,
+        xpEarned,
+      },
     });
+    tx.set(dailyMarkRef, {
+      predictionId,
+      predictionCreatedAt: prediction.createdAt,
+      userId: prediction.userId,
+      ticker: prediction.ticker,
+      direction: prediction.direction,
+      date: tradingDate,
+      runDate: tradingDate,
+      status: "SETTLED",
+      entryPrice: prediction.entryPrice,
+      markPrice: close,
+      markPriceSource: typeof source === "string" ? source : "eod",
+      markPriceDate: tradingDate,
+      markPriceCapturedAt: typeof loadedAt === "string" ? loadedAt : nowIso,
+      markReturnValue: returnValue,
+      markScore: score,
+      markPredictionScore: score,
+      score,
+      scoreChange: dailyMarkSnapshot.get("scoreChange") ?? 0,
+      previousScore: dailyMarkSnapshot.get("previousScore") ?? 0,
+      previousReturnValue: dailyMarkSnapshot.get("previousReturnValue") ?? 0,
+      returnValueChange: dailyMarkSnapshot.get("returnValueChange") ?? 0,
+      isClosed: true,
+      createdAt: dailyMarkSnapshot.get("createdAt") ?? nowIso,
+      updatedAt: nowIso,
+    }, { merge: true });
     tx.update(userRef, {
       updatedAt: nowIso,
       "stats.openPredictions": FieldValue.increment(-1),
-      "stats.closingPredictions": FieldValue.increment(1),
+      "stats.closedPredictions": FieldValue.increment(1),
     });
     if (!tickerLockSnapshot.exists || tickerLockSnapshot.get("predictionId") === predictionId) {
       tx.delete(tickerLockRef);
     }
   });
 
-  return { closed: false, status: "CLOSING" as const };
+  await recomputeUserAnalytics(db, user.uid, nowIso);
+
+  return { closed: true, status: resultStatus };
 }
 
 export async function updatePredictionDetails(predictionId: string, input: UpdatePredictionInput, user: AuthedUser) {
@@ -570,12 +666,13 @@ export async function updatePredictionDetails(predictionId: string, input: Updat
       throw new Error("Forbidden");
     }
 
+    const status = canonicalPredictionStatus(prediction.status);
     const canEdit =
-      prediction.status === "OPEN" ||
-      (prediction.status === "OPENING" && hasCreateCancelWindowExpired(prediction));
+      status === "OPEN" ||
+      (status === "CREATED" && hasCreateCancelWindowExpired(prediction));
 
     if (!canEdit) {
-      throw new Error("Only OPEN predictions or OPENING predictions after the cancel window can be edited.");
+      throw new Error("Only OPEN predictions or CREATED predictions after the cancel window can be edited.");
     }
 
     const baseDate =
@@ -627,7 +724,9 @@ export async function cancelPrediction(predictionId: string, user: AuthedUser) {
       throw new Error("Forbidden");
     }
 
-    if (prediction.status === "OPENING") {
+    const status = canonicalPredictionStatus(prediction.status);
+
+    if (status === "CREATED") {
       if (!hasCancelWindow(prediction.createdAt)) {
         throw new Error("Create cancel window expired.");
       }
@@ -652,41 +751,7 @@ export async function cancelPrediction(predictionId: string, user: AuthedUser) {
       return;
     }
 
-    if (prediction.status === "CLOSING") {
-      if (!hasCancelWindow(prediction.closeRequestedAt)) {
-        throw new Error("Close cancel window expired.");
-      }
-
-      const tickerLockRef = activeTickerLockRef(db, user.uid, prediction.ticker);
-      const tickerLockSnapshot = await tx.get(tickerLockRef);
-      if (tickerLockSnapshot.exists && tickerLockSnapshot.get("predictionId") !== predictionId) {
-        throw new Error("Duplicate open prediction exists for this ticker.");
-      }
-
-      nextStatus = "OPEN";
-      tx.update(predictionRef, {
-        status: "OPEN",
-        updatedAt: nowIso,
-        closeRequestedAt: null,
-        closeTargetDate: null,
-      });
-      tx.update(userRef, {
-        updatedAt: nowIso,
-        "stats.closingPredictions": FieldValue.increment(-1),
-        "stats.openPredictions": FieldValue.increment(1),
-      });
-      tx.set(tickerLockRef, {
-        predictionId,
-        userId: user.uid,
-        ticker: prediction.ticker,
-        status: "OPEN",
-        createdAt: nowIso,
-        updatedAt: nowIso,
-      }, { merge: true });
-      return;
-    }
-
-    throw new Error("Only OPENING or CLOSING predictions can be canceled.");
+    throw new Error("Only CREATED predictions can be canceled.");
   });
 
   return { status: nextStatus };

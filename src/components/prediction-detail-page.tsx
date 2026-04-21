@@ -87,10 +87,6 @@ function formatDetailDate(value: string | null | undefined): string {
   return DETAIL_DATE_FORMATTER.format(date);
 }
 
-function formatDetailStatus(status: PredictionStatus): string {
-  return status === "CLOSING" ? "Close pending" : formatPredictionStatus(status);
-}
-
 function formatResultReturn(result: NonNullable<PredictionDetail["result"]>): string {
   return formatReturnPercent(result.returnValue);
 }
@@ -311,24 +307,20 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   const thesis = sanitizePredictionThesis(prediction.thesis);
   const isOwner = Boolean(user && user.uid === prediction.userId);
   const createdAtMs = Date.parse(prediction.createdAt);
-  const closeRequestedAtMs = Date.parse(prediction.closeRequestedAt ?? "");
   const createCancelWindowOpen = !Number.isNaN(createdAtMs) && now - createdAtMs <= 5 * 60 * 1000;
-  const closeCancelWindowOpen = !Number.isNaN(closeRequestedAtMs) && now - closeRequestedAtMs <= 5 * 60 * 1000;
   const canEdit =
     isOwner &&
-    (prediction.status === "OPEN" || (prediction.status === "OPENING" && !createCancelWindowOpen));
+    (prediction.status === "OPEN" || (prediction.status === "CREATED" && !createCancelWindowOpen));
   const returnText =
     typeof prediction.markReturnValue === "number"
       ? formatReturnPercent(prediction.markReturnValue)
       : "Pending";
   const ownerAction =
-    isOwner && prediction.status === "OPENING" && createCancelWindowOpen
+    isOwner && prediction.status === "CREATED" && createCancelWindowOpen
       ? { action: "cancel" as const, label: "Cancel" }
       : isOwner && prediction.status === "OPEN"
         ? { action: "close" as const, label: "Close" }
-        : isOwner && prediction.status === "CLOSING" && closeCancelWindowOpen
-          ? { action: "cancel" as const, label: "Cancel close" }
-          : null;
+        : null;
 
   return (
     <main className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-8">
@@ -346,7 +338,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           </h1>
           <div className="flex items-center gap-3">
             <span className="rounded-lg border border-cyan-400/30 px-2.5 py-1 text-xs font-medium text-cyan-100">
-              {formatDetailStatus(prediction.status)}
+              {formatPredictionStatus(prediction.status)}
             </span>
             {ownerAction ? (
               <button

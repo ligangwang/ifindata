@@ -1,8 +1,8 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { NextRequest, NextResponse } from "next/server";
-import { normalizeTicker, sanitizePredictionThesis, sanitizePredictionThesisTitle, type Prediction } from "@/lib/predictions/types";
+import { canonicalPredictionStatus, normalizeTicker, sanitizePredictionThesis, sanitizePredictionThesisTitle, type Prediction } from "@/lib/predictions/types";
 
-const PUBLIC_PREDICTION_STATUSES = ["OPENING", "OPEN", "CLOSING", "CLOSED"] as const;
+const PUBLIC_PREDICTION_STATUSES = ["CREATED", "OPEN", "SETTLED", "OPENING", "CLOSING", "CLOSED"] as const;
 
 function parseLimit(raw: string | null): number {
   const parsed = Number(raw ?? "25");
@@ -45,6 +45,7 @@ function mapPredictionDoc(doc: FirebaseFirestore.QueryDocumentSnapshot) {
   return {
     id: doc.id,
     ...data,
+    status: canonicalPredictionStatus(data.status) ?? "CREATED",
     thesisTitle: sanitizePredictionThesisTitle(data.thesisTitle),
     thesis: sanitizePredictionThesis(data.thesis),
   };

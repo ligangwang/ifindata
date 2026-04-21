@@ -39,7 +39,7 @@ export async function readUserAnalytics(
   const sourceStats = stats && typeof stats === "object" ? stats : {};
   const settledSnapshot = await db.collection("predictions")
     .where("userId", "==", userId)
-    .where("status", "==", "CLOSED")
+    .where("status", "in", ["SETTLED", "CLOSED"])
     .get();
   const totalCalls = Math.max(
     settledSnapshot.size,

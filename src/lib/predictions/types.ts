@@ -40,6 +40,8 @@ export type UserProfile = {
   displayName: string | null;
   email: string | null;
   photoURL: string | null;
+  accountType?: "HUMAN" | "AI_ANALYST";
+  aiAnalystId?: string | null;
   authProviders: string[];
   createdAt: string;
   updatedAt: string;
@@ -66,6 +68,7 @@ export type Prediction = {
   userId: string;
   authorDisplayName: string | null;
   authorPhotoURL: string | null;
+  sourceType?: "HUMAN" | "AI_ANALYST";
   ticker: string;
   direction: PredictionDirection;
   thesisTitle?: string;
@@ -98,6 +101,14 @@ export type Prediction = {
   closeTargetDate?: string | null;
   closedAt: string | null;
   canceledAt?: string | null;
+  generation?: {
+    confidence?: number | null;
+    catalyst?: string | null;
+    model?: string | null;
+    promptVersion?: string | null;
+    generatedAt?: string | null;
+    approvalStatus?: "DRAFT" | "APPROVED" | "REJECTED" | "PUBLISHED" | null;
+  } | null;
   result: PredictionResult | null;
 };
 

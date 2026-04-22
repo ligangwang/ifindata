@@ -37,6 +37,23 @@ type ProfilePayload = {
     photoURL: string | null;
     nickname: string | null;
     bio: string;
+    accountType?: "HUMAN" | "AI_ANALYST";
+    aiAnalyst?: {
+      badgeLabel: string;
+      coverageTickers: string[];
+      disclosureLong: string;
+      howItWorks: {
+        summary: string;
+        methodology: string[];
+        rules: string[];
+        limitations: string[];
+      };
+      profileSections: {
+        coverageUniverseTitle: string;
+        methodologyTitle: string;
+        limitationsTitle: string;
+      };
+    } | null;
     stats: {
       totalPredictions: number;
       openingPredictions: number;
@@ -135,6 +152,7 @@ export function AnalystProfilePage({
         authorDisplayName: payload.profile.displayName,
         authorNickname: payload.profile.nickname,
         authorPhotoURL: payload.profile.photoURL,
+        authorAccountType: payload.profile.accountType ?? "HUMAN",
         authorStats: {
           totalScore: payload.profile.stats.totalScore,
           totalPredictions: settledCalls,
@@ -392,6 +410,13 @@ export function AnalystProfilePage({
                 <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">
                   {payload.profile.nickname ? `@${payload.profile.nickname}` : preferredName}
                 </h1>
+                {payload.profile.aiAnalyst ? (
+                  <p className="mt-2">
+                    <span className="rounded-full border border-cyan-400/35 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-cyan-100">
+                      {payload.profile.aiAnalyst.badgeLabel}
+                    </span>
+                  </p>
+                ) : null}
                 <nav className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400" aria-label="Profile follow lists">
                   <Link href={`/analysts/${userId}/following`} className="hover:text-cyan-200">
                     {countText(payload.profile.stats.followingCount, "following", "following")}
@@ -532,7 +557,56 @@ export function AnalystProfilePage({
             {payload.profile.bio || "Add a bio to tell others what you analyze"}
           </p>
         )}
+        {payload.profile.aiAnalyst ? (
+          <p className="mt-3 text-xs leading-6 text-slate-400">
+            {payload.profile.aiAnalyst.disclosureLong}
+          </p>
+        ) : null}
       </section>
+
+      {payload.profile.aiAnalyst ? (
+        <section className="grid gap-4 rounded-2xl border border-white/15 bg-slate-950/55 p-5 md:grid-cols-3">
+          <div>
+            <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">
+              {payload.profile.aiAnalyst.profileSections.coverageUniverseTitle}
+            </h2>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {payload.profile.aiAnalyst.coverageTickers.map((ticker) => (
+                <span
+                  key={ticker}
+                  className="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs font-medium text-cyan-100"
+                >
+                  {formatTickerSymbol(ticker)}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">
+              {payload.profile.aiAnalyst.profileSections.methodologyTitle}
+            </h2>
+            <div className="mt-2 space-y-2 text-sm leading-6 text-slate-300">
+              <p>{payload.profile.aiAnalyst.howItWorks.summary}</p>
+              {payload.profile.aiAnalyst.howItWorks.methodology.map((item) => (
+                <p key={item}>{item}</p>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h2 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">
+              {payload.profile.aiAnalyst.profileSections.limitationsTitle}
+            </h2>
+            <div className="mt-2 space-y-2 text-sm leading-6 text-slate-300">
+              {payload.profile.aiAnalyst.howItWorks.rules.map((item) => (
+                <p key={item}>{item}</p>
+              ))}
+              {payload.profile.aiAnalyst.howItWorks.limitations.map((item) => (
+                <p key={item}>{item}</p>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {shareOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/80 px-4">

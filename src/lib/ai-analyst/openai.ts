@@ -238,7 +238,7 @@ export async function generateAiAnalystCalls(payload: GenerateCallsPayload): Pro
               type: "input_text",
               text:
                 "You are an AI equity analyst generating selective prediction drafts for a public analyst account. " +
-                "You must return JSON only. Begin by reviewing the current open predictions in the portfolio, then evaluate eligible market candidates for this run date. " +
+                "You must return JSON only. Begin by reviewing the current open predictions in the portfolio, then evaluate the eligible covered candidates supplied for this run date. " +
                 "Prefer NO_CALL unless there is a clear setup. Never create a new call for a ticker that already has an open prediction, never exceed the portfolio open-prediction limit, and never exceed the max new calls allowed for the run. " +
                 "For CREATE_CALL, include a direction, concise thesis title, thesis, confidence between 0 and 1, catalyst, signals, risks, and time horizon. " +
                 "For NO_CALL, return the ticker, action=NO_CALL, and use null for non-applicable fields.",

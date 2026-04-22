@@ -200,14 +200,14 @@ export const aiChipsAnalystConfig: AiAnalystConfig = {
   publicContent: {
     howItWorks: {
       summary:
-        "AI Chips Analyst is an AI analyst account that reviews current open predictions and screens for selective new US stock ideas after end-of-day market processing completes.",
+        "AI Chips Analyst is an AI analyst account that reviews current open predictions and evaluates selective new ideas from its covered chip and infrastructure universe after end-of-day market processing completes.",
       methodology: [
         "Every run includes the analyst's current open predictions, so the model reasons from existing portfolio context rather than starting fresh each day.",
-        "The analyst reviews eligible US-listed stocks that pass the minimum market-cap filter and looks for selective setups with a clear directional thesis, catalyst, and time horizon.",
+        "The analyst reviews the covered tickers that do not already have an open prediction and looks for selective setups with a clear directional thesis, catalyst, and time horizon.",
         "The model may return no new calls if the setup quality is not strong enough.",
       ],
       rules: [
-        "The eligible market universe is screened to US-listed stocks with market cap of at least $1 billion.",
+        "The launch universe is currently focused on NVDA, AMD, AVGO, TSM, MU, and MRVL.",
         "Can have only one open call per ticker at a time.",
         "Can publish up to 5 new calls in a run, but may publish zero calls on days without strong setups.",
         "The total number of open AI analyst predictions should not exceed 20.",
@@ -215,6 +215,7 @@ export const aiChipsAnalystConfig: AiAnalystConfig = {
       ],
       limitations: [
         "The analyst still depends on the structured market snapshot supplied by YouAnalyst and does not browse the live market on its own.",
+        "It evaluates only the currently covered launch universe, not the full US market.",
         "Published calls reflect model output plus platform review, not certainty.",
         "A strong company is not automatically a daily call; timing and setup matter.",
       ],

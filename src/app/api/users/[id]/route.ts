@@ -1,5 +1,6 @@
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { getAiAnalystPublicProfileForUser } from "@/lib/ai-analyst/config";
 import { listPredictions } from "@/lib/predictions/service";
 import { readUserAnalytics } from "@/lib/predictions/user-analytics";
 import { NextRequest, NextResponse } from "next/server";
@@ -205,6 +206,8 @@ export async function GET(
           photoURL: profileData.photoURL,
           nickname: profileData.nickname,
           bio: profileData.bio,
+          accountType: "HUMAN",
+          aiAnalyst: null,
           stats,
           latestDailyScore,
           settings: profileData.settings,
@@ -225,6 +228,7 @@ export async function GET(
     }
 
     const stats = await coerceStatsWithAnalytics(db, id, userData.stats);
+    const aiAnalyst = getAiAnalystPublicProfileForUser(userData);
 
     return NextResponse.json({
       profile: {
@@ -233,6 +237,8 @@ export async function GET(
         photoURL: userData.photoURL ?? null,
         nickname: typeof userData.nickname === "string" ? userData.nickname : null,
         bio: userData.bio ?? "",
+        accountType: userData.accountType === "AI_ANALYST" ? "AI_ANALYST" : "HUMAN",
+        aiAnalyst,
         stats,
         latestDailyScore,
         settings: {

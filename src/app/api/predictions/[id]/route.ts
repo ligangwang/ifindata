@@ -1,5 +1,6 @@
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { getAiAnalystPublicProfileForUser } from "@/lib/ai-analyst/config";
 import { canonicalPredictionStatus, sanitizePredictionThesis, sanitizePredictionThesisTitle } from "@/lib/predictions/types";
 import { updatePredictionDetails, validateUpdatePredictionInput } from "@/lib/predictions/service";
 import { NextRequest, NextResponse } from "next/server";
@@ -50,11 +51,16 @@ export async function GET(
     }
 
     let authorNickname: string | null = null;
+    let authorAccountType: "HUMAN" | "AI_ANALYST" | null = null;
+    let authorAiAnalystTheme: "AI_CHIPS" | null = null;
     if (predictionUserId) {
       const userSnapshot = await db.collection("users").doc(predictionUserId).get();
       const userData = userSnapshot.data() as Record<string, unknown> | undefined;
       const nickname = typeof userData?.nickname === "string" ? userData.nickname.trim() : "";
+      const aiAnalystProfile = getAiAnalystPublicProfileForUser(userData);
       authorNickname = nickname || null;
+      authorAccountType = userData?.accountType === "AI_ANALYST" ? "AI_ANALYST" : "HUMAN";
+      authorAiAnalystTheme = aiAnalystProfile?.theme ?? null;
     }
 
     return NextResponse.json({
@@ -63,6 +69,8 @@ export async function GET(
       status: canonicalPredictionStatus(prediction.status) ?? "CREATED",
       authorDisplayName,
       authorNickname,
+      authorAccountType,
+      authorAiAnalystTheme,
       thesisTitle: sanitizePredictionThesisTitle(typeof prediction.thesisTitle === "string" ? prediction.thesisTitle : ""),
       thesis: sanitizePredictionThesis(typeof prediction.thesis === "string" ? prediction.thesis : ""),
     });

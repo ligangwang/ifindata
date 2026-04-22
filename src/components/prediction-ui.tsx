@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import type { AiAnalystTheme } from "@/lib/ai-analyst/config";
 import type { PredictionDirection, PredictionStatus, PredictionTimeHorizon } from "@/lib/predictions/types";
 
 export type PredictionMarkFields = {
@@ -21,6 +22,8 @@ export type PredictionAuthorFields = {
   authorDisplayName?: string | null;
   authorNickname?: string | null;
   authorPhotoURL?: string | null;
+  authorAccountType?: "HUMAN" | "AI_ANALYST" | null;
+  authorAiAnalystTheme?: AiAnalystTheme | null;
   authorStats?: {
     totalScore?: number | null;
     totalPredictions?: number | null;
@@ -297,6 +300,7 @@ export function PredictionAuthorSummary({ author, className = "" }: { author: Pr
   const totalScore = author.authorStats?.totalScore;
   const totalPredictions = author.authorStats?.totalPredictions;
   const hasStats = typeof totalScore === "number" && typeof totalPredictions === "number";
+  const isAiAnalyst = author.authorAccountType === "AI_ANALYST";
 
   return (
     <Link
@@ -318,6 +322,11 @@ export function PredictionAuthorSummary({ author, className = "" }: { author: Pr
         </span>
       )}
       <span className="font-medium text-cyan-200">{label}</span>
+      {isAiAnalyst ? (
+        <span className="rounded-full border border-cyan-400/35 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-100">
+          AI Analyst
+        </span>
+      ) : null}
       {hasStats ? (
         <>
           <span className="text-slate-500">&middot;</span>

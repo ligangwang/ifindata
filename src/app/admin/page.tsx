@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AdminFeedbackPage } from "@/components/admin-feedback-page";
+import { AdminDashboardPage } from "@/components/admin-dashboard-page";
 
 export const metadata: Metadata = {
   title: "Admin | YouAnalyst",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function AdminPage() {
-  return <AdminFeedbackPage />;
+  return <AdminDashboardPage />;
 }

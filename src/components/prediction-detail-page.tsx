@@ -34,6 +34,7 @@ type PredictionDetail = {
   createdAt: string;
   closeRequestedAt?: string | null;
   closeTargetDate?: string | null;
+  closeReason?: string | null;
   markPrice?: number | null;
   markPriceDate?: string | null;
   markReturnValue?: number | null;
@@ -100,6 +101,8 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<"close" | "cancel" | null>(null);
+  const [closeReason, setCloseReason] = useState("");
+  const [showCloseComposer, setShowCloseComposer] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editThesis, setEditThesis] = useState("");
@@ -185,6 +188,12 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
       return;
     }
 
+    const trimmedCloseReason = closeReason.trim();
+    if (action === "close" && !trimmedCloseReason) {
+      setError("A close reason is required.");
+      return;
+    }
+
     setActionPending(action);
     setError(null);
 
@@ -192,8 +201,10 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
       const response = await fetch(`/api/predictions/${predictionId}/${action}`, {
         method: "POST",
         headers: {
+          "content-type": "application/json",
           authorization: `Bearer ${token}`,
         },
+        body: action === "close" ? JSON.stringify({ reason: trimmedCloseReason }) : undefined,
       });
 
       if (!response.ok) {
@@ -202,6 +213,10 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
       }
 
       await loadAll();
+      if (action === "close") {
+        setCloseReason("");
+        setShowCloseComposer(false);
+      }
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to update prediction.");
     } finally {
@@ -352,14 +367,28 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
               {statusLabel}
             </span>
             {ownerAction ? (
-              <button
-                type="button"
-                onClick={() => void runPredictionAction(ownerAction.action)}
-                disabled={actionPending !== null}
-                className="rounded-lg border border-cyan-400/35 px-3 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {actionPending === ownerAction.action ? "Working..." : ownerAction.label}
-              </button>
+              ownerAction.action === "close" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCloseComposer((prev) => !prev);
+                    setError(null);
+                  }}
+                  disabled={actionPending !== null}
+                  className="rounded-lg border border-cyan-400/35 px-3 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {showCloseComposer ? "Cancel close" : ownerAction.label}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void runPredictionAction(ownerAction.action)}
+                  disabled={actionPending !== null}
+                  className="rounded-lg border border-cyan-400/35 px-3 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {actionPending === ownerAction.action ? "Working..." : ownerAction.label}
+                </button>
+              )
             ) : null}
             {canEdit && !editing ? (
               <button
@@ -376,6 +405,12 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
         {prediction.status === "CLOSING" ? (
           <div className="mb-4 rounded-xl border border-cyan-400/15 bg-cyan-500/5 px-4 py-3 text-sm text-slate-300">
             <p>Your exit request is locked. Final settlement happens at the next end-of-day update.</p>
+            {prediction.closeReason ? (
+              <p className="mt-2 text-sm text-slate-200">
+                <span className="text-slate-400">Reason: </span>
+                {prediction.closeReason}
+              </p>
+            ) : null}
             {prediction.closeTargetDate ? (
               <p className="mt-1 text-xs text-slate-400">
                 Expected settlement: {formatDetailDate(prediction.closeTargetDate)}
@@ -384,6 +419,47 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             <p className="mt-1 text-xs text-slate-400">
               Next EOD update runs around 8:00 PM ET on trading days.
             </p>
+          </div>
+        ) : null}
+
+        {showCloseComposer && ownerAction?.action === "close" ? (
+          <div className="mb-4 grid gap-3 rounded-xl border border-cyan-400/15 bg-slate-950/45 px-4 py-4">
+            <div className="grid gap-1">
+              <label className="text-xs text-slate-400" htmlFor="close-reason">
+                Close reason
+              </label>
+              <textarea
+                id="close-reason"
+                rows={3}
+                value={closeReason}
+                onChange={(event) => setCloseReason(event.target.value)}
+                placeholder="Why are you closing this prediction?"
+                className="rounded-lg border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+              />
+              <p className="text-xs text-slate-500">A reason is required. There is no minimum length.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void runPredictionAction("close")}
+                disabled={actionPending !== null}
+                className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-50"
+              >
+                {actionPending === "close" ? "Working..." : "Confirm close"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCloseComposer(false);
+                  setCloseReason("");
+                  setError(null);
+                }}
+                disabled={actionPending !== null}
+                className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-slate-200 hover:border-white/30 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         ) : null}
 
@@ -509,6 +585,12 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
         {prediction.result ? (
           <div className="mt-4 rounded-xl border border-emerald-400/35 bg-emerald-900/20 p-3 text-sm text-emerald-50">
             Closed at {prediction.result.exitPrice.toFixed(2)} with return {formatResultReturn(prediction.result)}.
+            {prediction.closeReason ? (
+              <p className="mt-2 text-sm text-emerald-100">
+                <span className="text-emerald-200/80">Close reason: </span>
+                {prediction.closeReason}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </section>

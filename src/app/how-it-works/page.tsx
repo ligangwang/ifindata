@@ -102,15 +102,22 @@ export default function HowItWorksPage() {
         <div>
           <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">AI Analyst Accounts</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">{aiAnalystGuide.summary}</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {aiChipsAnalystConfig.coverage.tickers.map((ticker) => (
-              <span
-                key={ticker}
-                className="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs font-medium text-cyan-100"
-              >
-                {ticker}
-              </span>
-            ))}
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Market Scope</p>
+              <p className="mt-2 font-[var(--font-sora)] text-lg font-semibold text-cyan-100">US-listed stocks</p>
+              <p className="mt-1 text-sm leading-6 text-slate-300">The AI analyst can look beyond a fixed starter basket.</p>
+            </div>
+            <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Minimum Size</p>
+              <p className="mt-2 font-[var(--font-sora)] text-lg font-semibold text-cyan-100">$1B market cap</p>
+              <p className="mt-1 text-sm leading-6 text-slate-300">The screen is limited to larger public companies in the US market.</p>
+            </div>
+            <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Portfolio Limit</p>
+              <p className="mt-2 font-[var(--font-sora)] text-lg font-semibold text-cyan-100">20 open calls max</p>
+              <p className="mt-1 text-sm leading-6 text-slate-300">It manages a bounded set of active ideas instead of opening unlimited positions.</p>
+            </div>
           </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-3 md:grid-cols-1">

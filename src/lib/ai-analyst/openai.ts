@@ -24,30 +24,36 @@ export type GenerateCallsPayload = {
     badgeLabel: string;
     theme: string;
   };
+  portfolio: {
+    currentOpenPredictions: Array<{
+      predictionId: string;
+      ticker: string;
+      direction: "UP" | "DOWN";
+      thesisTitle: string;
+      confidence: number | null;
+      catalyst: string | null;
+      createdAt: string;
+      entryDate: string | null;
+      markReturnValue: number | null;
+      targetDate: string | null;
+      status: string;
+    }>;
+    maxOpenPredictions: number;
+    oneOpenPredictionPerTicker: boolean;
+  };
   rules: {
-    oneOpenCallPerTicker: boolean;
-    maxOpenCallsPerTicker: number;
     requiresAdminReview: boolean;
     mayPublishZeroCalls: boolean;
     minPublishConfidence: number;
+    maxNewCallsPerRun: number;
   };
-  coverage: {
-    tickers: string[];
+  candidateUniverse: {
+    market: string;
+    currentFocusTickers: string[];
     thesisScope: string[];
+    usListedOnly: boolean;
+    minMarketCapUsd: number;
   };
-  existingOpenCalls: Array<{
-    predictionId: string;
-    ticker: string;
-    direction: "UP" | "DOWN";
-    thesisTitle: string;
-    confidence: number | null;
-    catalyst: string | null;
-    createdAt: string;
-    entryDate: string | null;
-    markReturnValue: number | null;
-    targetDate: string | null;
-    status: string;
-  }>;
   eligibleTickers: string[];
   runDate: string;
 };
@@ -232,8 +238,8 @@ export async function generateAiAnalystCalls(payload: GenerateCallsPayload): Pro
               type: "input_text",
               text:
                 "You are an AI equity analyst generating selective prediction drafts for a public analyst account. " +
-                "You must return JSON only. Evaluate the covered universe for this run date. " +
-                "Prefer NO_CALL unless there is a clear setup. Never create a new call for a ticker that already has an open call. " +
+                "You must return JSON only. Begin by reviewing the current open predictions in the portfolio, then evaluate eligible market candidates for this run date. " +
+                "Prefer NO_CALL unless there is a clear setup. Never create a new call for a ticker that already has an open prediction, never exceed the portfolio open-prediction limit, and never exceed the max new calls allowed for the run. " +
                 "For CREATE_CALL, include a direction, concise thesis title, thesis, confidence between 0 and 1, catalyst, signals, risks, and time horizon. " +
                 "For NO_CALL, return the ticker, action=NO_CALL, and use null for non-applicable fields.",
             },

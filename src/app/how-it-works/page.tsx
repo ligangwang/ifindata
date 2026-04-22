@@ -105,8 +105,8 @@ export default function HowItWorksPage() {
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Current Focus</p>
-              <p className="mt-2 font-[var(--font-sora)] text-lg font-semibold text-cyan-100">AI chips and infrastructure</p>
-              <p className="mt-1 text-sm leading-6 text-slate-300">The launch universe is intentionally narrow while the workflow matures.</p>
+              <p className="mt-2 font-[var(--font-sora)] text-lg font-semibold text-cyan-100">SMH-style chip basket</p>
+              <p className="mt-1 text-sm leading-6 text-slate-300">The launch universe starts with a broader semiconductor and infrastructure basket instead of only a handful of names.</p>
             </div>
             <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Run Limit</p>

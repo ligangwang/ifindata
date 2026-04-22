@@ -535,11 +535,20 @@ export async function createPredictionForUser(
 }
 
 export async function closePrediction(predictionId: string, user: AuthedUser) {
+  return closePredictionWithReason(predictionId, "", user);
+}
+
+export async function closePredictionWithReason(predictionId: string, reason: string, user: AuthedUser) {
   const db = getAdminFirestore();
   const nowIso = new Date().toISOString();
   const predictionRef = db.collection("predictions").doc(predictionId);
   const userRef = db.collection("users").doc(user.uid);
   const resultStatus: PredictionStatus = "CLOSING";
+  const trimmedReason = reason.trim();
+
+  if (!trimmedReason) {
+    throw new Error("close reason is required");
+  }
 
   await db.runTransaction(async (tx) => {
     const [predictionSnapshot, userSnapshot, closeTargetDate] = await Promise.all([
@@ -580,6 +589,7 @@ export async function closePrediction(predictionId: string, user: AuthedUser) {
       updatedAt: nowIso,
       closeRequestedAt: nowIso,
       closeTargetDate,
+      closeReason: trimmedReason,
     });
     tx.update(userRef, {
       updatedAt: nowIso,
@@ -713,6 +723,7 @@ export async function cancelPrediction(predictionId: string, user: AuthedUser) {
         updatedAt: nowIso,
         closeRequestedAt: null,
         closeTargetDate: null,
+        closeReason: null,
       });
       tx.update(userRef, {
         updatedAt: nowIso,

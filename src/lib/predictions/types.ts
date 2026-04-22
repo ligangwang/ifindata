@@ -99,6 +99,7 @@ export type Prediction = {
   outcome?: number | null;
   closeRequestedAt?: string | null;
   closeTargetDate?: string | null;
+  closeReason?: string | null;
   closedAt: string | null;
   canceledAt?: string | null;
   generation?: {

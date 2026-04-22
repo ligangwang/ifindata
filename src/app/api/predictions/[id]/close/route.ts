@@ -1,5 +1,5 @@
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
-import { closePrediction } from "@/lib/predictions/service";
+import { closePredictionWithReason } from "@/lib/predictions/service";
 import { NextRequest, NextResponse } from "next/server";
 
 function statusFromError(message: string): number {
@@ -30,7 +30,9 @@ export async function POST(
   const { id } = await context.params;
 
   try {
-    const result = await closePrediction(id, {
+    const payload = (await request.json().catch(() => ({}))) as { reason?: unknown };
+    const reason = typeof payload.reason === "string" ? payload.reason : "";
+    const result = await closePredictionWithReason(id, reason, {
       uid: decoded.uid,
       displayName: decoded.name,
       photoURL: decoded.picture,

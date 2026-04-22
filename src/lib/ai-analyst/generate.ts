@@ -49,18 +49,24 @@ export type AiAnalystGenerateResult = {
       badgeLabel: string;
       theme: string;
     };
+    portfolio: {
+      currentOpenPredictions: ReturnType<typeof summarizeOpenCalls>;
+      maxOpenPredictions: number;
+      oneOpenPredictionPerTicker: boolean;
+    };
     rules: {
-      oneOpenCallPerTicker: boolean;
-      maxOpenCallsPerTicker: number;
       requiresAdminReview: boolean;
       mayPublishZeroCalls: boolean;
       minPublishConfidence: number;
+      maxNewCallsPerRun: number;
     };
-    coverage: {
-      tickers: string[];
+    candidateUniverse: {
+      market: string;
+      currentFocusTickers: string[];
       thesisScope: string[];
+      usListedOnly: boolean;
+      minMarketCapUsd: number;
     };
-    existingOpenCalls: ReturnType<typeof summarizeOpenCalls>;
     eligibleTickers: string[];
     runDate: string;
   };
@@ -133,18 +139,24 @@ export async function runAiAnalystGenerate(
       badgeLabel: aiChipsAnalystConfig.identity.badgeLabel,
       theme: aiChipsAnalystConfig.identity.theme,
     },
+    portfolio: {
+      currentOpenPredictions: openCalls,
+      maxOpenPredictions: aiChipsAnalystConfig.publication.portfolio.maxOpenPredictions,
+      oneOpenPredictionPerTicker: aiChipsAnalystConfig.guardrails.openCallPolicy.blockDuplicateTickerWhileOpen,
+    },
     rules: {
-      oneOpenCallPerTicker: aiChipsAnalystConfig.guardrails.openCallPolicy.blockDuplicateTickerWhileOpen,
-      maxOpenCallsPerTicker: aiChipsAnalystConfig.guardrails.openCallPolicy.maxOpenCallsPerTicker,
       requiresAdminReview: aiChipsAnalystConfig.guardrails.approval.requiresAdminReview,
       mayPublishZeroCalls: aiChipsAnalystConfig.publication.cadence.mayPublishZeroCalls,
       minPublishConfidence: aiChipsAnalystConfig.guardrails.confidence.minPublishConfidence,
+      maxNewCallsPerRun: aiChipsAnalystConfig.publication.cadence.maxNewCallsPerRun,
     },
-    coverage: {
-      tickers: aiChipsAnalystConfig.coverage.tickers,
+    candidateUniverse: {
+      market: aiChipsAnalystConfig.coverage.market,
+      currentFocusTickers: aiChipsAnalystConfig.coverage.tickers,
       thesisScope: aiChipsAnalystConfig.coverage.thesisScope,
+      usListedOnly: aiChipsAnalystConfig.coverage.candidateRequirements.usListedOnly,
+      minMarketCapUsd: aiChipsAnalystConfig.coverage.candidateRequirements.minMarketCapUsd,
     },
-    existingOpenCalls: openCalls,
     eligibleTickers: dailyContext.eligibleTickers,
     runDate,
   };

@@ -1,5 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { getAiAnalystPublicProfileForUser } from "@/lib/ai-analyst/config";
 import {
   canonicalPredictionStatus,
   isPredictionDirection,
@@ -25,6 +26,11 @@ type AuthedUser = {
   photoURL?: string | null;
 };
 
+type InternalCreatePredictionOptions = {
+  sourceType?: "HUMAN" | "AI_ANALYST";
+  generation?: Prediction["generation"];
+};
+
   type ListPredictionsInput = {
   limit?: number;
   status?: PredictionStatus | "ACTIVE" | "LIVE" | "FINAL" | "SETTLED";
@@ -37,6 +43,8 @@ type ListPredictionsResult = {
   items: Array<Prediction & {
     id: string;
     authorNickname: string | null;
+    authorAccountType: "HUMAN" | "AI_ANALYST" | null;
+    authorAiAnalystTheme: "AI_CHIPS" | null;
     authorStats: {
       totalScore: number;
       totalPredictions: number;
@@ -219,12 +227,15 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
       const userSnapshot = await db.collection("users").doc(id).get();
       const userData = userSnapshot.data() as Record<string, unknown> | undefined;
       const nickname = typeof userData?.nickname === "string" ? userData.nickname : null;
+      const aiAnalystProfile = getAiAnalystPublicProfileForUser(userData);
       const stats = userData?.stats && typeof userData.stats === "object"
         ? userData.stats as Record<string, unknown>
         : {};
       const canShowStats = isPublicProfile(userData);
       return [id, {
         nickname,
+        accountType: userData?.accountType === "AI_ANALYST" ? "AI_ANALYST" : "HUMAN",
+        aiAnalystTheme: aiAnalystProfile?.theme ?? null,
         totalScore: canShowStats ? numberFromStats(stats, "totalScore") : null,
         totalPredictions: canShowStats ? numberFromStats(stats, "settledCalls") || numberFromStats(stats, "closedPredictions") : null,
       }] as const;
@@ -235,6 +246,8 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
   const itemsWithNickname = items.map((item) => ({
     ...item,
     authorNickname: authorByUserId.get(item.userId)?.nickname ?? null,
+    authorAccountType: authorByUserId.get(item.userId)?.accountType ?? null,
+    authorAiAnalystTheme: authorByUserId.get(item.userId)?.aiAnalystTheme ?? null,
     authorStats:
       authorByUserId.get(item.userId)?.totalScore === null ||
       authorByUserId.get(item.userId)?.totalPredictions === null
@@ -401,6 +414,14 @@ export function validateUpdatePredictionInput(raw: unknown, baseDate: string): U
 }
 
 export async function createPrediction(input: CreatePredictionInput, user: AuthedUser) {
+  return createPredictionForUser(input, user);
+}
+
+export async function createPredictionForUser(
+  input: CreatePredictionInput,
+  user: AuthedUser,
+  options: InternalCreatePredictionOptions = {},
+) {
   const db = getAdminFirestore();
   const nowIso = new Date().toISOString();
   const predictionRef = db.collection("predictions").doc();
@@ -443,6 +464,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       authorDisplayName:
         (userData.displayName as string | null | undefined) ?? user.displayName ?? null,
       authorPhotoURL: (userData.photoURL as string | null | undefined) ?? user.photoURL ?? null,
+      sourceType: options.sourceType ?? "HUMAN",
       ticker: input.ticker,
       direction: input.direction,
       entryRequestedAt: nowIso,
@@ -470,6 +492,7 @@ export async function createPrediction(input: CreatePredictionInput, user: Authe
       closeRequestedAt: null,
       closeTargetDate: null,
       closedAt: null,
+      generation: options.generation ?? null,
       result: null,
     };
 

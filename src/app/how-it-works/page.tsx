@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { aiChipsAnalystConfig } from "@/lib/ai-analyst/config";
 
 export const metadata: Metadata = {
   title: "How It Works | YouAnalyst",
@@ -22,6 +23,8 @@ const lifecycle = [
 ];
 
 export default function HowItWorksPage() {
+  const aiAnalystGuide = aiChipsAnalystConfig.publicContent.howItWorks;
+
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8">
       <section className="border-b border-white/10 pb-6">
@@ -92,6 +95,49 @@ export default function HowItWorksPage() {
           <p className="mt-2 text-sm leading-6 text-slate-300">
             End-of-day pricing keeps results consistent and comparable across all users.
           </p>
+        </div>
+      </section>
+
+      <section className="grid gap-5 border-t border-white/10 py-6 md:grid-cols-[1.1fr_1fr]">
+        <div>
+          <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">AI Analyst Accounts</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-300">{aiAnalystGuide.summary}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {aiChipsAnalystConfig.coverage.tickers.map((ticker) => (
+              <span
+                key={ticker}
+                className="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs font-medium text-cyan-100"
+              >
+                {ticker}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3 md:grid-cols-1">
+          <div>
+            <h3 className="text-sm font-semibold text-cyan-200">Methodology</h3>
+            <div className="mt-2 space-y-2 text-sm leading-6 text-slate-300">
+              {aiAnalystGuide.methodology.map((item) => (
+                <p key={item}>{item}</p>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-cyan-200">Rules</h3>
+            <div className="mt-2 space-y-2 text-sm leading-6 text-slate-300">
+              {aiAnalystGuide.rules.map((item) => (
+                <p key={item}>{item}</p>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-cyan-200">Limitations</h3>
+            <div className="mt-2 space-y-2 text-sm leading-6 text-slate-300">
+              {aiAnalystGuide.limitations.map((item) => (
+                <p key={item}>{item}</p>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 

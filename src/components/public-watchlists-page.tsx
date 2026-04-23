@@ -1,7 +1,16 @@
 import Image from "next/image";
 import Link from "next/link";
-import { formatTickerSymbol, PredictionReturnSummary } from "@/components/prediction-ui";
+import { PredictionReturnSummary } from "@/components/prediction-ui";
 import type { PublicWatchlistSummary } from "@/lib/watchlists/service";
+
+function formatTickerSymbol(value: string | null | undefined): string {
+  const symbol = value?.trim();
+  if (!symbol) {
+    return "Prediction";
+  }
+
+  return symbol.startsWith("$") ? symbol : `$${symbol}`;
+}
 
 function ownerLabel(watchlist: PublicWatchlistSummary): string {
   if (watchlist.owner.nickname) {

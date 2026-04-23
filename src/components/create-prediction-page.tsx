@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { TickerSearchInput } from "@/components/ticker-search-input";
 import { MAX_PREDICTION_THESIS_LENGTH, MAX_PREDICTION_THESIS_TITLE_LENGTH, type PredictionTimeHorizonUnit } from "@/lib/predictions/types";
@@ -21,6 +21,7 @@ type WatchlistOption = {
 
 export function CreatePredictionPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading, getIdToken } = useAuth();
   const [ticker, setTicker] = useState("");
   const [direction, setDirection] = useState<"UP" | "DOWN">("UP");
@@ -62,6 +63,7 @@ export function CreatePredictionPage() {
     timeHorizonUnit !== "NONE" && !isValidTimeHorizon
       ? "Open until must be a positive whole number."
       : null;
+  const requestedWatchlistId = searchParams.get("watchlistId")?.trim() ?? "";
 
   useEffect(() => {
     if (!user) {
@@ -83,7 +85,15 @@ export function CreatePredictionPage() {
           return;
         }
         setWatchlists(payload.items);
-        setWatchlistId((current) => current || payload.items[0]?.id || "");
+        setWatchlistId((current) => {
+          if (current && payload.items.some((watchlist) => watchlist.id === current)) {
+            return current;
+          }
+          if (requestedWatchlistId && payload.items.some((watchlist) => watchlist.id === requestedWatchlistId)) {
+            return requestedWatchlistId;
+          }
+          return payload.items[0]?.id || "";
+        });
       })
       .catch((nextError) => {
         if (!cancelled) {
@@ -94,7 +104,7 @@ export function CreatePredictionPage() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [requestedWatchlistId, user]);
 
   if (loading) {
     return <main className="mx-auto w-full max-w-3xl px-4 py-8 text-sm text-slate-300">Loading...</main>;

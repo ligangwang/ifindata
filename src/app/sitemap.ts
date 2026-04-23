@@ -57,7 +57,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ]);
 
     const publicUserEntries: Array<[string, Record<string, unknown>]> = userSnapshot.docs
-      .map((doc) => [doc.id, doc.data() as Record<string, unknown>])
+      .map((doc): [string, Record<string, unknown>] => [doc.id, doc.data() as Record<string, unknown>])
       .filter((entry) => isPublicUser(entry[1]));
     const publicUsers = new Map<string, Record<string, unknown>>(publicUserEntries);
 

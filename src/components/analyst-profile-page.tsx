@@ -164,6 +164,11 @@ export function AnalystProfilePage({
   const [followError, setFollowError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [watchlistComposerOpen, setWatchlistComposerOpen] = useState(false);
+  const [watchlistName, setWatchlistName] = useState("");
+  const [watchlistDescription, setWatchlistDescription] = useState("");
+  const [creatingWatchlist, setCreatingWatchlist] = useState(false);
+  const [watchlistCreateError, setWatchlistCreateError] = useState<string | null>(null);
   const preferredName = payload?.profile.nickname ?? payload?.profile.displayName ?? "Analyst";
   const badgePath = `/api/users/${userId}/badge.svg`;
   const profilePath = `/analysts/${userId}`;
@@ -372,6 +377,74 @@ export function AnalystProfilePage({
       setFollowError(nextError instanceof Error ? nextError.message : "Unable to update follow.");
     } finally {
       setFollowSaving(false);
+    }
+  }
+
+  async function createProfileWatchlist() {
+    if (!payload) return;
+
+    const name = watchlistName.trim();
+    const description = watchlistDescription.trim();
+    if (!name) {
+      setWatchlistCreateError("Watchlist name is required.");
+      return;
+    }
+
+    if (payload.watchlists.length >= 5) {
+      setWatchlistCreateError("You can create up to 5 watchlists.");
+      return;
+    }
+
+    setCreatingWatchlist(true);
+    setWatchlistCreateError(null);
+
+    try {
+      const token = await getIdToken();
+      if (!token) throw new Error("Sign in to create a watchlist.");
+
+      const response = await fetch("/api/watchlists", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name,
+          description: description || null,
+        }),
+      });
+      const body = (await response.json().catch(() => ({}))) as { id?: string; error?: string };
+      if (!response.ok || !body.id) {
+        throw new Error(body.error ?? "Failed to create watchlist.");
+      }
+
+      const nextWatchlist: WatchlistSummary = {
+        id: body.id,
+        name,
+        description: description || null,
+        metrics: {
+          liveReturn: null,
+          settledReturn: null,
+          livePredictionCount: 0,
+          settledPredictionCount: 0,
+        },
+      };
+
+      setPayload((prev) =>
+        prev
+          ? {
+              ...prev,
+              watchlists: [...prev.watchlists, nextWatchlist],
+            }
+          : prev,
+      );
+      setWatchlistName("");
+      setWatchlistDescription("");
+      setWatchlistComposerOpen(false);
+    } catch (nextError) {
+      setWatchlistCreateError(nextError instanceof Error ? nextError.message : "Failed to create watchlist.");
+    } finally {
+      setCreatingWatchlist(false);
     }
   }
 
@@ -637,14 +710,59 @@ export function AnalystProfilePage({
             <p className="mt-1 text-sm text-slate-300">Public strategy groups for this analyst&apos;s predictions.</p>
           </div>
           {isOwner ? (
-            <Link
-              href="/predictions/new"
-              className="rounded-full bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
-            >
-              Add prediction
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              {payload.watchlists.length < 5 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWatchlistCreateError(null);
+                    setWatchlistComposerOpen((current) => !current);
+                  }}
+                  className="rounded-full border border-cyan-400/35 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/15"
+                >
+                  {watchlistComposerOpen ? "Close" : "New watchlist"}
+                </button>
+              ) : null}
+              <Link
+                href="/predictions/new"
+                className="rounded-full bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
+              >
+                Add prediction
+              </Link>
+            </div>
           ) : null}
         </div>
+        {isOwner && watchlistComposerOpen ? (
+          <div className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4">
+            <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+              <input
+                type="text"
+                value={watchlistName}
+                onChange={(event) => setWatchlistName(event.target.value)}
+                maxLength={80}
+                placeholder="Watchlist name"
+                className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+              />
+              <input
+                type="text"
+                value={watchlistDescription}
+                onChange={(event) => setWatchlistDescription(event.target.value)}
+                maxLength={240}
+                placeholder="Optional description"
+                className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+              />
+              <button
+                type="button"
+                onClick={() => void createProfileWatchlist()}
+                disabled={creatingWatchlist}
+                className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-60"
+              >
+                {creatingWatchlist ? "Creating..." : "Create"}
+              </button>
+            </div>
+            {watchlistCreateError ? <p className="mt-2 text-xs text-rose-300">{watchlistCreateError}</p> : null}
+          </div>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-2">
           {payload.watchlists.map((watchlist) => (
             <Link
@@ -678,7 +796,7 @@ export function AnalystProfilePage({
           ))}
           {payload.watchlists.length === 0 ? (
             <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
-              No watchlists yet.
+              {isOwner ? "No watchlists yet. Create one to organize your predictions." : "No watchlists yet."}
             </p>
           ) : null}
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { formatTickerSymbol, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
@@ -130,6 +130,7 @@ export function MyWatchlistsPage() {
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const watchlistRequestIdRef = useRef(0);
 
   const selectedSummary = useMemo(
     () => watchlists.find((item) => item.id === selectedWatchlistId) ?? null,
@@ -146,6 +147,9 @@ export function MyWatchlistsPage() {
           : [];
 
   async function loadWatchlistDetail(nextWatchlistId: string) {
+    const requestId = watchlistRequestIdRef.current + 1;
+    watchlistRequestIdRef.current = requestId;
+    setSelectedWatchlistId(nextWatchlistId);
     setLoadingDetail(true);
     setError(null);
 
@@ -156,15 +160,22 @@ export function MyWatchlistsPage() {
       }
 
       const payload = (await response.json()) as { watchlist: WatchlistDetail };
-      setSelectedWatchlistId(nextWatchlistId);
+      if (watchlistRequestIdRef.current !== requestId) {
+        return;
+      }
       setWatchlist(payload.watchlist);
       setEditName(payload.watchlist.name);
       setEditDescription(payload.watchlist.description ?? "");
     } catch (nextError) {
+      if (watchlistRequestIdRef.current !== requestId) {
+        return;
+      }
       setError(nextError instanceof Error ? nextError.message : "Unable to load watchlist.");
       setWatchlist(null);
     } finally {
-      setLoadingDetail(false);
+      if (watchlistRequestIdRef.current === requestId) {
+        setLoadingDetail(false);
+      }
     }
   }
 

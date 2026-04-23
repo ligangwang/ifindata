@@ -298,8 +298,7 @@ export function PredictionAuthorSummary({ author, className = "" }: { author: Pr
   const label = nickname ? `@${nickname}` : displayName || "Anonymous";
   const avatarLabel = nickname?.slice(0, 1) ?? displayName?.slice(0, 1) ?? "?";
   const totalScore = author.authorStats?.totalScore;
-  const totalPredictions = author.authorStats?.totalPredictions;
-  const hasStats = typeof totalScore === "number" && typeof totalPredictions === "number";
+  const hasScore = typeof totalScore === "number";
   const isAiAnalyst = author.authorAccountType === "AI_ANALYST";
 
   return (
@@ -327,12 +326,10 @@ export function PredictionAuthorSummary({ author, className = "" }: { author: Pr
           AI Analyst
         </span>
       ) : null}
-      {hasStats ? (
+      {hasScore ? (
         <>
           <span className="text-slate-500">&middot;</span>
           <span>Score {formatScoreValue(totalScore)}</span>
-          <span className="text-slate-500">&middot;</span>
-          <span>{totalPredictions.toLocaleString()} settled</span>
         </>
       ) : null}
     </Link>

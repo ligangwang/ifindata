@@ -3,6 +3,7 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 import { getAiAnalystPublicProfileForUser } from "@/lib/ai-analyst/config";
 import { listPredictions } from "@/lib/predictions/service";
 import { readUserAnalytics } from "@/lib/predictions/user-analytics";
+import { listWatchlistsForUser } from "@/lib/watchlists/service";
 import { NextRequest, NextResponse } from "next/server";
 
 type UserStats = {
@@ -145,7 +146,10 @@ export async function GET(
     });
 
     const userSnapshot = await db.collection("users").doc(id).get();
-    const latestDailyScore = await readLatestDailyScore(id);
+    const [latestDailyScore, watchlists] = await Promise.all([
+      readLatestDailyScore(id),
+      listWatchlistsForUser(id),
+    ]);
 
     if (!userSnapshot.exists) {
       // If user document doesn't exist, check if they have predictions
@@ -213,6 +217,7 @@ export async function GET(
           settings: profileData.settings,
         },
         relationship,
+        watchlists,
         predictions: predictions.items,
         nextCursor: predictions.nextCursor,
       });
@@ -246,6 +251,7 @@ export async function GET(
         },
       },
       relationship,
+      watchlists,
       predictions: predictions.items,
       nextCursor: predictions.nextCursor,
     });

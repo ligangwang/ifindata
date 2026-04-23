@@ -1,13 +1,27 @@
 import type { Metadata } from "next";
-import { MyWatchlistsPage } from "@/components/my-watchlists-page";
-import { noIndexRobots } from "@/lib/seo";
+import { PublicWatchlistsPage } from "@/components/public-watchlists-page";
+import { listPublicWatchlists } from "@/lib/watchlists/service";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "My watchlists | YouAnalyst",
-  description: "Create and manage your watchlists on YouAnalyst.",
-  robots: noIndexRobots(),
+  title: "Community watchlists | YouAnalyst",
+  description: "Browse the newest public watchlists from the YouAnalyst community.",
+  alternates: {
+    canonical: "/watchlists",
+  },
+  openGraph: {
+    title: "Community watchlists | YouAnalyst",
+    description: "Browse the newest public watchlists from the YouAnalyst community.",
+    url: "/watchlists",
+  },
+  twitter: {
+    title: "Community watchlists | YouAnalyst",
+    description: "Browse the newest public watchlists from the YouAnalyst community.",
+  },
 };
 
-export default function WatchlistsRoutePage() {
-  return <MyWatchlistsPage />;
+export default async function WatchlistsRoutePage() {
+  const watchlists = await listPublicWatchlists();
+  return <PublicWatchlistsPage watchlists={watchlists} />;
 }

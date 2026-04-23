@@ -40,6 +40,15 @@ export type WatchlistSummary = Watchlist & {
   metrics: WatchlistMetrics;
 };
 
+export type PublicWatchlistSummary = WatchlistSummary & {
+  owner: {
+    id: string;
+    displayName: string | null;
+    nickname: string | null;
+    photoURL: string | null;
+  };
+};
+
 export type WatchlistPrediction = Prediction & {
   id: string;
 };
@@ -195,6 +204,53 @@ export async function listWatchlistsForUser(userId: string): Promise<WatchlistSu
   );
 
   return summaries;
+}
+
+export async function listPublicWatchlists(limit = 24): Promise<PublicWatchlistSummary[]> {
+  const db = getAdminFirestore();
+  const clampedLimit = Math.max(1, Math.min(limit, 48));
+  const snapshot = await db.collection("watchlists").orderBy("createdAt", "desc").limit(clampedLimit).get();
+  const watchlists = snapshot.docs
+    .map(mapWatchlistDoc)
+    .filter((watchlist) => !watchlist.archivedAt);
+
+  const ownerIds = Array.from(new Set(watchlists.map((watchlist) => watchlist.userId).filter(Boolean)));
+  const ownerEntries = await Promise.all(
+    ownerIds.map(async (userId) => {
+      const userSnapshot = await db.collection("users").doc(userId).get();
+      const data = userSnapshot.data() as Record<string, unknown> | undefined;
+      const settings = data?.settings;
+      const isPublic = !settings || typeof settings !== "object"
+        ? true
+        : (settings as Record<string, unknown>).isPublic !== false;
+
+      return [userId, isPublic ? {
+        id: userId,
+        displayName: typeof data?.displayName === "string" ? data.displayName : null,
+        nickname: typeof data?.nickname === "string" ? data.nickname : null,
+        photoURL: typeof data?.photoURL === "string" ? data.photoURL : null,
+      } : null] as const;
+    }),
+  );
+  const ownerById = new Map(ownerEntries);
+
+  const summaries = await Promise.all(
+    watchlists.map(async (watchlist) => {
+      const owner = ownerById.get(watchlist.userId);
+      if (!owner) {
+        return null;
+      }
+
+      const predictions = await listWatchlistPredictions(watchlist.id);
+      return {
+        ...watchlist,
+        metrics: metricsForPredictions(predictions),
+        owner,
+      };
+    }),
+  );
+
+  return summaries.filter((summary): summary is PublicWatchlistSummary => summary !== null);
 }
 
 export async function createWatchlist(input: CreateWatchlistInput, user: AuthedUser): Promise<{ id: string }> {

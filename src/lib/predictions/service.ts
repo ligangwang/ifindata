@@ -32,12 +32,13 @@ type InternalCreatePredictionOptions = {
   generation?: Prediction["generation"];
 };
 
-  type ListPredictionsInput = {
+type ListPredictionsInput = {
   limit?: number;
   status?: PredictionStatus | "ACTIVE" | "LIVE" | "FINAL" | "SETTLED";
   userId?: string;
   cursorCreatedAt?: string;
   includePrivate?: boolean;
+  sort?: "createdAt" | "performance";
 };
 
 type ListPredictionsResult = {
@@ -145,6 +146,45 @@ function activeTickerLockRef(db: FirebaseFirestore.Firestore, userId: string, ti
   return db.collection(ACTIVE_TICKER_LOCK_COLLECTION).doc(activeTickerLockDocId(userId, ticker));
 }
 
+function predictionPerformanceValue(
+  prediction: Prediction & {
+    result: Prediction["result"];
+    markReturnValue?: number | null;
+  },
+): number | null {
+  if (typeof prediction.result?.returnValue === "number" && Number.isFinite(prediction.result.returnValue)) {
+    return prediction.result.returnValue;
+  }
+
+  if (typeof prediction.markReturnValue === "number" && Number.isFinite(prediction.markReturnValue)) {
+    return prediction.markReturnValue;
+  }
+
+  return null;
+}
+
+function comparePredictionsByPerformance(
+  a: Prediction & { createdAt: string; result: Prediction["result"]; markReturnValue?: number | null },
+  b: Prediction & { createdAt: string; result: Prediction["result"]; markReturnValue?: number | null },
+): number {
+  const aPerformance = predictionPerformanceValue(a);
+  const bPerformance = predictionPerformanceValue(b);
+
+  if (aPerformance !== null && bPerformance !== null && aPerformance !== bPerformance) {
+    return bPerformance - aPerformance;
+  }
+
+  if (aPerformance !== null && bPerformance === null) {
+    return -1;
+  }
+
+  if (aPerformance === null && bPerformance !== null) {
+    return 1;
+  }
+
+  return b.createdAt.localeCompare(a.createdAt);
+}
+
 function targetDateFromRunStatus(today: string, status: unknown): string {
   return status === "STARTED" || status === "COMPLETED" || status === "FAILED"
     ? addDays(today, 1)
@@ -166,6 +206,7 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
   const status = input.status;
   const userId = input.userId?.trim() ?? "";
   const includePrivate = input.includePrivate === true;
+  const sort = input.sort === "performance" ? "performance" : "createdAt";
 
   let query = db.collection("predictions") as FirebaseFirestore.Query;
 
@@ -194,10 +235,13 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
     }
   }
 
-  query = query.orderBy("createdAt", "desc").limit(clampedLimit + 1);
+  const queryLimit = sort === "performance"
+    ? Math.min(Math.max(clampedLimit * 5, 120), 300)
+    : clampedLimit + 1;
+  query = query.orderBy("createdAt", "desc").limit(queryLimit);
 
   const cursor = input.cursorCreatedAt?.trim();
-  if (cursor) {
+  if (cursor && sort === "createdAt") {
     const cursorDate = new Date(cursor);
     if (!Number.isNaN(cursorDate.getTime())) {
       query = query.startAfter(cursorDate.toISOString());
@@ -206,7 +250,7 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
 
   const snapshot = await query.get();
   const docs = snapshot.docs;
-  const hasMore = docs.length > clampedLimit;
+  const hasMore = sort === "createdAt" && docs.length > clampedLimit;
   const selected = hasMore ? docs.slice(0, clampedLimit) : docs;
   const visibleSelected = selected.filter((doc) => PUBLIC_PREDICTION_STATUSES.includes(doc.get("status") as (typeof PUBLIC_PREDICTION_STATUSES)[number]));
   const items = visibleSelected.map((doc) => {
@@ -259,10 +303,14 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
           },
   }));
 
-  const nextCursor = hasMore && selected.length > 0 ? selected[selected.length - 1].get("createdAt") : null;
+  if (sort === "performance") {
+    itemsWithNickname.sort(comparePredictionsByPerformance);
+  }
+
+  const nextCursor = sort === "createdAt" && hasMore && selected.length > 0 ? selected[selected.length - 1].get("createdAt") : null;
 
   return {
-    items: itemsWithNickname,
+    items: sort === "performance" ? itemsWithNickname.slice(0, clampedLimit) : itemsWithNickname,
     nextCursor: typeof nextCursor === "string" ? nextCursor : null,
   };
 }

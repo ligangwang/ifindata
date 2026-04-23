@@ -143,6 +143,18 @@ function metricsForPredictions(predictions: WatchlistPrediction[]): WatchlistMet
   };
 }
 
+function watchlistPerformanceValue(metrics: WatchlistMetrics): number | null {
+  if (typeof metrics.settledReturn === "number" && Number.isFinite(metrics.settledReturn)) {
+    return metrics.settledReturn;
+  }
+
+  if (typeof metrics.liveReturn === "number" && Number.isFinite(metrics.liveReturn)) {
+    return metrics.liveReturn;
+  }
+
+  return null;
+}
+
 async function listWatchlistPredictions(watchlistId: string): Promise<WatchlistPrediction[]> {
   const snapshot = await getAdminFirestore()
     .collection("predictions")
@@ -209,7 +221,8 @@ export async function listWatchlistsForUser(userId: string): Promise<WatchlistSu
 export async function listPublicWatchlists(limit = 24): Promise<PublicWatchlistSummary[]> {
   const db = getAdminFirestore();
   const clampedLimit = Math.max(1, Math.min(limit, 48));
-  const snapshot = await db.collection("watchlists").orderBy("createdAt", "desc").limit(clampedLimit).get();
+  const candidateLimit = Math.min(Math.max(clampedLimit * 5, 120), 240);
+  const snapshot = await db.collection("watchlists").orderBy("createdAt", "desc").limit(candidateLimit).get();
   const watchlists = snapshot.docs
     .map(mapWatchlistDoc)
     .filter((watchlist) => !watchlist.archivedAt);
@@ -250,7 +263,27 @@ export async function listPublicWatchlists(limit = 24): Promise<PublicWatchlistS
     }),
   );
 
-  return summaries.filter((summary): summary is PublicWatchlistSummary => summary !== null);
+  return summaries
+    .filter((summary): summary is PublicWatchlistSummary => summary !== null)
+    .sort((a, b) => {
+      const aPerformance = watchlistPerformanceValue(a.metrics);
+      const bPerformance = watchlistPerformanceValue(b.metrics);
+
+      if (aPerformance !== null && bPerformance !== null && aPerformance !== bPerformance) {
+        return bPerformance - aPerformance;
+      }
+
+      if (aPerformance !== null && bPerformance === null) {
+        return -1;
+      }
+
+      if (aPerformance === null && bPerformance !== null) {
+        return 1;
+      }
+
+      return b.createdAt.localeCompare(a.createdAt);
+    })
+    .slice(0, clampedLimit);
 }
 
 export async function createWatchlist(input: CreateWatchlistInput, user: AuthedUser): Promise<{ id: string }> {

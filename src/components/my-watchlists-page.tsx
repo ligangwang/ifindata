@@ -113,7 +113,7 @@ function WatchlistPredictionRow({ prediction }: { prediction: WatchlistPredictio
   );
 }
 
-export function MyWatchlistsPage() {
+export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { user, loading: authLoading, getIdToken } = useAuth();
   const [watchlists, setWatchlists] = useState<WatchlistSummary[]>([]);
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | null>(null);
@@ -462,28 +462,36 @@ export function MyWatchlistsPage() {
   }
 
   if (!user) {
-    return (
-      <main className="mx-auto w-full max-w-4xl px-4 py-8">
-        <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-6 text-center shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
-          <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">My Watchlists</h1>
-          <p className="mt-3 text-sm text-slate-300">Sign in to create watchlists, organize predictions, and manage your public research workspace.</p>
-          <Link
-            href="/auth"
-            className="mt-6 inline-flex rounded-full bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
-          >
-            Sign in
-          </Link>
-        </section>
-      </main>
+    const content = (
+      <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-6 text-center shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
+        <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">My Watchlists</h1>
+        <p className="mt-3 text-sm text-slate-300">Sign in to create watchlists, organize predictions, and manage your public research workspace.</p>
+        <Link
+          href="/auth"
+          className="mt-6 inline-flex rounded-full bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+        >
+          Sign in
+        </Link>
+      </section>
     );
+
+    if (embedded) {
+      return content;
+    }
+
+    return <main className="mx-auto w-full max-w-4xl px-4 py-8">{content}</main>;
   }
 
   if (authLoading || loadingWorkspace) {
+    if (embedded) {
+      return <div className="py-4 text-sm text-slate-300">Loading watchlists...</div>;
+    }
+
     return <main className="mx-auto w-full max-w-6xl px-4 py-8 text-sm text-slate-300">Loading watchlists...</main>;
   }
 
-  return (
-    <main className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-8">
+  const content = (
+    <div className="grid gap-4">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -782,6 +790,12 @@ export function MyWatchlistsPage() {
           </p>
         </section>
       )}
-    </main>
+    </div>
   );
+
+  if (embedded) {
+    return content;
+  }
+
+  return <main className="mx-auto w-full max-w-6xl px-4 py-8">{content}</main>;
 }

@@ -47,6 +47,7 @@ export type PublicWatchlistSummary = WatchlistSummary & {
     nickname: string | null;
     photoURL: string | null;
   };
+  previewPredictions: WatchlistPrediction[];
 };
 
 export type WatchlistPrediction = Prediction & {
@@ -259,6 +260,7 @@ export async function listPublicWatchlists(limit = 24): Promise<PublicWatchlistS
         ...watchlist,
         metrics: metricsForPredictions(predictions),
         owner,
+        previewPredictions: predictions.slice(0, 4),
       };
     }),
   );

@@ -8,6 +8,13 @@ export const metadata: Metadata = {
   robots: noIndexRobots(),
 };
 
-export default function NewPredictionRoutePage() {
-  return <CreatePredictionPage />;
+export default async function NewPredictionRoutePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ watchlistId?: string | string[] }>;
+}) {
+  const { watchlistId } = await searchParams;
+  const requestedWatchlistId = Array.isArray(watchlistId) ? watchlistId[0] : watchlistId;
+
+  return <CreatePredictionPage requestedWatchlistId={requestedWatchlistId ?? ""} />;
 }

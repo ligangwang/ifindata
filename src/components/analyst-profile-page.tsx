@@ -217,11 +217,6 @@ export function AnalystProfilePage({
   const [followError, setFollowError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
-  const [watchlistComposerOpen, setWatchlistComposerOpen] = useState(false);
-  const [watchlistName, setWatchlistName] = useState("");
-  const [watchlistDescription, setWatchlistDescription] = useState("");
-  const [creatingWatchlist, setCreatingWatchlist] = useState(false);
-  const [watchlistCreateError, setWatchlistCreateError] = useState<string | null>(null);
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | null>(null);
   const [watchlistState, setWatchlistState] = useState<WatchlistRequestState>({
     watchlistId: null,
@@ -477,91 +472,6 @@ export function AnalystProfilePage({
       setFollowError(nextError instanceof Error ? nextError.message : "Unable to update follow.");
     } finally {
       setFollowSaving(false);
-    }
-  }
-
-  async function createProfileWatchlist() {
-    if (!payload) {
-      return;
-    }
-
-    const name = watchlistName.trim();
-    const description = watchlistDescription.trim();
-    if (!name) {
-      setWatchlistCreateError("Watchlist name is required.");
-      return;
-    }
-
-    if (payload.watchlists.length >= 5) {
-      setWatchlistCreateError("You can create up to 5 watchlists.");
-      return;
-    }
-
-    setCreatingWatchlist(true);
-    setWatchlistCreateError(null);
-
-    try {
-      const token = await getIdToken();
-      if (!token) {
-        throw new Error("Sign in to create a watchlist.");
-      }
-
-      const response = await fetch("/api/watchlists", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name,
-          description: description || null,
-        }),
-      });
-      const body = (await response.json().catch(() => ({}))) as { id?: string; error?: string };
-      if (!response.ok || !body.id) {
-        throw new Error(body.error ?? "Failed to create watchlist.");
-      }
-
-      const nextWatchlist: WatchlistSummary = {
-        id: body.id,
-        name,
-        description: description || null,
-        metrics: {
-          liveReturn: null,
-          settledReturn: null,
-          livePredictionCount: 0,
-          settledPredictionCount: 0,
-        },
-      };
-      const nextWatchlistDetail: WatchlistDetail = {
-        ...nextWatchlist,
-        userId,
-        livePredictions: [],
-        settledPredictions: [],
-      };
-
-      setPayload((current) =>
-        current
-          ? {
-              ...current,
-              watchlists: [...current.watchlists, nextWatchlist],
-            }
-          : current,
-      );
-      beginWatchlistLoad(body.id, nextWatchlistDetail);
-      setWatchlistState({
-        watchlistId: body.id,
-        watchlist: nextWatchlistDetail,
-        loading: false,
-        error: null,
-      });
-      setWatchlistName("");
-      setWatchlistDescription("");
-      setWatchlistComposerOpen(false);
-    } catch (nextError) {
-      setWatchlistCreateError(nextError instanceof Error ? nextError.message : "Failed to create watchlist.");
-    } finally {
-      setCreatingWatchlist(false);
     }
   }
 
@@ -837,63 +747,17 @@ export function AnalystProfilePage({
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Watchlists</h2>
-            <p className="mt-1 text-sm text-slate-300">Your watchlist. Your track record.</p>
+            <p className="mt-1 text-sm text-slate-300">Public watchlists and track record for this analyst.</p>
           </div>
           {isOwner ? (
-            <div className="flex flex-wrap gap-2">
-              {payload.watchlists.length < 5 ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWatchlistCreateError(null);
-                    setWatchlistComposerOpen((current) => !current);
-                  }}
-                  className="rounded-full border border-cyan-400/35 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/15"
-                >
-                  {watchlistComposerOpen ? "Close" : "New watchlist"}
-                </button>
-              ) : null}
-              <Link
-                href="/predictions/new"
-                className="rounded-full bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
-              >
-                Add prediction
-              </Link>
-            </div>
+            <Link
+              href="/watchlists"
+              className="rounded-full border border-cyan-400/35 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/15"
+            >
+              Manage watchlists
+            </Link>
           ) : null}
         </div>
-
-        {isOwner && watchlistComposerOpen ? (
-          <div className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4">
-            <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-              <input
-                type="text"
-                value={watchlistName}
-                onChange={(event) => setWatchlistName(event.target.value)}
-                maxLength={80}
-                placeholder="Watchlist name"
-                className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
-              />
-              <input
-                type="text"
-                value={watchlistDescription}
-                onChange={(event) => setWatchlistDescription(event.target.value)}
-                maxLength={240}
-                placeholder="Optional description"
-                className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
-              />
-              <button
-                type="button"
-                onClick={() => void createProfileWatchlist()}
-                disabled={creatingWatchlist}
-                className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-60"
-              >
-                {creatingWatchlist ? "Creating..." : "Create"}
-              </button>
-            </div>
-            {watchlistCreateError ? <p className="mt-2 text-xs text-rose-300">{watchlistCreateError}</p> : null}
-          </div>
-        ) : null}
 
         {payload.watchlists.length > 0 ? (
           <>

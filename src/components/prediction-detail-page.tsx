@@ -25,6 +25,8 @@ type PredictionDetail = {
   } | null;
   ticker: string;
   direction: "UP" | "DOWN";
+  watchlistId?: string | null;
+  watchlistName?: string | null;
   entryPrice: number | null;
   entryDate: string | null;
   thesisTitle: string;
@@ -44,6 +46,11 @@ type PredictionDetail = {
     exitPrice: number;
     returnValue: number;
   } | null;
+};
+
+type WatchlistOption = {
+  id: string;
+  name: string;
 };
 
 type PredictionComment = {
@@ -109,6 +116,9 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   const [editHorizonUnit, setEditHorizonUnit] = useState<"NONE" | PredictionTimeHorizonUnit>("NONE");
   const [editHorizonValue, setEditHorizonValue] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+  const [ownerWatchlists, setOwnerWatchlists] = useState<WatchlistOption[]>([]);
+  const [moveWatchlistId, setMoveWatchlistId] = useState("");
+  const [moveSaving, setMoveSaving] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   async function loadAll() {
@@ -150,6 +160,37 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
     const interval = window.setInterval(() => setNow(Date.now()), 30 * 1000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!user || !prediction || user.uid !== prediction.userId) {
+      return;
+    }
+
+    let cancelled = false;
+    void fetch(`/api/watchlists?userId=${encodeURIComponent(user.uid)}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Unable to load watchlists.");
+        }
+        return (await response.json()) as { items: WatchlistOption[] };
+      })
+      .then((payload) => {
+        if (cancelled) {
+          return;
+        }
+        setOwnerWatchlists(payload.items);
+        setMoveWatchlistId((current) => current || prediction.watchlistId || payload.items[0]?.id || "");
+      })
+      .catch((nextError) => {
+        if (!cancelled) {
+          setError(nextError instanceof Error ? nextError.message : "Unable to load watchlists.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [prediction, user]);
 
   async function submitComment() {
     if (!commentText.trim()) {
@@ -301,6 +342,43 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
       setError(nextError instanceof Error ? nextError.message : "Unable to edit prediction.");
     } finally {
       setEditSaving(false);
+    }
+  }
+
+  async function movePrediction() {
+    if (!prediction || !moveWatchlistId || moveWatchlistId === prediction.watchlistId) {
+      return;
+    }
+
+    const token = await getIdToken();
+    if (!token) {
+      setError("Sign in to move this prediction.");
+      return;
+    }
+
+    setMoveSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/predictions/${predictionId}/watchlist`, {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ watchlistId: moveWatchlistId }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error ?? "Unable to move prediction.");
+      }
+
+      await loadAll();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to move prediction.");
+    } finally {
+      setMoveSaving(false);
     }
   }
 
@@ -545,6 +623,10 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
         <div className="mt-4 grid gap-6 text-sm text-slate-300 sm:grid-cols-2">
           <dl className="grid gap-1">
             <div className="grid grid-cols-[110px_1fr] gap-3">
+              <dt className="text-slate-400">Watchlist:</dt>
+              <dd className="text-slate-100">{prediction.watchlistName || "Unassigned"}</dd>
+            </div>
+            <div className="grid grid-cols-[110px_1fr] gap-3">
               <dt className="text-slate-400">Entry Price:</dt>
               <dd className="text-slate-100">{formatDetailCurrency(prediction.entryPrice)}</dd>
             </div>
@@ -571,6 +653,34 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             </div>
           </dl>
         </div>
+
+        {isOwner && ownerWatchlists.length > 0 ? (
+          <div className="mt-4 grid gap-2 rounded-xl border border-white/10 bg-slate-950/45 p-3">
+            <label className="text-xs text-slate-400" htmlFor="move-watchlist">Move to watchlist</label>
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+              <select
+                id="move-watchlist"
+                value={moveWatchlistId}
+                onChange={(event) => setMoveWatchlistId(event.target.value)}
+                className="rounded-lg border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+              >
+                {ownerWatchlists.map((watchlist) => (
+                  <option key={watchlist.id} value={watchlist.id}>
+                    {watchlist.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => void movePrediction()}
+                disabled={moveSaving || !moveWatchlistId || moveWatchlistId === prediction.watchlistId}
+                className="rounded-lg border border-cyan-400/35 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/15 disabled:opacity-60"
+              >
+                {moveSaving ? "Moving..." : "Move"}
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {!isOwner ? <PredictionAuthorSummary author={prediction} className="mt-5" /> : null}
 

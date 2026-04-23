@@ -54,6 +54,24 @@ export type CreateWatchlistInput = {
   description?: string | null;
 };
 
+export type UpdateWatchlistInput = CreateWatchlistInput;
+
+export type BackfillWatchlistsInput = {
+  dryRun?: boolean;
+  limit?: number;
+  defaultName?: string;
+};
+
+export type BackfillWatchlistsResult = {
+  dryRun: boolean;
+  scanned: number;
+  updated: number;
+  skipped: number;
+  usersTouched: number;
+  hasMore: boolean;
+  defaultName: string;
+};
+
 function trimString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -156,6 +174,8 @@ export function validateCreateWatchlistInput(raw: unknown): CreateWatchlistInput
   };
 }
 
+export const validateUpdateWatchlistInput = validateCreateWatchlistInput;
+
 export async function listWatchlistsForUser(userId: string): Promise<WatchlistSummary[]> {
   const db = getAdminFirestore();
   const snapshot = await db.collection("watchlists").where("userId", "==", userId).get();
@@ -216,6 +236,59 @@ export async function createWatchlist(input: CreateWatchlistInput, user: AuthedU
   return { id: watchlistRef.id };
 }
 
+export async function updateWatchlist(
+  watchlistId: string,
+  input: UpdateWatchlistInput,
+  user: AuthedUser,
+): Promise<{ updated: true }> {
+  const db = getAdminFirestore();
+  const nowIso = new Date().toISOString();
+  const watchlistRef = db.collection("watchlists").doc(watchlistId);
+
+  await db.runTransaction(async (tx) => {
+    const watchlistSnapshot = await tx.get(watchlistRef);
+    if (!watchlistSnapshot.exists) {
+      throw new Error("Watchlist not found");
+    }
+
+    const watchlist = mapWatchlistDoc(watchlistSnapshot);
+    if (watchlist.userId !== user.uid) {
+      throw new Error("Forbidden");
+    }
+
+    if (watchlist.archivedAt) {
+      throw new Error("Watchlist not found");
+    }
+
+    tx.update(watchlistRef, {
+      name: input.name,
+      description: input.description ?? null,
+      updatedAt: nowIso,
+    });
+  });
+
+  const predictionSnapshot = await db.collection("predictions").where("watchlistId", "==", watchlistId).get();
+  let batch = db.batch();
+  let batchSize = 0;
+  for (const doc of predictionSnapshot.docs) {
+    batch.update(doc.ref, {
+      watchlistName: input.name,
+      updatedAt: nowIso,
+    });
+    batchSize += 1;
+    if (batchSize === 450) {
+      await batch.commit();
+      batch = db.batch();
+      batchSize = 0;
+    }
+  }
+  if (batchSize > 0) {
+    await batch.commit();
+  }
+
+  return { updated: true };
+}
+
 export async function assertWatchlistCanReceivePrediction(
   tx: FirebaseFirestore.Transaction,
   watchlistRef: FirebaseFirestore.DocumentReference,
@@ -249,6 +322,156 @@ export async function getOrCreateDefaultWatchlistForUser(
 
   const created = await createWatchlist({ name, description: null }, { uid: userId });
   return created.id;
+}
+
+export async function movePredictionToWatchlist(
+  predictionId: string,
+  watchlistId: string,
+  user: AuthedUser,
+): Promise<{ moved: true; watchlistId: string; watchlistName: string }> {
+  const db = getAdminFirestore();
+  const nowIso = new Date().toISOString();
+  const predictionRef = db.collection("predictions").doc(predictionId);
+  const watchlistRef = db.collection("watchlists").doc(watchlistId);
+  let movedWatchlist: Watchlist | null = null;
+
+  await db.runTransaction(async (tx) => {
+    const predictionSnapshot = await tx.get(predictionRef);
+    if (!predictionSnapshot.exists) {
+      throw new Error("Prediction not found");
+    }
+
+    const prediction = predictionSnapshot.data() as Prediction;
+    if (prediction.userId !== user.uid) {
+      throw new Error("Forbidden");
+    }
+
+    const status = canonicalPredictionStatus(prediction.status);
+    if (!status || status === "CANCELED") {
+      throw new Error("Prediction not found");
+    }
+
+    const watchlist = await assertWatchlistCanReceivePrediction(tx, watchlistRef, user.uid);
+    movedWatchlist = watchlist;
+    tx.update(predictionRef, {
+      watchlistId: watchlist.id,
+      watchlistName: watchlist.name,
+      updatedAt: nowIso,
+    });
+  });
+
+  if (!movedWatchlist) {
+    throw new Error("Watchlist not found");
+  }
+
+  return {
+    moved: true,
+    watchlistId: movedWatchlist.id,
+    watchlistName: movedWatchlist.name,
+  };
+}
+
+export async function backfillLegacyPredictionWatchlists(
+  input: BackfillWatchlistsInput = {},
+): Promise<BackfillWatchlistsResult> {
+  const db = getAdminFirestore();
+  const dryRun = input.dryRun === true;
+  const parsedLimit = Number(input.limit ?? 500);
+  const limit = Number.isFinite(parsedLimit)
+    ? Math.max(1, Math.min(Math.trunc(parsedLimit), 1000))
+    : 500;
+  const defaultName = trimString(input.defaultName) || "Main Watchlist";
+  const docs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  let scanned = 0;
+  let hasMore = false;
+  let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+
+  while (docs.length < limit) {
+    let query = db.collection("predictions").orderBy("createdAt", "desc").limit(500);
+    if (lastDoc) {
+      query = query.startAfter(lastDoc);
+    }
+
+    const snapshot = await query.get();
+    scanned += snapshot.docs.length;
+    if (snapshot.empty) {
+      hasMore = false;
+      break;
+    }
+
+    for (const doc of snapshot.docs) {
+      if (!trimString(doc.get("watchlistId"))) {
+        docs.push(doc);
+        if (docs.length === limit) {
+          break;
+        }
+      }
+    }
+
+    lastDoc = snapshot.docs.at(-1) ?? null;
+    hasMore = snapshot.docs.length === 500;
+    if (!hasMore) {
+      break;
+    }
+  }
+  const nowIso = new Date().toISOString();
+  const watchlistByUserId = new Map<string, Watchlist>();
+  let updated = 0;
+  let skipped = 0;
+
+  for (const doc of docs) {
+    const prediction = doc.data() as Prediction;
+    const userId = trimString(prediction.userId);
+    const status = canonicalPredictionStatus(prediction.status);
+    if (!userId || !status || status === "CANCELED") {
+      skipped += 1;
+      continue;
+    }
+
+    let watchlist = watchlistByUserId.get(userId);
+    if (!watchlist) {
+      const existing = await listWatchlistsForUser(userId);
+      const existingDefault = existing.find((item) => item.name === defaultName) ?? existing[0];
+      if (existingDefault) {
+        watchlist = existingDefault;
+      } else if (dryRun) {
+        watchlist = {
+          id: `dry_run_default_${userId}`,
+          userId,
+          name: defaultName,
+          description: null,
+          isPublic: true,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+          archivedAt: null,
+        };
+      } else {
+        const created = await createWatchlist({ name: defaultName, description: null }, { uid: userId });
+        const createdSnapshot = await db.collection("watchlists").doc(created.id).get();
+        watchlist = mapWatchlistDoc(createdSnapshot);
+      }
+      watchlistByUserId.set(userId, watchlist);
+    }
+
+    if (!dryRun) {
+      await doc.ref.update({
+        watchlistId: watchlist.id,
+        watchlistName: watchlist.name,
+        updatedAt: nowIso,
+      });
+    }
+    updated += 1;
+  }
+
+  return {
+    dryRun,
+    scanned,
+    updated,
+    skipped,
+    usersTouched: watchlistByUserId.size,
+    hasMore,
+    defaultName,
+  };
 }
 
 export async function getWatchlistDetail(watchlistId: string): Promise<WatchlistDetail | null> {

@@ -18,7 +18,12 @@ export async function PATCH(
   const { id } = await context.params;
 
   try {
-    const body = (await request.json().catch(() => ({}))) as MovePredictionWatchlistRequest;
+    const payload = (await request.json().catch(() => ({}))) as unknown;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const body = payload as MovePredictionWatchlistRequest;
     const watchlistId = typeof body.watchlistId === "string" ? body.watchlistId.trim() : "";
     if (!watchlistId) {
       return NextResponse.json({ error: "watchlistId is required" }, { status: 400 });

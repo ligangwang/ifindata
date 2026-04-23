@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { MyWatchlistsPage } from "@/components/my-watchlists-page";
+import { redirect } from "next/navigation";
 import { noIndexRobots } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function MyWatchlistsRoutePage() {
-  return <MyWatchlistsPage />;
+  redirect("/watchlists?tab=mine");
 }

@@ -91,51 +91,70 @@ function hiddenPredictionCount(watchlist: PublicWatchlistSummary): number {
   return Math.max(0, totalPredictions - watchlist.previewPredictions.length);
 }
 
-export function PublicWatchlistsPage({ watchlists }: { watchlists: PublicWatchlistSummary[] }) {
-  return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-5">
-      <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-4 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
+export function PublicWatchlistsPage({
+  watchlists,
+  embedded = false,
+  showHeader = true,
+}: {
+  watchlists: PublicWatchlistSummary[];
+  embedded?: boolean;
+  showHeader?: boolean;
+}) {
+  const content = (
+    <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-4 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
+      {showHeader ? (
         <div className="mb-4">
           <h1 className="text-lg font-semibold tracking-tight text-white sm:text-xl">Community Watchlists</h1>
           <p className="mt-1 text-sm text-slate-300">Best-performing public watchlists, with newer watchlists breaking ties.</p>
         </div>
+      ) : null}
 
-        {watchlists.length > 0 ? (
-          <div className="grid gap-3">
-            {watchlists.map((watchlist) => {
-              const hiddenPredictions = hiddenPredictionCount(watchlist);
+      {watchlists.length > 0 ? (
+        <div className="grid gap-3">
+          {watchlists.map((watchlist) => {
+            const hiddenPredictions = hiddenPredictionCount(watchlist);
 
-              return (
-                <article
-                  key={watchlist.id}
-                  className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition hover:border-cyan-300/30"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <Link
-                      href={`/analysts/${watchlist.owner.id}`}
-                      className="flex min-w-0 items-center gap-3 hover:opacity-90"
-                    >
-                      {watchlist.owner.photoURL ? (
-                        <Image
-                          src={watchlist.owner.photoURL}
-                          alt={ownerLabel(watchlist)}
-                          width={40}
-                          height={40}
-                          className="h-10 w-10 rounded-full object-cover ring-1 ring-cyan-400/30"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-cyan-500/20 text-sm font-semibold text-cyan-100 ring-1 ring-cyan-400/30">
-                          {ownerLabel(watchlist).slice(0, 1).toUpperCase()}
-                        </span>
-                      )}
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-cyan-200">{ownerLabel(watchlist)}</p>
-                        <p className="mt-0.5 text-xs uppercase tracking-wide text-slate-500">
-                          Created {createdDateText(watchlist.createdAt)}
-                        </p>
-                      </div>
-                    </Link>
+            return (
+              <article
+                key={watchlist.id}
+                className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition hover:border-cyan-300/30"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <Link
+                    href={`/analysts/${watchlist.owner.id}`}
+                    className="flex min-w-0 items-center gap-3 hover:opacity-90"
+                  >
+                    {watchlist.owner.photoURL ? (
+                      <Image
+                        src={watchlist.owner.photoURL}
+                        alt={ownerLabel(watchlist)}
+                        width={40}
+                        height={40}
+                        className="h-10 w-10 rounded-full object-cover ring-1 ring-cyan-400/30"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-cyan-500/20 text-sm font-semibold text-cyan-100 ring-1 ring-cyan-400/30">
+                        {ownerLabel(watchlist).slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-cyan-200">{ownerLabel(watchlist)}</p>
+                      <p className="mt-0.5 text-xs uppercase tracking-wide text-slate-500">
+                        Created {createdDateText(watchlist.createdAt)}
+                      </p>
+                    </div>
+                  </Link>
+                  <Link
+                    href={`/analysts/${watchlist.owner.id}/watchlists/${watchlist.id}`}
+                    className="shrink-0 text-xs font-medium text-cyan-300 hover:text-cyan-100"
+                  >
+                    View watchlist
+                  </Link>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
                     <Link
                       href={`/analysts/${watchlist.owner.id}/watchlists/${watchlist.id}`}
                       className="shrink-0 text-xs font-medium text-cyan-300 hover:text-cyan-100"
@@ -143,65 +162,46 @@ export function PublicWatchlistsPage({ watchlists }: { watchlists: PublicWatchli
                       View watchlist
                     </Link>
                   </div>
+                </div>
 
-                  <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <Link
-                        href={`/analysts/${watchlist.owner.id}/watchlists/${watchlist.id}`}
-                        className="text-lg font-semibold text-white hover:text-cyan-100"
-                      >
-                        {watchlist.name}
-                      </Link>
-                      {watchlist.description ? (
-                        <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-300">{watchlist.description}</p>
+                <div className="mt-4 rounded-xl border border-white/10 bg-slate-900/40 p-4">
+                  {watchlist.previewPredictions.length > 0 ? (
+                    <div>
+                      {watchlist.previewPredictions.map((prediction) => (
+                        <WatchlistPreviewRow key={prediction.id} prediction={prediction} watchlistId={watchlist.id} />
+                      ))}
+                      {hiddenPredictions > 0 ? (
+                        <div className="mt-3 border-t border-white/10 pt-3">
+                          <Link
+                            href={`/analysts/${watchlist.owner.id}/watchlists/${watchlist.id}`}
+                            className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-cyan-300 transition hover:border-cyan-300/40 hover:text-cyan-100"
+                            aria-label={`View ${hiddenPredictions} more predictions in ${watchlist.name}`}
+                          >
+                            <span aria-hidden="true">...</span>
+                            <span>{hiddenPredictions} more</span>
+                          </Link>
+                        </div>
                       ) : null}
                     </div>
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300">
-                        Live {watchlistReturnText(watchlist.metrics.liveReturn)}
-                      </span>
-                      <span className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300">
-                        Settled {watchlistReturnText(watchlist.metrics.settledReturn)}
-                      </span>
-                      <span className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300">
-                        {watchlist.metrics.livePredictionCount + watchlist.metrics.settledPredictionCount} predictions
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-xl border border-white/10 bg-slate-900/40 p-4">
-                    {watchlist.previewPredictions.length > 0 ? (
-                      <div>
-                        {watchlist.previewPredictions.map((prediction) => (
-                          <WatchlistPreviewRow key={prediction.id} prediction={prediction} watchlistId={watchlist.id} />
-                        ))}
-                        {hiddenPredictions > 0 ? (
-                          <div className="mt-3 border-t border-white/10 pt-3">
-                            <Link
-                              href={`/analysts/${watchlist.owner.id}/watchlists/${watchlist.id}`}
-                              className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-cyan-300 transition hover:border-cyan-300/40 hover:text-cyan-100"
-                              aria-label={`View ${hiddenPredictions} more predictions in ${watchlist.name}`}
-                            >
-                              <span aria-hidden="true">...</span>
-                              <span>{hiddenPredictions} more</span>
-                            </Link>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-slate-300">No predictions in this watchlist yet.</p>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
-            No public watchlists yet.
-          </p>
-        )}
-      </section>
-    </main>
+                  ) : (
+                    <p className="text-sm text-slate-300">No predictions in this watchlist yet.</p>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
+          No public watchlists yet.
+        </p>
+      )}
+    </section>
   );
+
+  if (embedded) {
+    return content;
+  }
+
+  return <main className="mx-auto w-full max-w-6xl px-4 py-5">{content}</main>;
 }

@@ -221,7 +221,7 @@ export async function listWatchlistsForUser(userId: string): Promise<WatchlistSu
 export async function listPublicWatchlists(limit = 24): Promise<PublicWatchlistSummary[]> {
   const db = getAdminFirestore();
   const clampedLimit = Math.max(1, Math.min(limit, 48));
-  const snapshot = await db.collection("watchlists").orderBy("createdAt", "desc").limit(clampedLimit).get();
+  const snapshot = await db.collection("watchlists").orderBy("createdAt", "desc").get();
   const watchlists = snapshot.docs
     .map(mapWatchlistDoc)
     .filter((watchlist) => !watchlist.archivedAt);
@@ -281,7 +281,8 @@ export async function listPublicWatchlists(limit = 24): Promise<PublicWatchlistS
       }
 
       return b.createdAt.localeCompare(a.createdAt);
-    });
+    })
+    .slice(0, clampedLimit);
 }
 
 export async function createWatchlist(input: CreateWatchlistInput, user: AuthedUser): Promise<{ id: string }> {

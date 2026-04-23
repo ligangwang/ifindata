@@ -5,6 +5,7 @@ import Script from "next/script";
 import { AppProviders } from "@/components/providers/app-providers";
 import { EnvironmentBanner } from "@/components/environment-banner";
 import { SiteNav } from "@/components/site-nav";
+import { absoluteUrl, getSiteUrl, isProductionAppEnvironment, noIndexRobots } from "@/lib/seo";
 import "./globals.css";
 
 const GOOGLE_ANALYTICS_ID = process.env.GOOGLE_ANALYTICS_ID;
@@ -21,8 +22,31 @@ const ibmPlexSans = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "YouAnalyst | You are the analyst. Your watchlist. Your track record.",
-  description: "Make public market calls, track your score, and build your analyst reputation.",
+  metadataBase: getSiteUrl(),
+  title: "YouAnalyst | Your watchlist. Your track record.",
+  description: "Make public stock predictions, organize them into watchlists, and build an analyst track record in public.",
+  applicationName: "YouAnalyst",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "YouAnalyst",
+    title: "YouAnalyst | Your watchlist. Your track record.",
+    description: "Make public stock predictions, organize them into watchlists, and build an analyst track record in public.",
+  },
+  twitter: {
+    card: "summary",
+    title: "YouAnalyst | Your watchlist. Your track record.",
+    description: "Make public stock predictions, organize them into watchlists, and build an analyst track record in public.",
+  },
+  robots: isProductionAppEnvironment()
+    ? {
+        index: true,
+        follow: true,
+      }
+    : noIndexRobots(),
 };
 
 export default function RootLayout({
@@ -30,6 +54,14 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "YouAnalyst",
+    url: absoluteUrl("/"),
+    description: "Make public stock predictions, organize them into watchlists, and build an analyst track record in public.",
+  };
+
   return (
     <html
       lang="en"
@@ -52,6 +84,9 @@ export default function RootLayout({
             </Script>
           </>
         ) : null}
+        <Script id="website-jsonld" type="application/ld+json" strategy="beforeInteractive">
+          {JSON.stringify(websiteJsonLd)}
+        </Script>
         <AppProviders>
           <EnvironmentBanner />
           <SiteNav />

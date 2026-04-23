@@ -1,25 +1,25 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
+import { formatTickerSymbol, PredictionReturnSummary } from "@/components/prediction-ui";
 import { analystLevelName } from "@/lib/predictions/analytics";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type ProfileStatusFilter = "ALL" | "LIVE" | "SETTLED";
 
-type Prediction = {
+type WatchlistPrediction = {
   id: string;
   ticker: string;
   direction: "UP" | "DOWN";
-  entryPrice: number | null;
-  entryDate: string | null;
-  thesisTitle: string;
+  thesisTitle?: string;
   thesis: string;
   createdAt: string;
   status: PredictionStatus;
+  entryPrice: number | null;
+  entryDate: string | null;
   markPrice?: number | null;
   markPriceDate?: string | null;
   markReturnValue?: number | null;
@@ -30,16 +30,35 @@ type Prediction = {
   } | null;
 };
 
+type WatchlistMetrics = {
+  liveReturn: number | null;
+  settledReturn: number | null;
+  livePredictionCount: number;
+  settledPredictionCount: number;
+};
+
 type WatchlistSummary = {
   id: string;
   name: string;
   description?: string | null;
-  metrics: {
-    liveReturn: number | null;
-    settledReturn: number | null;
-    livePredictionCount: number;
-    settledPredictionCount: number;
-  };
+  metrics: WatchlistMetrics;
+};
+
+type WatchlistDetail = {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string | null;
+  metrics: WatchlistMetrics;
+  livePredictions: WatchlistPrediction[];
+  settledPredictions: WatchlistPrediction[];
+};
+
+type WatchlistRequestState = {
+  watchlistId: string | null;
+  watchlist: WatchlistDetail | null;
+  loading: boolean;
+  error: string | null;
 };
 
 type ProfilePayload = {
@@ -90,8 +109,6 @@ type ProfilePayload = {
     isFollowing: boolean;
   };
   watchlists: WatchlistSummary[];
-  predictions: Prediction[];
-  nextCursor: string | null;
 };
 
 function scoreValueText(score: number): string {
@@ -100,12 +117,6 @@ function scoreValueText(score: number): string {
 
 function xpProgressText(totalXP: number, level: number): string {
   return `${Math.round(totalXP).toLocaleString()} / ${(100 * Math.max(1, level) ** 2).toLocaleString()}`;
-}
-
-function resultReturnText(result: NonNullable<Prediction["result"]>): string {
-  const returnPercent = result.returnValue * 100;
-  const sign = returnPercent > 0 ? "+" : "";
-  return `${sign}${returnPercent.toFixed(2)}%`;
 }
 
 function statusFilterLabel(status: ProfileStatusFilter): string {
@@ -132,12 +143,55 @@ function watchlistReturnText(value: number | null): string {
   return `${sign}${percent.toFixed(2)}%`;
 }
 
+function predictionStatusLabel(status: PredictionStatus): string {
+  if (status === "CREATED") {
+    return "Awaiting entry";
+  }
+  if (status === "OPEN") {
+    return "Live";
+  }
+  if (status === "CLOSING") {
+    return "Closing";
+  }
+  if (status === "SETTLED") {
+    return "Settled";
+  }
+  return "Canceled";
+}
+
 function escapeHtmlAttribute(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+
+function ProfileWatchlistPredictionRow({ prediction }: { prediction: WatchlistPrediction }) {
+  const title = prediction.thesisTitle?.trim();
+
+  return (
+    <article className="border-t border-white/10 py-3 first:border-t-0 first:pt-0 last:pb-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <Link
+            href={`/predictions/${prediction.id}`}
+            className="flex w-fit items-center gap-1 text-base font-semibold text-cyan-200 hover:text-cyan-100"
+            aria-label={`${prediction.direction === "UP" ? "Up" : "Down"} prediction for ${prediction.ticker}`}
+          >
+            <span aria-hidden="true">{prediction.direction === "UP" ? "\u2191" : "\u2193"}</span>
+            <span>{formatTickerSymbol(prediction.ticker)}</span>
+          </Link>
+          {title ? <p className="mt-1 truncate text-sm text-slate-300">{title}</p> : null}
+          <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} status={prediction.status} />
+        </div>
+        <div className="shrink-0 text-right text-xs text-slate-500">
+          <p>{predictionStatusLabel(prediction.status)}</p>
+          <p className="mt-1">{prediction.commentCount.toLocaleString()} comments</p>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export function AnalystProfilePage({
@@ -153,7 +207,6 @@ export function AnalystProfilePage({
   const [payload, setPayload] = useState<ProfilePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editNickname, setEditNickname] = useState("");
   const [editBio, setEditBio] = useState("");
@@ -169,35 +222,21 @@ export function AnalystProfilePage({
   const [watchlistDescription, setWatchlistDescription] = useState("");
   const [creatingWatchlist, setCreatingWatchlist] = useState(false);
   const [watchlistCreateError, setWatchlistCreateError] = useState<string | null>(null);
+  const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | null>(null);
+  const [watchlistState, setWatchlistState] = useState<WatchlistRequestState>({
+    watchlistId: null,
+    watchlist: null,
+    loading: false,
+    error: null,
+  });
   const preferredName = payload?.profile.nickname ?? payload?.profile.displayName ?? "Analyst";
   const badgePath = `/api/users/${userId}/badge.svg`;
   const profilePath = `/analysts/${userId}`;
   const settledCalls = payload?.profile.stats.settledCalls ?? payload?.profile.stats.closedPredictions ?? 0;
-  const profileAuthor = payload
-    ? {
-        userId,
-        authorDisplayName: payload.profile.displayName,
-        authorNickname: payload.profile.nickname,
-        authorPhotoURL: payload.profile.photoURL,
-        authorAccountType: payload.profile.accountType ?? "HUMAN",
-        authorStats: {
-          totalScore: payload.profile.stats.totalScore,
-          totalPredictions: settledCalls,
-        },
-      }
-    : null;
 
-  const fetchProfile = useCallback(async (cursorCreatedAt?: string): Promise<ProfilePayload> => {
-    const params = new URLSearchParams();
-    if (status !== "ALL") {
-      params.set("status", status);
-    }
-    if (cursorCreatedAt) {
-      params.set("cursorCreatedAt", cursorCreatedAt);
-    }
-
+  const fetchProfile = useCallback(async (): Promise<ProfilePayload> => {
     const token = await getIdToken();
-    const response = await fetch(`/api/users/${userId}?${params.toString()}`, {
+    const response = await fetch(`/api/users/${userId}`, {
       headers: token ? { authorization: `Bearer ${token}` } : undefined,
     });
 
@@ -206,18 +245,52 @@ export function AnalystProfilePage({
     }
 
     return (await response.json()) as ProfilePayload;
-  }, [getIdToken, status, userId]);
+  }, [getIdToken, userId]);
+
+  function beginWatchlistLoad(nextWatchlistId: string, fallback?: WatchlistDetail | null) {
+    if (nextWatchlistId === selectedWatchlistId && !watchlistState.error) {
+      return;
+    }
+
+    setSelectedWatchlistId(nextWatchlistId);
+    setWatchlistState({
+      watchlistId: nextWatchlistId,
+      watchlist: fallback ?? null,
+      loading: true,
+      error: null,
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     void fetchProfile()
       .then((nextPayload) => {
-        if (!cancelled) {
-          setPayload(nextPayload);
-          setLoading(false);
+        if (cancelled) {
+          return;
+        }
+
+        setPayload(nextPayload);
+        setLoading(false);
+        setError(null);
+
+        const firstWatchlist = nextPayload.watchlists[0];
+        if (firstWatchlist) {
+          setSelectedWatchlistId(firstWatchlist.id);
+          setWatchlistState({
+            watchlistId: firstWatchlist.id,
+            watchlist: null,
+            loading: true,
+            error: null,
+          });
+        } else {
+          setSelectedWatchlistId(null);
+          setWatchlistState({
+            watchlistId: null,
+            watchlist: null,
+            loading: false,
+            error: null,
+          });
         }
       })
       .catch((nextError) => {
@@ -233,34 +306,50 @@ export function AnalystProfilePage({
     };
   }, [fetchProfile]);
 
-  async function loadMorePredictions() {
-    if (!payload?.nextCursor || loadingMore) {
+  useEffect(() => {
+    if (!selectedWatchlistId) {
       return;
     }
 
-    setLoadingMore(true);
-    try {
-      const nextPayload = await fetchProfile(payload.nextCursor);
-      setPayload((prev) => {
-        if (!prev) {
-          return nextPayload;
-        }
+    let cancelled = false;
 
-        return {
-          ...prev,
-          predictions: [...prev.predictions, ...nextPayload.predictions],
-          nextCursor: nextPayload.nextCursor,
-        };
+    void fetch(`/api/watchlists/${selectedWatchlistId}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Unable to load watchlist.");
+        }
+        return (await response.json()) as { watchlist: WatchlistDetail };
+      })
+      .then((response) => {
+        if (!cancelled) {
+          setWatchlistState({
+            watchlistId: selectedWatchlistId,
+            watchlist: response.watchlist,
+            loading: false,
+            error: null,
+          });
+        }
+      })
+      .catch((nextError) => {
+        if (!cancelled) {
+          setWatchlistState({
+            watchlistId: selectedWatchlistId,
+            watchlist: null,
+            loading: false,
+            error: nextError instanceof Error ? nextError.message : "Unable to load watchlist.",
+          });
+        }
       });
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unable to load more predictions.");
-    } finally {
-      setLoadingMore(false);
-    }
-  }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedWatchlistId]);
 
   function startEditing() {
-    if (!payload) return;
+    if (!payload) {
+      return;
+    }
     setEditNickname(payload.profile.nickname ?? "");
     setEditBio(payload.profile.bio);
     setSaveError(null);
@@ -285,13 +374,18 @@ export function AnalystProfilePage({
   }
 
   async function saveProfile() {
-    if (!payload) return;
+    if (!payload) {
+      return;
+    }
+
     setSaving(true);
     setSaveError(null);
 
     try {
       const token = await getIdToken();
-      if (!token) throw new Error("Not authenticated.");
+      if (!token) {
+        throw new Error("Not authenticated.");
+      }
 
       const response = await fetch(`/api/users/${userId}`, {
         method: "PATCH",
@@ -310,17 +404,17 @@ export function AnalystProfilePage({
         throw new Error(body.error ?? "Failed to save profile.");
       }
 
-      setPayload((prev) =>
-        prev
+      setPayload((current) =>
+        current
           ? {
-              ...prev,
+              ...current,
               profile: {
-                ...prev.profile,
+                ...current.profile,
                 nickname: editNickname.trim() || null,
                 bio: editBio.trim(),
               },
             }
-          : prev,
+          : current,
       );
       setEditing(false);
     } catch (nextError) {
@@ -331,16 +425,19 @@ export function AnalystProfilePage({
   }
 
   async function toggleFollow() {
-    if (!payload || isOwner) return;
+    if (!payload || isOwner) {
+      return;
+    }
 
     setFollowSaving(true);
     setFollowError(null);
-
     const wasFollowing = payload.relationship.isFollowing;
 
     try {
       const token = await getIdToken();
-      if (!token) throw new Error("Sign in to follow analysts.");
+      if (!token) {
+        throw new Error("Sign in to follow analysts.");
+      }
 
       const response = await fetch(`/api/users/${userId}/follow`, {
         method: wasFollowing ? "DELETE" : "POST",
@@ -354,21 +451,24 @@ export function AnalystProfilePage({
         throw new Error(body.error ?? "Unable to update follow.");
       }
 
-      setPayload((prev) => {
-        if (!prev) return prev;
+      setPayload((current) => {
+        if (!current) {
+          return current;
+        }
+
         const nextIsFollowing = !wasFollowing;
         const followersDelta = nextIsFollowing ? 1 : -1;
 
         return {
-          ...prev,
+          ...current,
           relationship: {
             isFollowing: nextIsFollowing,
           },
           profile: {
-            ...prev.profile,
+            ...current.profile,
             stats: {
-              ...prev.profile.stats,
-              followersCount: Math.max(0, prev.profile.stats.followersCount + followersDelta),
+              ...current.profile.stats,
+              followersCount: Math.max(0, current.profile.stats.followersCount + followersDelta),
             },
           },
         };
@@ -381,7 +481,9 @@ export function AnalystProfilePage({
   }
 
   async function createProfileWatchlist() {
-    if (!payload) return;
+    if (!payload) {
+      return;
+    }
 
     const name = watchlistName.trim();
     const description = watchlistDescription.trim();
@@ -400,7 +502,9 @@ export function AnalystProfilePage({
 
     try {
       const token = await getIdToken();
-      if (!token) throw new Error("Sign in to create a watchlist.");
+      if (!token) {
+        throw new Error("Sign in to create a watchlist.");
+      }
 
       const response = await fetch("/api/watchlists", {
         method: "POST",
@@ -429,15 +533,28 @@ export function AnalystProfilePage({
           settledPredictionCount: 0,
         },
       };
+      const nextWatchlistDetail: WatchlistDetail = {
+        ...nextWatchlist,
+        userId,
+        livePredictions: [],
+        settledPredictions: [],
+      };
 
-      setPayload((prev) =>
-        prev
+      setPayload((current) =>
+        current
           ? {
-              ...prev,
-              watchlists: [...prev.watchlists, nextWatchlist],
+              ...current,
+              watchlists: [...current.watchlists, nextWatchlist],
             }
-          : prev,
+          : current,
       );
+      beginWatchlistLoad(body.id, nextWatchlistDetail);
+      setWatchlistState({
+        watchlistId: body.id,
+        watchlist: nextWatchlistDetail,
+        loading: false,
+        error: null,
+      });
       setWatchlistName("");
       setWatchlistDescription("");
       setWatchlistComposerOpen(false);
@@ -472,6 +589,19 @@ export function AnalystProfilePage({
       setCopyMessage("Unable to copy.");
     }
   }
+
+  const selectedWatchlistSummary = payload?.watchlists.find((watchlist) => watchlist.id === selectedWatchlistId) ?? null;
+  const selectedWatchlist =
+    watchlistState.watchlistId === selectedWatchlistId ? watchlistState.watchlist : null;
+  const selectedMetrics = selectedWatchlist?.metrics ?? selectedWatchlistSummary?.metrics ?? null;
+  const selectedPredictions =
+    selectedWatchlist && status === "LIVE"
+      ? selectedWatchlist.livePredictions
+      : selectedWatchlist && status === "SETTLED"
+        ? selectedWatchlist.settledPredictions
+        : selectedWatchlist
+          ? [...selectedWatchlist.livePredictions, ...selectedWatchlist.settledPredictions].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          : [];
 
   if (loading || !payload) {
     return (
@@ -635,7 +765,7 @@ export function AnalystProfilePage({
                 disabled={saving}
                 className="rounded-lg bg-cyan-500 px-4 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-50"
               >
-                {saving ? "Saving…" : "Save"}
+                {saving ? "Saving..." : "Save"}
               </button>
               <button
                 type="button"
@@ -707,7 +837,7 @@ export function AnalystProfilePage({
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Watchlists</h2>
-            <p className="mt-1 text-sm text-slate-300">Public strategy groups for this analyst&apos;s predictions.</p>
+            <p className="mt-1 text-sm text-slate-300">Your watchlist. Your track record.</p>
           </div>
           {isOwner ? (
             <div className="flex flex-wrap gap-2">
@@ -732,6 +862,7 @@ export function AnalystProfilePage({
             </div>
           ) : null}
         </div>
+
         {isOwner && watchlistComposerOpen ? (
           <div className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4">
             <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
@@ -763,43 +894,121 @@ export function AnalystProfilePage({
             {watchlistCreateError ? <p className="mt-2 text-xs text-rose-300">{watchlistCreateError}</p> : null}
           </div>
         ) : null}
-        <div className="grid gap-3 md:grid-cols-2">
-          {payload.watchlists.map((watchlist) => (
-            <Link
-              key={watchlist.id}
-              href={`/analysts/${userId}/watchlists/${watchlist.id}`}
-              className="rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4 transition hover:border-cyan-300/60 hover:bg-cyan-500/10"
-            >
-              <h3 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">{watchlist.name}</h3>
-              {watchlist.description ? (
-                <p className="mt-1 text-sm leading-6 text-slate-300">{watchlist.description}</p>
-              ) : null}
-              <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Live return</p>
-                  <p className="font-semibold text-cyan-100">{watchlistReturnText(watchlist.metrics.liveReturn)}</p>
+
+        {payload.watchlists.length > 0 ? (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {payload.watchlists.map((watchlist) => (
+                <button
+                  key={watchlist.id}
+                  type="button"
+                  onClick={() => beginWatchlistLoad(watchlist.id)}
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
+                    selectedWatchlistId === watchlist.id
+                      ? "bg-cyan-500 text-slate-950"
+                      : "border border-white/10 text-slate-300 hover:border-cyan-300/40 hover:text-cyan-100"
+                  }`}
+                >
+                  {watchlist.name}
+                </button>
+              ))}
+            </div>
+
+            {selectedWatchlistSummary ? (
+              <div className="mt-5 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
+                        {selectedWatchlistSummary.name}
+                      </h3>
+                      <Link
+                        href={`/analysts/${userId}/watchlists/${selectedWatchlistSummary.id}`}
+                        className="text-xs font-medium text-cyan-300 hover:text-cyan-100"
+                      >
+                        Open page
+                      </Link>
+                    </div>
+                    {selectedWatchlistSummary.description ? (
+                      <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                        {selectedWatchlistSummary.description}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="inline-flex rounded-full border border-slate-700 bg-slate-800/70 p-1 text-xs">
+                    {(["ALL", "LIVE", "SETTLED"] as const).map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setStatus(option)}
+                        className={`rounded-full px-3 py-1.5 transition ${
+                          status === option ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"
+                        }`}
+                      >
+                        {statusFilterLabel(option)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Settled return</p>
-                  <p className="font-semibold text-cyan-100">{watchlistReturnText(watchlist.metrics.settledReturn)}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Live</p>
-                  <p className="font-semibold text-slate-100">{watchlist.metrics.livePredictionCount.toLocaleString()} predictions</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Settled</p>
-                  <p className="font-semibold text-slate-100">{watchlist.metrics.settledPredictionCount.toLocaleString()} predictions</p>
+
+                {selectedMetrics ? (
+                  <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-xl border border-white/10 bg-slate-950/50 p-3">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Live return</p>
+                      <p className="mt-1 font-semibold text-cyan-100">
+                        {watchlistReturnText(selectedMetrics.liveReturn)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-slate-950/50 p-3">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Settled return</p>
+                      <p className="mt-1 font-semibold text-cyan-100">
+                        {watchlistReturnText(selectedMetrics.settledReturn)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-slate-950/50 p-3">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Live</p>
+                      <p className="mt-1 font-semibold text-slate-100">
+                        {selectedMetrics.livePredictionCount.toLocaleString()} predictions
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-slate-950/50 p-3">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Settled</p>
+                      <p className="mt-1 font-semibold text-slate-100">
+                        {selectedMetrics.settledPredictionCount.toLocaleString()} predictions
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                  {watchlistState.loading && watchlistState.watchlistId === selectedWatchlistId ? (
+                    <p className="text-sm text-slate-300">Loading watchlist...</p>
+                  ) : watchlistState.error && watchlistState.watchlistId === selectedWatchlistId ? (
+                    <p className="text-sm text-rose-300">{watchlistState.error}</p>
+                  ) : selectedPredictions.length > 0 ? (
+                    <div>
+                      {selectedPredictions.map((prediction) => (
+                        <ProfileWatchlistPredictionRow key={prediction.id} prediction={prediction} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-300">
+                      {status === "LIVE"
+                        ? "No live predictions in this watchlist."
+                        : status === "SETTLED"
+                          ? "No settled predictions in this watchlist."
+                          : "No predictions in this watchlist yet."}
+                    </p>
+                  )}
                 </div>
               </div>
-            </Link>
-          ))}
-          {payload.watchlists.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
-              {isOwner ? "No watchlists yet. Create one to organize your predictions." : "No watchlists yet."}
-            </p>
-          ) : null}
-        </div>
+            ) : null}
+          </>
+        ) : (
+          <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
+            {isOwner ? "No watchlists yet. Create one to organize your predictions." : "No watchlists yet."}
+          </p>
+        )}
       </section>
 
       {shareOpen ? (
@@ -868,62 +1077,6 @@ export function AnalystProfilePage({
           </div>
         </div>
       ) : null}
-
-      <section className="rounded-2xl border border-white/15 bg-slate-950/55 p-5">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Prediction history</h2>
-          <div className="inline-flex rounded-full border border-slate-700 bg-slate-800/70 p-1 text-xs">
-            {(["ALL", "LIVE", "SETTLED"] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setStatus(option)}
-                className={`rounded-full px-3 py-1.5 transition ${
-                  status === option ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"
-                }`}
-              >
-                {statusFilterLabel(option)}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="grid gap-2">
-          {payload.predictions.map((prediction) => (
-            <article
-              key={prediction.id}
-              className="rounded-xl border border-white/10 p-4 hover:border-cyan-300/60"
-            >
-              <Link
-                href={`/ticker/${prediction.ticker}`}
-                className="flex w-fit items-center gap-1 text-base font-semibold text-cyan-200 hover:text-cyan-100"
-                aria-label={`${prediction.direction === "UP" ? "Up" : "Down"} prediction for ${prediction.ticker}`}
-              >
-                <span aria-hidden="true">{prediction.direction === "UP" ? "\u2191" : "\u2193"}</span>
-                <span>{formatTickerSymbol(prediction.ticker)}</span>
-              </Link>
-              {prediction.result ? (
-                <p className="mt-1 text-sm text-emerald-200">Result {resultReturnText(prediction.result)}</p>
-              ) : null}
-              <PredictionReturnSummary prediction={prediction} href={`/predictions/${prediction.id}`} status={prediction.status} />
-              {profileAuthor ? <PredictionAuthorSummary author={profileAuthor} /> : null}
-            </article>
-          ))}
-
-          {payload.predictions.length === 0 ? <p className="text-sm text-slate-300">No predictions yet.</p> : null}
-
-          {payload.nextCursor ? (
-            <button
-              type="button"
-              onClick={() => void loadMorePredictions()}
-              disabled={loadingMore}
-              className="mt-2 rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 hover:border-cyan-300/60 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loadingMore ? "Loading..." : "Load more"}
-            </button>
-          ) : null}
-        </div>
-      </section>
     </main>
   );
 }
-

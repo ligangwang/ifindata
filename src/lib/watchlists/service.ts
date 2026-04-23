@@ -333,7 +333,8 @@ export async function movePredictionToWatchlist(
   const nowIso = new Date().toISOString();
   const predictionRef = db.collection("predictions").doc(predictionId);
   const watchlistRef = db.collection("watchlists").doc(watchlistId);
-  let movedWatchlist: Watchlist | null = null;
+  let movedWatchlistId = "";
+  let movedWatchlistName = "";
 
   await db.runTransaction(async (tx) => {
     const predictionSnapshot = await tx.get(predictionRef);
@@ -352,7 +353,8 @@ export async function movePredictionToWatchlist(
     }
 
     const watchlist = await assertWatchlistCanReceivePrediction(tx, watchlistRef, user.uid);
-    movedWatchlist = watchlist;
+    movedWatchlistId = watchlist.id;
+    movedWatchlistName = watchlist.name;
     tx.update(predictionRef, {
       watchlistId: watchlist.id,
       watchlistName: watchlist.name,
@@ -360,14 +362,14 @@ export async function movePredictionToWatchlist(
     });
   });
 
-  if (!movedWatchlist) {
+  if (!movedWatchlistId) {
     throw new Error("Watchlist not found");
   }
 
   return {
     moved: true,
-    watchlistId: movedWatchlist.id,
-    watchlistName: movedWatchlist.name,
+    watchlistId: movedWatchlistId,
+    watchlistName: movedWatchlistName,
   };
 }
 

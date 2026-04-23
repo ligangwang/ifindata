@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { TickerSearchInput } from "@/components/ticker-search-input";
 import { MAX_PREDICTION_THESIS_LENGTH, MAX_PREDICTION_THESIS_TITLE_LENGTH, type PredictionTimeHorizonUnit } from "@/lib/predictions/types";
@@ -19,9 +19,8 @@ type WatchlistOption = {
   description?: string | null;
 };
 
-export function CreatePredictionPage() {
+export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedWatchlistId?: string }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { user, loading, getIdToken } = useAuth();
   const [ticker, setTicker] = useState("");
   const [direction, setDirection] = useState<"UP" | "DOWN">("UP");
@@ -63,7 +62,6 @@ export function CreatePredictionPage() {
     timeHorizonUnit !== "NONE" && !isValidTimeHorizon
       ? "Open until must be a positive whole number."
       : null;
-  const requestedWatchlistId = searchParams.get("watchlistId")?.trim() ?? "";
 
   useEffect(() => {
     if (!user) {

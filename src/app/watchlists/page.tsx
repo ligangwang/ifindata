@@ -1,27 +1,34 @@
 import type { Metadata } from "next";
-import { PublicWatchlistsPage } from "@/components/public-watchlists-page";
+import { WatchlistsPage } from "@/components/watchlists-page";
 import { listPublicWatchlists } from "@/lib/watchlists/service";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Community watchlists | YouAnalyst",
-  description: "Browse top-performing public watchlists from the YouAnalyst community.",
+  title: "Watchlists | YouAnalyst",
+  description: "Browse community watchlists and manage your own watchlists on YouAnalyst.",
   alternates: {
     canonical: "/watchlists",
   },
   openGraph: {
-    title: "Community watchlists | YouAnalyst",
-    description: "Browse top-performing public watchlists from the YouAnalyst community.",
+    title: "Watchlists | YouAnalyst",
+    description: "Browse community watchlists and manage your own watchlists on YouAnalyst.",
     url: "/watchlists",
   },
   twitter: {
-    title: "Community watchlists | YouAnalyst",
-    description: "Browse top-performing public watchlists from the YouAnalyst community.",
+    title: "Watchlists | YouAnalyst",
+    description: "Browse community watchlists and manage your own watchlists on YouAnalyst.",
   },
 };
 
-export default async function WatchlistsRoutePage() {
+export default async function WatchlistsRoutePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string | string[] }>;
+}) {
   const watchlists = await listPublicWatchlists();
-  return <PublicWatchlistsPage watchlists={watchlists} />;
+  const { tab } = await searchParams;
+  const initialTab = Array.isArray(tab) ? tab[0] : tab;
+
+  return <WatchlistsPage publicWatchlists={watchlists} initialTab={initialTab} />;
 }

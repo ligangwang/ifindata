@@ -86,18 +86,35 @@ function WatchlistPreviewRow({
   );
 }
 
-export function PublicWatchlistsPage({ watchlists }: { watchlists: PublicWatchlistSummary[] }) {
-  return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-5">
-      <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-4 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
+function hiddenPredictionCount(watchlist: PublicWatchlistSummary): number {
+  const totalPredictions = watchlist.metrics.livePredictionCount + watchlist.metrics.settledPredictionCount;
+  return Math.max(0, totalPredictions - watchlist.previewPredictions.length);
+}
+
+export function PublicWatchlistsPage({
+  watchlists,
+  embedded = false,
+  showHeader = true,
+}: {
+  watchlists: PublicWatchlistSummary[];
+  embedded?: boolean;
+  showHeader?: boolean;
+}) {
+  const content = (
+    <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-4 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
+      {showHeader ? (
         <div className="mb-4">
           <h1 className="text-lg font-semibold tracking-tight text-white sm:text-xl">Community Watchlists</h1>
           <p className="mt-1 text-sm text-slate-300">Best-performing public watchlists, with newer watchlists breaking ties.</p>
         </div>
+      ) : null}
 
-        {watchlists.length > 0 ? (
-          <div className="grid gap-3">
-            {watchlists.map((watchlist) => (
+      {watchlists.length > 0 ? (
+        <div className="grid gap-3">
+          {watchlists.map((watchlist) => {
+            const hiddenPredictions = hiddenPredictionCount(watchlist);
+
+            return (
               <article
                 key={watchlist.id}
                 className="rounded-xl border border-white/10 bg-slate-950/55 p-4 transition hover:border-cyan-300/30"
@@ -167,20 +184,38 @@ export function PublicWatchlistsPage({ watchlists }: { watchlists: PublicWatchli
                       {watchlist.previewPredictions.map((prediction) => (
                         <WatchlistPreviewRow key={prediction.id} prediction={prediction} watchlistId={watchlist.id} />
                       ))}
+                      {hiddenPredictions > 0 ? (
+                        <div className="mt-3 border-t border-white/10 pt-3">
+                          <Link
+                            href={`/analysts/${watchlist.owner.id}/watchlists/${watchlist.id}`}
+                            className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-cyan-300 transition hover:border-cyan-300/40 hover:text-cyan-100"
+                            aria-label={`View ${hiddenPredictions} more predictions in ${watchlist.name}`}
+                          >
+                            <span aria-hidden="true">...</span>
+                            <span>{hiddenPredictions} more</span>
+                          </Link>
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
                     <p className="text-sm text-slate-300">No predictions in this watchlist yet.</p>
                   )}
                 </div>
               </article>
-            ))}
-          </div>
-        ) : (
-          <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
-            No public watchlists yet.
-          </p>
-        )}
-      </section>
-    </main>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
+          No public watchlists yet.
+        </p>
+      )}
+    </section>
   );
+
+  if (embedded) {
+    return content;
+  }
+
+  return <main className="mx-auto w-full max-w-6xl px-4 py-5">{content}</main>;
 }

@@ -324,6 +324,16 @@ export async function getOrCreateDefaultWatchlistForUser(
   return created.id;
 }
 
+async function findRawWatchlistForBackfill(userId: string, defaultName: string): Promise<Watchlist | null> {
+  const snapshot = await getAdminFirestore().collection("watchlists").where("userId", "==", userId).get();
+  const active = snapshot.docs
+    .map(mapWatchlistDoc)
+    .filter((watchlist) => !watchlist.archivedAt)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+  return active.find((watchlist) => watchlist.name === defaultName) ?? active[0] ?? null;
+}
+
 export async function movePredictionToWatchlist(
   predictionId: string,
   watchlistId: string,
@@ -432,10 +442,9 @@ export async function backfillLegacyPredictionWatchlists(
 
     let watchlist = watchlistByUserId.get(userId);
     if (!watchlist) {
-      const existing = await listWatchlistsForUser(userId);
-      const existingDefault = existing.find((item) => item.name === defaultName) ?? existing[0];
-      if (existingDefault) {
-        watchlist = existingDefault;
+      const existing = await findRawWatchlistForBackfill(userId, defaultName);
+      if (existing) {
+        watchlist = existing;
       } else if (dryRun) {
         watchlist = {
           id: `dry_run_default_${userId}`,

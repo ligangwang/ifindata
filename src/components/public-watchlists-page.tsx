@@ -157,24 +157,10 @@ export function PublicWatchlistsPage({
                   <div className="min-w-0">
                     <Link
                       href={`/analysts/${watchlist.owner.id}/watchlists/${watchlist.id}`}
-                      className="text-lg font-semibold text-white hover:text-cyan-100"
+                      className="shrink-0 text-xs font-medium text-cyan-300 hover:text-cyan-100"
                     >
-                      {watchlist.name}
+                      View watchlist
                     </Link>
-                    {watchlist.description ? (
-                      <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-300">{watchlist.description}</p>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300">
-                      Live {watchlistReturnText(watchlist.metrics.liveReturn)}
-                    </span>
-                    <span className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300">
-                      Settled {watchlistReturnText(watchlist.metrics.settledReturn)}
-                    </span>
-                    <span className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300">
-                      {watchlist.metrics.livePredictionCount + watchlist.metrics.settledPredictionCount} predictions
-                    </span>
                   </div>
                 </div>
 

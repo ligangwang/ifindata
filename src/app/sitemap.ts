@@ -3,6 +3,7 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 import { normalizeTicker } from "@/lib/predictions/types";
 import { absoluteUrl } from "@/lib/seo";
 
+export const dynamic = "force-dynamic";
 export const revalidate = 3600;
 
 const STATIC_ROUTES: MetadataRoute.Sitemap = [

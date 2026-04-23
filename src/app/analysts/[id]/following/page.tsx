@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import { FollowListPage } from "@/components/follow-list-page";
+import { noIndexRobots } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: "Following | YouAnalyst",
+  robots: noIndexRobots(),
+};
 
 export default async function AnalystFollowingRoutePage({
   params,

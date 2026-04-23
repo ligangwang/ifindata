@@ -221,7 +221,8 @@ export async function listWatchlistsForUser(userId: string): Promise<WatchlistSu
 export async function listPublicWatchlists(limit = 24): Promise<PublicWatchlistSummary[]> {
   const db = getAdminFirestore();
   const clampedLimit = Math.max(1, Math.min(limit, 48));
-  const snapshot = await db.collection("watchlists").orderBy("createdAt", "desc").get();
+  const candidateLimit = Math.min(Math.max(clampedLimit * 5, 120), 240);
+  const snapshot = await db.collection("watchlists").orderBy("createdAt", "desc").limit(candidateLimit).get();
   const watchlists = snapshot.docs
     .map(mapWatchlistDoc)
     .filter((watchlist) => !watchlist.archivedAt);

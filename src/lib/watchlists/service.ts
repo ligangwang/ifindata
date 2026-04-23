@@ -143,6 +143,18 @@ function metricsForPredictions(predictions: WatchlistPrediction[]): WatchlistMet
   };
 }
 
+function watchlistPerformanceValue(metrics: WatchlistMetrics): number | null {
+  if (typeof metrics.settledReturn === "number" && Number.isFinite(metrics.settledReturn)) {
+    return metrics.settledReturn;
+  }
+
+  if (typeof metrics.liveReturn === "number" && Number.isFinite(metrics.liveReturn)) {
+    return metrics.liveReturn;
+  }
+
+  return null;
+}
+
 async function listWatchlistPredictions(watchlistId: string): Promise<WatchlistPrediction[]> {
   const snapshot = await getAdminFirestore()
     .collection("predictions")
@@ -250,7 +262,26 @@ export async function listPublicWatchlists(limit = 24): Promise<PublicWatchlistS
     }),
   );
 
-  return summaries.filter((summary): summary is PublicWatchlistSummary => summary !== null);
+  return summaries
+    .filter((summary): summary is PublicWatchlistSummary => summary !== null)
+    .sort((a, b) => {
+      const aPerformance = watchlistPerformanceValue(a.metrics);
+      const bPerformance = watchlistPerformanceValue(b.metrics);
+
+      if (aPerformance !== null && bPerformance !== null && aPerformance !== bPerformance) {
+        return bPerformance - aPerformance;
+      }
+
+      if (aPerformance !== null && bPerformance === null) {
+        return -1;
+      }
+
+      if (aPerformance === null && bPerformance !== null) {
+        return 1;
+      }
+
+      return b.createdAt.localeCompare(a.createdAt);
+    });
 }
 
 export async function createWatchlist(input: CreateWatchlistInput, user: AuthedUser): Promise<{ id: string }> {

@@ -16,8 +16,13 @@ function isPredictionStatus(value: string | null): value is Exclude<PredictionSt
   return value === "ACTIVE" || value === "LIVE" || value === "FINAL" || value === "SETTLED" || value === "CREATED" || value === "OPEN" || value === "CLOSING";
 }
 
+function isPredictionSort(value: string | null): value is "createdAt" | "performance" {
+  return value === "createdAt" || value === "performance";
+}
+
 export async function GET(request: NextRequest) {
   const statusParam = request.nextUrl.searchParams.get("status");
+  const sortParam = request.nextUrl.searchParams.get("sort");
   const userId = request.nextUrl.searchParams.get("userId")?.trim() ?? "";
   const includePrivateParam = request.nextUrl.searchParams.get("includePrivate");
   const cursorCreatedAt = request.nextUrl.searchParams.get("cursorCreatedAt")?.trim() ?? "";
@@ -25,6 +30,10 @@ export async function GET(request: NextRequest) {
 
   if (statusParam && !isPredictionStatus(statusParam)) {
     return NextResponse.json({ error: "status must be LIVE, SETTLED, ACTIVE, CREATED, OPEN, or CLOSING" }, { status: 400 });
+  }
+
+  if (sortParam && !isPredictionSort(sortParam)) {
+    return NextResponse.json({ error: "sort must be createdAt or performance" }, { status: 400 });
   }
 
   const includePrivate = includePrivateParam === "true";
@@ -42,6 +51,7 @@ export async function GET(request: NextRequest) {
       includePrivate: includePrivateForQuery,
       cursorCreatedAt: cursorCreatedAt || undefined,
       limit,
+      sort: isPredictionSort(sortParam) ? sortParam : undefined,
     });
 
     return NextResponse.json({

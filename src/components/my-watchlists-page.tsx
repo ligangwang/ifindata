@@ -222,6 +222,17 @@ export function MyWatchlistsPage() {
     }
 
     if (!user) {
+      watchlistRequestIdRef.current += 1;
+      setWatchlists([]);
+      setSelectedWatchlistId(null);
+      setWatchlist(null);
+      setEditName("");
+      setEditDescription("");
+      setComposerOpen(false);
+      setEditing(false);
+      setError(null);
+      setLoadingWorkspace(false);
+      setLoadingDetail(false);
       return;
     }
 

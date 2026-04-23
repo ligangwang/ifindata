@@ -69,6 +69,8 @@ export type Prediction = {
   authorDisplayName: string | null;
   authorPhotoURL: string | null;
   sourceType?: "HUMAN" | "AI_ANALYST";
+  watchlistId: string;
+  watchlistName: string;
   ticker: string;
   direction: PredictionDirection;
   thesisTitle?: string;
@@ -127,6 +129,7 @@ export type PredictionComment = {
 export type CreatePredictionInput = {
   ticker: string;
   direction: PredictionDirection;
+  watchlistId: string;
   thesisTitle: string;
   thesis: string;
   timeHorizon?: PredictionTimeHorizon | null;

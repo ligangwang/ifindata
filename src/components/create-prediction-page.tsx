@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { TickerSearchInput } from "@/components/ticker-search-input";
@@ -13,6 +13,12 @@ function isValidTickerFormat(ticker: string): boolean {
   return /^[A-Z0-9.\-]+$/.test(ticker);
 }
 
+type WatchlistOption = {
+  id: string;
+  name: string;
+  description?: string | null;
+};
+
 export function CreatePredictionPage() {
   const router = useRouter();
   const { user, loading, getIdToken } = useAuth();
@@ -20,6 +26,10 @@ export function CreatePredictionPage() {
   const [direction, setDirection] = useState<"UP" | "DOWN">("UP");
   const [thesisTitle, setThesisTitle] = useState("");
   const [thesis, setThesis] = useState("");
+  const [watchlists, setWatchlists] = useState<WatchlistOption[]>([]);
+  const [watchlistId, setWatchlistId] = useState("");
+  const [newWatchlistName, setNewWatchlistName] = useState("");
+  const [creatingWatchlist, setCreatingWatchlist] = useState(false);
   const [timeHorizonUnit, setTimeHorizonUnit] = useState<"NONE" | PredictionTimeHorizonUnit>("NONE");
   const [timeHorizonValue, setTimeHorizonValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -29,11 +39,10 @@ export function CreatePredictionPage() {
   const trimmedThesisTitleLength = thesisTitle.trim().length;
   const trimmedThesisLength = thesis.trim().length;
   const isValidThesisTitle =
-    trimmedThesisTitleLength > 0 &&
     trimmedThesisTitleLength <= MAX_PREDICTION_THESIS_TITLE_LENGTH;
   const isValidThesis =
-    trimmedThesisLength > 0 &&
     trimmedThesisLength <= MAX_PREDICTION_THESIS_LENGTH;
+  const isValidWatchlist = Boolean(watchlistId);
   const parsedTimeHorizonValue = Number(timeHorizonValue);
   const isValidTimeHorizon =
     timeHorizonUnit === "NONE" ||
@@ -42,9 +51,7 @@ export function CreatePredictionPage() {
     ? "Ticker must be 1-12 letters, numbers, dots, or hyphens."
     : null;
   const thesisErrorMessage =
-    trimmedThesisLength === 0
-      ? "Thesis is required."
-      : trimmedThesisLength > MAX_PREDICTION_THESIS_LENGTH
+    trimmedThesisLength > MAX_PREDICTION_THESIS_LENGTH
         ? `Thesis must be ${MAX_PREDICTION_THESIS_LENGTH} characters or fewer.`
         : null;
   const thesisTitleErrorMessage =
@@ -55,6 +62,39 @@ export function CreatePredictionPage() {
     timeHorizonUnit !== "NONE" && !isValidTimeHorizon
       ? "Open until must be a positive whole number."
       : null;
+
+  useEffect(() => {
+    if (!user) {
+      setWatchlists([]);
+      setWatchlistId("");
+      return;
+    }
+
+    let cancelled = false;
+    void fetch(`/api/watchlists?userId=${encodeURIComponent(user.uid)}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Unable to load watchlists.");
+        }
+        return (await response.json()) as { items: WatchlistOption[] };
+      })
+      .then((payload) => {
+        if (cancelled) {
+          return;
+        }
+        setWatchlists(payload.items);
+        setWatchlistId((current) => current || payload.items[0]?.id || "");
+      })
+      .catch((nextError) => {
+        if (!cancelled) {
+          setError(nextError instanceof Error ? nextError.message : "Unable to load watchlists.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   if (loading) {
     return <main className="mx-auto w-full max-w-3xl px-4 py-8 text-sm text-slate-300">Loading...</main>;
@@ -87,12 +127,17 @@ export function CreatePredictionPage() {
     }
 
     if (!isValidThesisTitle) {
-      setError(thesisTitleErrorMessage ?? "Title is required.");
+      setError(thesisTitleErrorMessage ?? "Invalid title.");
       return;
     }
 
     if (!isValidThesis) {
-      setError(thesisErrorMessage ?? "Thesis is required.");
+      setError(thesisErrorMessage ?? "Invalid thesis.");
+      return;
+    }
+
+    if (!isValidWatchlist) {
+      setError("Choose a watchlist for this prediction.");
       return;
     }
 
@@ -119,6 +164,7 @@ export function CreatePredictionPage() {
         body: JSON.stringify({
           ticker,
           direction,
+          watchlistId,
           thesisTitle,
           thesis,
           timeHorizon: timeHorizonUnit === "NONE"
@@ -141,6 +187,46 @@ export function CreatePredictionPage() {
       setError(nextError instanceof Error ? nextError.message : "Failed to create prediction");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function createNewWatchlist() {
+    setError(null);
+    const name = newWatchlistName.trim();
+    if (!name) {
+      setError("Watchlist name is required.");
+      return;
+    }
+
+    const token = await getIdToken();
+    if (!token) {
+      setError("Authentication required.");
+      return;
+    }
+
+    setCreatingWatchlist(true);
+    try {
+      const response = await fetch("/api/watchlists", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name }),
+      });
+      const payload = (await response.json()) as { id?: string; error?: string };
+      if (!response.ok || !payload.id) {
+        throw new Error(payload.error ?? "Failed to create watchlist");
+      }
+
+      const next = { id: payload.id, name };
+      setWatchlists((current) => [...current, next]);
+      setWatchlistId(payload.id);
+      setNewWatchlistName("");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Failed to create watchlist");
+    } finally {
+      setCreatingWatchlist(false);
     }
   }
 
@@ -173,6 +259,48 @@ export function CreatePredictionPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-sm text-slate-200" htmlFor="watchlist">Watchlist</label>
+            {watchlists.length > 0 ? (
+              <select
+                id="watchlist"
+                value={watchlistId}
+                onChange={(event) => setWatchlistId(event.target.value)}
+                className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+              >
+                {watchlists.map((watchlist) => (
+                  <option key={watchlist.id} value={watchlist.id}>
+                    {watchlist.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="rounded-xl border border-dashed border-cyan-400/25 bg-cyan-500/5 px-3 py-2 text-sm text-slate-300">
+                Create your first public watchlist before publishing this prediction.
+              </p>
+            )}
+            {watchlists.length < 5 ? (
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                <input
+                  type="text"
+                  value={newWatchlistName}
+                  onChange={(event) => setNewWatchlistName(event.target.value)}
+                  maxLength={80}
+                  placeholder="New watchlist name"
+                  className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+                />
+                <button
+                  type="button"
+                  onClick={() => void createNewWatchlist()}
+                  disabled={creatingWatchlist}
+                  className="rounded-xl border border-cyan-400/35 px-3 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-500/15 disabled:opacity-60"
+                >
+                  {creatingWatchlist ? "Creating..." : "Create watchlist"}
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="grid gap-2">
@@ -219,13 +347,12 @@ export function CreatePredictionPage() {
               value={thesisTitle}
               onChange={(event) => setThesisTitle(event.target.value)}
               maxLength={MAX_PREDICTION_THESIS_TITLE_LENGTH}
-              required
               className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
               placeholder="Summarize the prediction"
             />
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <p className={thesisTitleErrorMessage ? "text-rose-300" : "text-slate-400"}>
-                Required.
+                Optional.
               </p>
               <p className={trimmedThesisTitleLength > MAX_PREDICTION_THESIS_TITLE_LENGTH ? "text-rose-300" : "text-slate-400"}>
                 {trimmedThesisTitleLength}/{MAX_PREDICTION_THESIS_TITLE_LENGTH}
@@ -242,12 +369,11 @@ export function CreatePredictionPage() {
               onChange={(event) => setThesis(event.target.value)}
               rows={10}
               maxLength={MAX_PREDICTION_THESIS_LENGTH}
-              required
               className="min-h-56 rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
-              placeholder="Explain why this setup should work"
+              placeholder="Optional thesis: explain why this setup should work"
             />
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-              {thesisErrorMessage ? <span /> : <p className="text-slate-400">Required.</p>}
+              {thesisErrorMessage ? <span /> : <p className="text-slate-400">Optional.</p>}
               <p className={trimmedThesisLength > MAX_PREDICTION_THESIS_LENGTH ? "text-rose-300" : "text-slate-400"}>
                 {trimmedThesisLength}/{MAX_PREDICTION_THESIS_LENGTH}
               </p>
@@ -258,7 +384,7 @@ export function CreatePredictionPage() {
           <button
             type="button"
             onClick={() => void submit()}
-            disabled={submitting || !isValidTicker || !isValidThesisTitle || !isValidThesis || !isValidTimeHorizon}
+            disabled={submitting || !isValidTicker || !isValidWatchlist || !isValidThesisTitle || !isValidThesis || !isValidTimeHorizon}
             className="w-full rounded-full bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-slate-900 disabled:opacity-60 sm:w-fit"
           >
             {submitting ? "Publishing..." : "Publish prediction"}

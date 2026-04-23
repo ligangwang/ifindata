@@ -751,7 +751,7 @@ export function AnalystProfilePage({
           </div>
           {isOwner ? (
             <Link
-              href="/watchlists"
+              href="/my/watchlists"
               className="rounded-full border border-cyan-400/35 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/15"
             >
               Manage watchlists

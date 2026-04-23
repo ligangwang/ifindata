@@ -4,7 +4,10 @@ import { aiChipsAnalystConfig } from "@/lib/ai-analyst/config";
 
 export const metadata: Metadata = {
   title: "How It Works | YouAnalyst",
-  description: "How YouAnalyst predictions, scores, XP, and levels work.",
+  description: "Learn how YouAnalyst predictions, watchlists, scores, XP, and settlement rules work.",
+  alternates: {
+    canonical: "/how-it-works",
+  },
 };
 
 const lifecycle = [

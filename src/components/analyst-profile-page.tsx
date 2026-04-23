@@ -30,6 +30,18 @@ type Prediction = {
   } | null;
 };
 
+type WatchlistSummary = {
+  id: string;
+  name: string;
+  description?: string | null;
+  metrics: {
+    liveReturn: number | null;
+    settledReturn: number | null;
+    livePredictionCount: number;
+    settledPredictionCount: number;
+  };
+};
+
 type ProfilePayload = {
   profile: {
     id: string;
@@ -77,6 +89,7 @@ type ProfilePayload = {
   relationship: {
     isFollowing: boolean;
   };
+  watchlists: WatchlistSummary[];
   predictions: Prediction[];
   nextCursor: string | null;
 };
@@ -108,6 +121,15 @@ function statusFilterLabel(status: ProfileStatusFilter): string {
 function countText(count: number, singular: string, plural = `${singular}s`): string {
   const rounded = Math.max(0, Math.round(count));
   return `${rounded.toLocaleString()} ${rounded === 1 ? singular : plural}`;
+}
+
+function watchlistReturnText(value: number | null): string {
+  if (typeof value !== "number") {
+    return "Not marked";
+  }
+  const percent = value * 100;
+  const sign = percent > 0 ? "+" : "";
+  return `${sign}${percent.toFixed(2)}%`;
 }
 
 function escapeHtmlAttribute(value: string): string {
@@ -607,6 +629,60 @@ export function AnalystProfilePage({
           </div>
         </section>
       ) : null}
+
+      <section className="rounded-2xl border border-white/15 bg-slate-950/55 p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Watchlists</h2>
+            <p className="mt-1 text-sm text-slate-300">Public strategy groups for this analyst&apos;s predictions.</p>
+          </div>
+          {isOwner ? (
+            <Link
+              href="/predictions/new"
+              className="rounded-full bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
+            >
+              Add prediction
+            </Link>
+          ) : null}
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {payload.watchlists.map((watchlist) => (
+            <Link
+              key={watchlist.id}
+              href={`/analysts/${userId}/watchlists/${watchlist.id}`}
+              className="rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4 transition hover:border-cyan-300/60 hover:bg-cyan-500/10"
+            >
+              <h3 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">{watchlist.name}</h3>
+              {watchlist.description ? (
+                <p className="mt-1 text-sm leading-6 text-slate-300">{watchlist.description}</p>
+              ) : null}
+              <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Live return</p>
+                  <p className="font-semibold text-cyan-100">{watchlistReturnText(watchlist.metrics.liveReturn)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Settled return</p>
+                  <p className="font-semibold text-cyan-100">{watchlistReturnText(watchlist.metrics.settledReturn)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Live</p>
+                  <p className="font-semibold text-slate-100">{watchlist.metrics.livePredictionCount.toLocaleString()} predictions</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Settled</p>
+                  <p className="font-semibold text-slate-100">{watchlist.metrics.settledPredictionCount.toLocaleString()} predictions</p>
+                </div>
+              </div>
+            </Link>
+          ))}
+          {payload.watchlists.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
+              No watchlists yet.
+            </p>
+          ) : null}
+        </div>
+      </section>
 
       {shareOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/80 px-4">

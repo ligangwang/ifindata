@@ -3,6 +3,7 @@ import { isAdminUser } from "@/lib/firebase/admin-role";
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
 import { createPredictionForUser } from "@/lib/predictions/service";
 import { type CreatePredictionInput } from "@/lib/predictions/types";
+import { getOrCreateDefaultWatchlistForUser } from "@/lib/watchlists/service";
 import { NextRequest, NextResponse } from "next/server";
 
 type DraftMutationRequest = {
@@ -106,10 +107,12 @@ export async function POST(
     }
 
     const analyst = analystSnapshot.data() as Record<string, unknown>;
+    const watchlistId = await getOrCreateDefaultWatchlistForUser(analystUserId, "AI Analyst Calls");
     const created = await createPredictionForUser(
       {
         ticker,
         direction,
+        watchlistId,
         thesisTitle,
         thesis,
         timeHorizon,

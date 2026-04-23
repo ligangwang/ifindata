@@ -249,16 +249,8 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
       editHorizonUnit === "NONE" ||
       (Number.isInteger(horizonValue) && horizonValue > 0);
 
-    if (!trimmedTitle) {
-      setError("Title is required.");
-      return;
-    }
     if (trimmedTitle.length > MAX_PREDICTION_THESIS_TITLE_LENGTH) {
       setError(`Title must be ${MAX_PREDICTION_THESIS_TITLE_LENGTH} characters or fewer.`);
-      return;
-    }
-    if (!trimmedThesis) {
-      setError("Thesis is required.");
       return;
     }
     if (trimmedThesis.length > MAX_PREDICTION_THESIS_LENGTH) {

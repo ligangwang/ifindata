@@ -1,6 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { getAiAnalystPublicProfileForUser } from "@/lib/ai-analyst/config";
+import { assertWatchlistCanReceivePrediction } from "@/lib/watchlists/service";
 import {
   canonicalPredictionStatus,
   isPredictionDirection,
@@ -274,6 +275,7 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
   const input = raw as Record<string, unknown>;
   const ticker = typeof input.ticker === "string" ? normalizeTicker(input.ticker) : "";
   const direction = input.direction;
+  const watchlistId = typeof input.watchlistId === "string" ? input.watchlistId.trim() : "";
   const thesisTitle = typeof input.thesisTitle === "string" ? sanitizePredictionThesisTitle(input.thesisTitle) : "";
   const thesis = typeof input.thesis === "string" ? sanitizePredictionThesis(input.thesis) : "";
   const visibility = input.visibility;
@@ -286,6 +288,10 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
     throw new Error("direction must be UP or DOWN");
   }
 
+  if (!watchlistId) {
+    throw new Error("watchlist is required");
+  }
+
   validatePredictionText(thesisTitle, thesis);
 
   const resolvedVisibility = isPredictionVisibility(visibility) ? visibility : "PUBLIC";
@@ -293,6 +299,7 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
   return {
     ticker,
     direction,
+    watchlistId,
     thesisTitle,
     thesis,
     timeHorizon: validateTimeHorizonInput(input.timeHorizon, getCurrentEasternDate()),
@@ -301,16 +308,8 @@ export function validateCreatePredictionInput(raw: unknown): CreatePredictionInp
 }
 
 function validatePredictionText(thesisTitle: string, thesis: string): void {
-  if (!thesisTitle) {
-    throw new Error("title is required");
-  }
-
   if (thesisTitle.length > MAX_PREDICTION_THESIS_TITLE_LENGTH) {
     throw new Error(`title must be <= ${MAX_PREDICTION_THESIS_TITLE_LENGTH} chars`);
-  }
-
-  if (!thesis) {
-    throw new Error("thesis is required");
   }
 
   if (thesis.length > MAX_PREDICTION_THESIS_LENGTH) {
@@ -319,16 +318,8 @@ function validatePredictionText(thesisTitle: string, thesis: string): void {
 }
 
 function validateUpdatedPredictionText(thesisTitle: string, thesis: string): void {
-  if (!thesisTitle) {
-    throw new Error("title is required");
-  }
-
   if (thesisTitle.length > MAX_PREDICTION_THESIS_TITLE_LENGTH) {
     throw new Error(`title must be <= ${MAX_PREDICTION_THESIS_TITLE_LENGTH} chars`);
-  }
-
-  if (!thesis) {
-    throw new Error("thesis is required");
   }
 
   if (thesis.length > MAX_PREDICTION_THESIS_LENGTH) {
@@ -426,13 +417,15 @@ export async function createPredictionForUser(
   const nowIso = new Date().toISOString();
   const predictionRef = db.collection("predictions").doc();
   const userRef = db.collection("users").doc(user.uid);
+  const watchlistRef = db.collection("watchlists").doc(input.watchlistId);
   const tickerLockRef = activeTickerLockRef(db, user.uid, input.ticker);
 
 
   await db.runTransaction(async (tx) => {
-    const [userSnapshot, entryTargetDate] = await Promise.all([
+    const [userSnapshot, entryTargetDate, watchlist] = await Promise.all([
       tx.get(userRef),
       resolveEodTargetDateInTransaction(tx, db),
+      assertWatchlistCanReceivePrediction(tx, watchlistRef, user.uid),
     ]);
     if (!userSnapshot.exists) {
       throw new Error("User profile not found. Complete bootstrap first.");
@@ -465,6 +458,8 @@ export async function createPredictionForUser(
         (userData.displayName as string | null | undefined) ?? user.displayName ?? null,
       authorPhotoURL: (userData.photoURL as string | null | undefined) ?? user.photoURL ?? null,
       sourceType: options.sourceType ?? "HUMAN",
+      watchlistId: watchlist.id,
+      watchlistName: watchlist.name,
       ticker: input.ticker,
       direction: input.direction,
       entryRequestedAt: nowIso,

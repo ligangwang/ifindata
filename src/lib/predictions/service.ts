@@ -235,7 +235,9 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
     }
   }
 
-  const queryLimit = sort === "performance" ? Math.max(clampedLimit * 3, 60) : clampedLimit + 1;
+  const queryLimit = sort === "performance"
+    ? Math.min(Math.max(clampedLimit * 5, 120), 300)
+    : clampedLimit + 1;
   query = query.orderBy("createdAt", "desc").limit(queryLimit);
 
   const cursor = input.cursorCreatedAt?.trim();

@@ -235,9 +235,10 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
     }
   }
 
-  query = sort === "performance"
-    ? query.orderBy("createdAt", "desc")
-    : query.orderBy("createdAt", "desc").limit(clampedLimit + 1);
+  const queryLimit = sort === "performance"
+    ? Math.min(Math.max(clampedLimit * 5, 120), 300)
+    : clampedLimit + 1;
+  query = query.orderBy("createdAt", "desc").limit(queryLimit);
 
   const cursor = input.cursorCreatedAt?.trim();
   if (cursor && sort === "createdAt") {

@@ -29,6 +29,7 @@ type Prediction = {
   commentCount: number;
   result: {
     score: number;
+    returnValue: number;
   } | null;
 };
 
@@ -37,7 +38,7 @@ type FeedResponse = {
   nextCursor: string | null;
 };
 
-const FEED_QUERY = "limit=20";
+const FEED_QUERY = "limit=20&sort=performance";
 
 export function PredictionsFeed() {
   const [items, setItems] = useState<Prediction[]>([]);
@@ -100,8 +101,8 @@ export function PredictionsFeed() {
     <main className="mx-auto w-full max-w-6xl px-4 py-5">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-4 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
         <div className="mb-4">
-          <h1 className="text-lg font-semibold tracking-tight text-white sm:text-xl">Latest Calls</h1>
-          <p className="mt-1 text-sm text-slate-300">Recent predictions from the community.</p>
+          <h1 className="text-lg font-semibold tracking-tight text-white sm:text-xl">Top Calls</h1>
+          <p className="mt-1 text-sm text-slate-300">Best-performing community predictions, with newer calls breaking ties.</p>
         </div>
 
         {loading ? <p className="text-sm text-slate-300">Loading feed...</p> : null}

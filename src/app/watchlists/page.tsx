@@ -6,18 +6,18 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Community watchlists | YouAnalyst",
-  description: "Browse the newest public watchlists from the YouAnalyst community.",
+  description: "Browse top-performing public watchlists from the YouAnalyst community.",
   alternates: {
     canonical: "/watchlists",
   },
   openGraph: {
     title: "Community watchlists | YouAnalyst",
-    description: "Browse the newest public watchlists from the YouAnalyst community.",
+    description: "Browse top-performing public watchlists from the YouAnalyst community.",
     url: "/watchlists",
   },
   twitter: {
     title: "Community watchlists | YouAnalyst",
-    description: "Browse the newest public watchlists from the YouAnalyst community.",
+    description: "Browse top-performing public watchlists from the YouAnalyst community.",
   },
 };
 

@@ -19,7 +19,7 @@ type WatchlistOption = {
   description?: string | null;
 };
 
-export function CreatePredictionPage() {
+export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedWatchlistId?: string }) {
   const router = useRouter();
   const { user, loading, getIdToken } = useAuth();
   const [ticker, setTicker] = useState("");
@@ -83,7 +83,15 @@ export function CreatePredictionPage() {
           return;
         }
         setWatchlists(payload.items);
-        setWatchlistId((current) => current || payload.items[0]?.id || "");
+        setWatchlistId((current) => {
+          if (current && payload.items.some((watchlist) => watchlist.id === current)) {
+            return current;
+          }
+          if (requestedWatchlistId && payload.items.some((watchlist) => watchlist.id === requestedWatchlistId)) {
+            return requestedWatchlistId;
+          }
+          return payload.items[0]?.id || "";
+        });
       })
       .catch((nextError) => {
         if (!cancelled) {
@@ -94,7 +102,7 @@ export function CreatePredictionPage() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [requestedWatchlistId, user]);
 
   if (loading) {
     return <main className="mx-auto w-full max-w-3xl px-4 py-8 text-sm text-slate-300">Loading...</main>;

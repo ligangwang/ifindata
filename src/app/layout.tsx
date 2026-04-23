@@ -5,7 +5,7 @@ import Script from "next/script";
 import { AppProviders } from "@/components/providers/app-providers";
 import { EnvironmentBanner } from "@/components/environment-banner";
 import { SiteNav } from "@/components/site-nav";
-import { absoluteUrl, getSiteUrl } from "@/lib/seo";
+import { absoluteUrl, getSiteUrl, isProductionAppEnvironment, noIndexRobots } from "@/lib/seo";
 import "./globals.css";
 
 const GOOGLE_ANALYTICS_ID = process.env.GOOGLE_ANALYTICS_ID;
@@ -41,6 +41,12 @@ export const metadata: Metadata = {
     title: "YouAnalyst | Your watchlist. Your track record.",
     description: "Make public stock predictions, organize them into watchlists, and build an analyst track record in public.",
   },
+  robots: isProductionAppEnvironment()
+    ? {
+        index: true,
+        follow: true,
+      }
+    : noIndexRobots(),
 };
 
 export default function RootLayout({

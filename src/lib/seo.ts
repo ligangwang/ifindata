@@ -45,6 +45,17 @@ export function absoluteUrl(path = "/"): string {
   return new URL(path, getSiteUrl()).toString();
 }
 
+export function isProductionAppEnvironment(): boolean {
+  const raw = (
+    process.env.APP_ENVIRONMENT ??
+    process.env.NEXT_PUBLIC_APP_ENVIRONMENT ??
+    process.env.NODE_ENV ??
+    ""
+  ).trim().toLowerCase();
+
+  return raw === "production";
+}
+
 export function noIndexRobots(): NonNullable<Metadata["robots"]> {
   return {
     index: false,

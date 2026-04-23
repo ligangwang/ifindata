@@ -40,6 +40,13 @@ type WatchlistDetail = {
   settledPredictions: WatchlistPrediction[];
 };
 
+type WatchlistRequestState = {
+  watchlistId: string;
+  watchlist: WatchlistDetail | null;
+  loading: boolean;
+  error: string | null;
+};
+
 function returnText(value: number | null): string {
   if (typeof value !== "number") {
     return "Not marked";
@@ -75,15 +82,20 @@ export function WatchlistDetailPage({
   analystUserId: string;
   watchlistId: string;
 }) {
-  const [watchlist, setWatchlist] = useState<WatchlistDetail | null>(null);
+  const [requestState, setRequestState] = useState<WatchlistRequestState>({
+    watchlistId,
+    watchlist: null,
+    loading: true,
+    error: null,
+  });
   const [settledOpen, setSettledOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const isStaleRoute = requestState.watchlistId !== watchlistId;
+  const loading = requestState.loading || isStaleRoute;
+  const error = isStaleRoute ? null : requestState.error;
+  const watchlist = isStaleRoute ? null : requestState.watchlist;
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     void fetch(`/api/watchlists/${watchlistId}`)
       .then(async (response) => {
@@ -94,18 +106,22 @@ export function WatchlistDetailPage({
       })
       .then((payload) => {
         if (!cancelled) {
-          setWatchlist(payload.watchlist);
+          setRequestState({
+            watchlistId,
+            watchlist: payload.watchlist,
+            loading: false,
+            error: null,
+          });
         }
       })
       .catch((nextError) => {
         if (!cancelled) {
-          setError(nextError instanceof Error ? nextError.message : "Unable to load watchlist.");
-          setWatchlist(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
+          setRequestState({
+            watchlistId,
+            watchlist: null,
+            loading: false,
+            error: nextError instanceof Error ? nextError.message : "Unable to load watchlist.",
+          });
         }
       });
 

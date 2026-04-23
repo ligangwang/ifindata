@@ -130,6 +130,11 @@ export function MyWatchlistsPage() {
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddUpTickers, setQuickAddUpTickers] = useState("");
+  const [quickAddDownTickers, setQuickAddDownTickers] = useState("");
+  const [quickAddSubmitting, setQuickAddSubmitting] = useState(false);
+  const [quickAddMessage, setQuickAddMessage] = useState<string | null>(null);
   const watchlistRequestIdRef = useRef(0);
 
   const selectedSummary = useMemo(
@@ -230,6 +235,10 @@ export function MyWatchlistsPage() {
       setEditDescription("");
       setComposerOpen(false);
       setEditing(false);
+      setQuickAddOpen(false);
+      setQuickAddUpTickers("");
+      setQuickAddDownTickers("");
+      setQuickAddMessage(null);
       setError(null);
       setLoadingWorkspace(false);
       setLoadingDetail(false);
@@ -341,6 +350,115 @@ export function MyWatchlistsPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function parseTickerList(raw: string): string[] {
+    return Array.from(
+      new Set(
+        raw
+          .split(",")
+          .map((ticker) => ticker.trim().toUpperCase())
+          .filter(Boolean),
+      ),
+    );
+  }
+
+  async function quickAddPredictions() {
+    if (!user || !selectedWatchlistId) {
+      setError("Choose a watchlist first.");
+      return;
+    }
+
+    const token = await getIdToken();
+    if (!token) {
+      setError("Sign in to add predictions.");
+      return;
+    }
+
+    const upTickers = parseTickerList(quickAddUpTickers);
+    const downTickers = parseTickerList(quickAddDownTickers);
+    const duplicates = upTickers.filter((ticker) => downTickers.includes(ticker));
+
+    if (upTickers.length === 0 && downTickers.length === 0) {
+      setError("Enter at least one ticker in UP or DOWN.");
+      return;
+    }
+
+    if (duplicates.length > 0) {
+      setError(`Tickers must belong to only one direction: ${duplicates.join(", ")}`);
+      return;
+    }
+
+    setQuickAddSubmitting(true);
+    setError(null);
+    setQuickAddMessage(null);
+
+    const requests = [
+      ...upTickers.map((ticker) => ({ ticker, direction: "UP" as const })),
+      ...downTickers.map((ticker) => ({ ticker, direction: "DOWN" as const })),
+    ];
+
+    const results = await Promise.all(
+      requests.map(async ({ ticker, direction }) => {
+        try {
+          const response = await fetch("/api/predictions", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              ticker,
+              direction,
+              watchlistId: selectedWatchlistId,
+              thesisTitle: "",
+              thesis: "",
+              timeHorizon: null,
+              visibility: "PUBLIC",
+            }),
+          });
+
+          const payload = (await response.json().catch(() => ({}))) as { id?: string; error?: string };
+          if (!response.ok || !payload.id) {
+            return { ticker, ok: false, message: payload.error ?? "Failed to create prediction." };
+          }
+
+          return { ticker, ok: true, message: "" };
+        } catch (nextError) {
+          return {
+            ticker,
+            ok: false,
+            message: nextError instanceof Error ? nextError.message : "Failed to create prediction.",
+          };
+        }
+      }),
+    );
+
+    const succeeded = results.filter((result) => result.ok);
+    const failed = results.filter((result) => !result.ok);
+
+    if (succeeded.length > 0) {
+      setQuickAddUpTickers("");
+      setQuickAddDownTickers("");
+      setQuickAddOpen(false);
+      await loadWorkspace(user.uid, selectedWatchlistId);
+    }
+
+    if (failed.length > 0) {
+      setError(failed.map((result) => `${result.ticker}: ${result.message}`).join(" | "));
+    }
+
+    if (succeeded.length > 0) {
+      setQuickAddMessage(
+        failed.length > 0
+          ? `Created ${succeeded.length} prediction${succeeded.length === 1 ? "" : "s"} with ${failed.length} skipped.`
+          : `Created ${succeeded.length} prediction${succeeded.length === 1 ? "" : "s"}.`,
+      );
+    } else if (failed.length > 0) {
+      setQuickAddMessage("No predictions were created.");
+    }
+
+    setQuickAddSubmitting(false);
   }
 
   if (!user) {
@@ -534,9 +652,67 @@ export function MyWatchlistsPage() {
                     >
                       Add prediction
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuickAddOpen((current) => !current);
+                        setQuickAddMessage(null);
+                        setError(null);
+                      }}
+                      className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-slate-200 hover:border-white/30"
+                    >
+                      {quickAddOpen ? "Close quick add" : "Quick add"}
+                    </button>
                   </div>
                 </div>
               )}
+
+              {quickAddOpen ? (
+                <div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4">
+                  <div className="mb-3">
+                    <h3 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Quick add predictions</h3>
+                    <p className="mt-1 text-sm text-slate-300">
+                      Enter comma-separated tickers by direction. Thesis is optional, so these predictions will be created without a title or thesis.
+                    </p>
+                  </div>
+                  <div className="grid gap-3">
+                    <div className="grid gap-1">
+                      <label className="text-xs text-slate-400" htmlFor="quick-add-up">UP tickers</label>
+                      <textarea
+                        id="quick-add-up"
+                        value={quickAddUpTickers}
+                        onChange={(event) => setQuickAddUpTickers(event.target.value)}
+                        rows={2}
+                        placeholder="NVDA, AMD, AVGO"
+                        className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+                      />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-xs text-slate-400" htmlFor="quick-add-down">DOWN tickers</label>
+                      <textarea
+                        id="quick-add-down"
+                        value={quickAddDownTickers}
+                        onChange={(event) => setQuickAddDownTickers(event.target.value)}
+                        rows={2}
+                        placeholder="TSLA, AAPL"
+                        className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => void quickAddPredictions()}
+                        disabled={quickAddSubmitting}
+                        className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-60"
+                      >
+                        {quickAddSubmitting ? "Creating..." : "Create predictions"}
+                      </button>
+                      <p className="text-xs text-slate-400">One ticker can only appear in one direction row.</p>
+                    </div>
+                    {quickAddMessage ? <p className="text-sm text-emerald-300">{quickAddMessage}</p> : null}
+                  </div>
+                </div>
+              ) : null}
 
               {selectedMetrics ? (
                 <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">

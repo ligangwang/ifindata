@@ -21,7 +21,7 @@ const ibmPlexSans = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "YouAnalyst | You're the analyst.",
+  title: "YouAnalyst | You are the analyst. Your watchlist. Your track record.",
   description: "Make public market calls, track your score, and build your analyst reputation.",
 };
 

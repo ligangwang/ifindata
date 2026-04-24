@@ -11,6 +11,10 @@ function parseLimit(raw: string | null): number {
   return Math.max(1, Math.min(100, Math.trunc(parsed)));
 }
 
+function draftCreatedAt(data: Record<string, unknown>): string {
+  return typeof data.createdAt === "string" ? data.createdAt : "";
+}
+
 export async function GET(request: NextRequest) {
   const decoded = await getDecodedUserFromRequest(request);
   if (!decoded) {
@@ -23,17 +27,33 @@ export async function GET(request: NextRequest) {
     }
 
     const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
-    const snapshot = await getAdminFirestore()
+    const db = getAdminFirestore();
+    const latestSnapshot = await db
       .collection("ai_prediction_drafts")
       .orderBy("createdAt", "desc")
-      .limit(limit)
+      .limit(1)
       .get();
 
-    return NextResponse.json({
-      drafts: snapshot.docs.map((doc) => ({
+    const latestCreatedAt = latestSnapshot.docs[0] ? draftCreatedAt(latestSnapshot.docs[0].data()) : "";
+    if (!latestCreatedAt) {
+      return NextResponse.json({ drafts: [], runCreatedAt: null });
+    }
+
+    const snapshot = await db
+      .collection("ai_prediction_drafts")
+      .where("createdAt", "==", latestCreatedAt)
+      .limit(limit)
+      .get();
+    const drafts = snapshot.docs
+      .map((doc) => ({
         id: doc.id,
         ...doc.data(),
-      })),
+      }))
+      .sort((a, b) => String(a.ticker ?? "").localeCompare(String(b.ticker ?? "")));
+
+    return NextResponse.json({
+      drafts,
+      runCreatedAt: latestCreatedAt,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load AI analyst drafts.";

@@ -151,7 +151,7 @@ export function SiteNav() {
                 width={140}
                 height={32}
                 priority
-                className="h-8 w-auto md:hidden"
+                className="h-9 w-auto md:hidden"
               />
               <Image
                 src="/youanalyst-logo.svg"

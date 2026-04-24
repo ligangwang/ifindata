@@ -15,6 +15,10 @@ function draftCreatedAt(data: Record<string, unknown>): string {
   return typeof data.createdAt === "string" ? data.createdAt : "";
 }
 
+function draftTicker(data: Record<string, unknown>): string {
+  return typeof data.ticker === "string" ? data.ticker : "";
+}
+
 export async function GET(request: NextRequest) {
   const decoded = await getDecodedUserFromRequest(request);
   if (!decoded) {
@@ -45,11 +49,11 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .get();
     const drafts = snapshot.docs
+      .sort((a, b) => draftTicker(a.data()).localeCompare(draftTicker(b.data())))
       .map((doc) => ({
         id: doc.id,
         ...doc.data(),
-      }))
-      .sort((a, b) => String(a.ticker ?? "").localeCompare(String(b.ticker ?? "")));
+      }));
 
     return NextResponse.json({
       drafts,

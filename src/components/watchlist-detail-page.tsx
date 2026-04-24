@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useAuth } from "@/components/providers/auth-provider";
 import { formatTickerSymbol, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
@@ -77,13 +76,10 @@ function PredictionRow({ prediction }: { prediction: WatchlistPrediction }) {
 }
 
 export function WatchlistDetailPage({
-  analystUserId,
   watchlistId,
 }: {
-  analystUserId: string;
   watchlistId: string;
 }) {
-  const { getIdToken, user } = useAuth();
   const [requestState, setRequestState] = useState<WatchlistRequestState>({
     watchlistId,
     watchlist: null,
@@ -91,16 +87,10 @@ export function WatchlistDetailPage({
     error: null,
   });
   const [settledOpen, setSettledOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [editName, setEditName] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
   const isStaleRoute = requestState.watchlistId !== watchlistId;
   const loading = requestState.loading || isStaleRoute;
   const error = isStaleRoute ? null : requestState.error;
   const watchlist = isStaleRoute ? null : requestState.watchlist;
-  const isOwner = Boolean(user && watchlist && user.uid === watchlist.userId);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,65 +128,6 @@ export function WatchlistDetailPage({
     };
   }, [watchlistId]);
 
-  function startEditing() {
-    if (!watchlist) {
-      return;
-    }
-    setEditName(watchlist.name);
-    setEditDescription(watchlist.description ?? "");
-    setEditError(null);
-    setEditing(true);
-  }
-
-  async function saveWatchlist() {
-    if (!watchlist) {
-      return;
-    }
-
-    const token = await getIdToken();
-    if (!token) {
-      setEditError("Sign in to edit this watchlist.");
-      return;
-    }
-
-    setSaving(true);
-    setEditError(null);
-    try {
-      const response = await fetch(`/api/watchlists/${watchlist.id}`, {
-        method: "PATCH",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: editName,
-          description: editDescription,
-        }),
-      });
-
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(payload.error ?? "Unable to update watchlist.");
-      }
-
-      setRequestState({
-        watchlistId,
-        watchlist: {
-          ...watchlist,
-          name: editName.trim(),
-          description: editDescription.trim() || null,
-        },
-        loading: false,
-        error: null,
-      });
-      setEditing(false);
-    } catch (nextError) {
-      setEditError(nextError instanceof Error ? nextError.message : "Unable to update watchlist.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   if (loading) {
     return <main className="mx-auto w-full max-w-5xl px-4 py-8 text-sm text-slate-300">Loading watchlist...</main>;
   }
@@ -208,69 +139,8 @@ export function WatchlistDetailPage({
   return (
     <main className="mx-auto grid w-full max-w-5xl gap-4 px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href={`/analysts/${analystUserId}`} className="text-sm text-cyan-300 hover:text-cyan-100">
-            Back to analyst profile
-          </Link>
-          {isOwner && !editing ? (
-            <button
-              type="button"
-              onClick={startEditing}
-              className="rounded-lg border border-cyan-400/35 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/15"
-            >
-              Edit watchlist
-            </button>
-          ) : null}
-        </div>
-        {editing ? (
-          <div className="mt-4 grid gap-3">
-            <div className="grid gap-1">
-              <label className="text-xs text-slate-400" htmlFor="watchlist-name">Name</label>
-              <input
-                id="watchlist-name"
-                value={editName}
-                onChange={(event) => setEditName(event.target.value)}
-                maxLength={80}
-                className="rounded-lg border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
-              />
-            </div>
-            <div className="grid gap-1">
-              <label className="text-xs text-slate-400" htmlFor="watchlist-description">Description</label>
-              <textarea
-                id="watchlist-description"
-                value={editDescription}
-                onChange={(event) => setEditDescription(event.target.value)}
-                maxLength={500}
-                rows={3}
-                className="rounded-lg border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void saveWatchlist()}
-                disabled={saving}
-                className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-60"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditing(false)}
-                disabled={saving}
-                className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-slate-200 hover:border-white/30 disabled:opacity-60"
-              >
-                Cancel
-              </button>
-            </div>
-            {editError ? <p className="text-sm text-rose-300">{editError}</p> : null}
-          </div>
-        ) : (
-          <>
-            <h1 className="mt-3 font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">{watchlist.name}</h1>
-            {watchlist.description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{watchlist.description}</p> : null}
-          </>
-        )}
+        <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">{watchlist.name}</h1>
+        {watchlist.description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{watchlist.description}</p> : null}
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

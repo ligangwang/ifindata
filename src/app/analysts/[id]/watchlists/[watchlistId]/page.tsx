@@ -77,6 +77,6 @@ export default async function AnalystWatchlistPage({
 }: {
   params: Promise<{ id: string; watchlistId: string }>;
 }) {
-  const { id, watchlistId } = await params;
-  return <WatchlistDetailPage analystUserId={id} watchlistId={watchlistId} />;
+  const { watchlistId } = await params;
+  return <WatchlistDetailPage watchlistId={watchlistId} />;
 }

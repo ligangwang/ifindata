@@ -8,6 +8,7 @@ import type { PredictionDirection, PredictionStatus, PredictionTimeHorizon } fro
 
 export type PredictionMarkFields = {
   direction: PredictionDirection;
+  entryTargetDate?: string | null;
   entryPrice?: number | null;
   entryDate?: string | null;
   markPrice?: number | null;
@@ -208,6 +209,23 @@ function daysSinceCall(entryDate: string | null | undefined, markPriceDate: stri
   return Math.max(0, Math.floor((markTimestamp - entryTimestamp) / (24 * 60 * 60 * 1000)));
 }
 
+function formatEntryTargetDate(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const [dateOnly] = value.split("T");
+  const timestamp = Date.parse(`${dateOnly}T00:00:00.000Z`);
+  if (Number.isNaN(timestamp)) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(timestamp));
+}
+
 export function formatPredictionStatus(status: PredictionStatus): string {
   switch (status) {
     case "CREATED":
@@ -249,6 +267,7 @@ export function PredictionReturnSummary({
   const isAwaitingFirstMark = status === "OPEN" && entryPrice !== null && markReturnValue === null;
   const hasReturn = !isAwaitingEntry && markReturnValue !== null && sinceCallDays !== null;
   const statusLabel = status ? formatPredictionStatus(status).toLowerCase() : null;
+  const entryTargetDate = formatEntryTargetDate(prediction.entryTargetDate);
 
   if (!hasReturn && !statusLabel && !isAwaitingFirstMark) {
     return null;
@@ -264,7 +283,11 @@ export function PredictionReturnSummary({
           <span className="text-slate-400"> since call ({sinceCallDays}d)</span>
         </>
       ) : null}
-      {isAwaitingEntry ? <span className="text-slate-400">Awaiting entry price</span> : null}
+      {isAwaitingEntry ? (
+        <span className="text-slate-400">
+          {entryTargetDate ? `Entry price pending for ${entryTargetDate} close` : "Entry price pending at next market close"}
+        </span>
+      ) : null}
       {isAwaitingFirstMark ? (
         <>
           <span className="text-slate-400">Entry: ${entryPrice.toFixed(2)}</span>

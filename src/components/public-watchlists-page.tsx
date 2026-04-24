@@ -30,19 +30,6 @@ function watchlistReturnText(value: number | null): string {
   return `${sign}${percent.toFixed(2)}%`;
 }
 
-function createdDateText(value: string): string {
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) {
-    return "Recently created";
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(parsed));
-}
-
 function predictionStatusLabel(status: PublicWatchlistSummary["previewPredictions"][number]["status"]): string {
   if (status === "CREATED") {
     return "Awaiting entry";
@@ -140,9 +127,6 @@ export function PublicWatchlistsPage({
                     )}
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-cyan-200">{ownerLabel(watchlist)}</p>
-                      <p className="mt-0.5 text-xs uppercase tracking-wide text-slate-500">
-                        Created {createdDateText(watchlist.createdAt)}
-                      </p>
                     </div>
                   </Link>
                   <Link

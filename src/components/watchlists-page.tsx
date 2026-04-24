@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MyWatchlistsPage } from "@/components/my-watchlists-page";
 import { PublicWatchlistsPage } from "@/components/public-watchlists-page";
@@ -23,6 +23,10 @@ export function WatchlistsPage({
   const router = useRouter();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<WatchlistsTab>(normalizeTab(initialTab));
+  const communityWatchlists = useMemo(
+    () => publicWatchlists.filter((watchlist) => !user || watchlist.owner.id !== user.uid),
+    [publicWatchlists, user],
+  );
 
   useEffect(() => {
     setActiveTab(normalizeTab(initialTab));
@@ -72,7 +76,7 @@ export function WatchlistsPage({
         {activeTab === "mine" ? (
           <MyWatchlistsPage embedded />
         ) : (
-          <PublicWatchlistsPage watchlists={publicWatchlists} embedded showHeader={false} />
+          <PublicWatchlistsPage watchlists={communityWatchlists} embedded showHeader={false} />
         )}
       </div>
     </main>

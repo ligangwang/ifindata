@@ -95,6 +95,7 @@ export function AdminAiAnalystPage() {
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingDraftId, setPendingDraftId] = useState<string | null>(null);
+  const [runCreatedAt, setRunCreatedAt] = useState<string | null>(null);
 
   const countLabel = useMemo(() => {
     if (drafts.length === 1) {
@@ -142,6 +143,7 @@ export function AdminAiAnalystPage() {
         };
         const draftsPayload = (await draftsResponse.json().catch(() => ({}))) as {
           drafts?: AiPredictionDraft[];
+          runCreatedAt?: string | null;
           error?: string;
         };
 
@@ -160,12 +162,14 @@ export function AdminAiAnalystPage() {
             feedback: countFromPayload(statsPayload.feedback),
           });
           setDrafts(draftsPayload.drafts ?? []);
+          setRunCreatedAt(draftsPayload.runCreatedAt ?? null);
         }
       } catch (nextError) {
         if (!cancelled) {
           setError(nextError instanceof Error ? nextError.message : "Unable to load AI analyst drafts.");
           setStats(null);
           setDrafts([]);
+          setRunCreatedAt(null);
         }
       } finally {
         if (!cancelled) {
@@ -275,7 +279,9 @@ export function AdminAiAnalystPage() {
       <section className="rounded-2xl border border-white/10 bg-slate-900/70 shadow-[0_8px_40px_rgba(8,47,73,0.35)]">
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
           <p className="text-sm font-medium text-slate-200">{loadingData ? "Loading..." : countLabel}</p>
-          <p className="text-xs text-slate-500">Latest 100</p>
+          <p className="text-xs text-slate-500">
+            {runCreatedAt ? `Latest run: ${formatDateTime(runCreatedAt)}` : "Latest run"}
+          </p>
         </div>
 
         {error ? (

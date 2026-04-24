@@ -20,16 +20,6 @@ function ownerLabel(watchlist: PublicWatchlistSummary): string {
   return watchlist.owner.displayName ?? "Analyst";
 }
 
-function watchlistReturnText(value: number | null): string {
-  if (typeof value !== "number") {
-    return "Not marked";
-  }
-
-  const percent = value * 100;
-  const sign = percent > 0 ? "+" : "";
-  return `${sign}${percent.toFixed(2)}%`;
-}
-
 function predictionStatusLabel(status: PublicWatchlistSummary["previewPredictions"][number]["status"]): string {
   if (status === "CREATED") {
     return "Awaiting entry";

@@ -159,7 +159,7 @@ export function SiteNav() {
                 width={140}
                 height={32}
                 priority
-                className="hidden h-8 w-auto md:block"
+                className="hidden h-10 w-auto md:block"
               />
             </Link>
             <nav className="hidden items-center gap-4 text-[15px] text-slate-200 md:flex">

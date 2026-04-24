@@ -329,7 +329,7 @@ export function PredictionAuthorSummary({ author, className = "" }: { author: Pr
       {hasScore ? (
         <>
           <span className="text-slate-500">&middot;</span>
-          <span>Score {formatScoreValue(totalScore)}</span>
+          <span className="font-medium text-cyan-200">Score {formatScoreValue(totalScore)}</span>
         </>
       ) : null}
     </Link>

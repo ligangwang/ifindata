@@ -131,6 +131,10 @@ function predictionShareReturnText(prediction: PredictionDetail, returnText: str
   return elapsedDays === null ? returnText : `${returnText} (${elapsedDays}d)`;
 }
 
+function predictionUrl(predictionId: string): string {
+  return `https://youanalyst.com/predictions/${encodeURIComponent(predictionId)}`;
+}
+
 function predictionShareText(prediction: PredictionDetail, statusLabel: string, returnText: string): string {
   const direction = prediction.direction === "UP" ? "Bullish" : "Bearish";
   const title = formatPredictionThesisTitle(prediction.thesisTitle);
@@ -154,6 +158,7 @@ function predictionShareText(prediction: PredictionDetail, statusLabel: string, 
 function predictionShareUrl(prediction: PredictionDetail, statusLabel: string, returnText: string): string {
   const params = new URLSearchParams({
     text: predictionShareText(prediction, statusLabel, returnText),
+    url: predictionUrl(prediction.id),
   });
 
   return `https://twitter.com/intent/tweet?${params.toString()}`;

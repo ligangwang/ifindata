@@ -155,20 +155,6 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "scoreChange",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "prediction_daily_marks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "date",
-          "order": "ASCENDING"
-        },
-        {
           "fieldPath": "directionDailyReturn",
           "order": "DESCENDING"
         },

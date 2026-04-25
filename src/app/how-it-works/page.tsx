@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { aiChipsAnalystConfig } from "@/lib/ai-analyst/config";
+import { SCORE_SCALE, TANH_SCALE } from "@/lib/predictions/analytics";
 
 export const metadata: Metadata = {
   title: "How It Works | YouAnalyst",
@@ -77,8 +78,18 @@ export default function HowItWorksPage() {
         <div>
           <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">How Scores Work</h2>
           <div className="mt-2 space-y-2 text-sm leading-6 text-slate-300">
-            <p>Your Score reflects how your predictions perform.</p>
-            <p>Strong calls help your Score. Poor calls can hold it back.</p>
+            <p>Your Score reflects how your predictions perform from entry price to the latest end-of-day mark.</p>
+            <p>
+              Prediction score uses a capped curve:{" "}
+              <span className="font-mono text-xs text-cyan-100">
+                round({SCORE_SCALE} * tanh(return / {TANH_SCALE}))
+              </span>
+              .
+            </p>
+            <p>
+              Daily score is the change in prediction score from the previous market close. Because the curve flattens
+              as a call gets further ahead, the same daily price move can add more score early and less score later.
+            </p>
             <p>Rankings are based on overall Score.</p>
           </div>
         </div>

@@ -109,7 +109,7 @@ function missingDailyReturnReportPath(call: DailyCallHighlight, date: string | n
     `Created at: ${call.createdAt || "Unknown"}`,
     `Return since entry: ${returnText(call.returnSinceEntry) ?? "Unknown"}`,
     "",
-    "Expected: daily return change should be present for this daily mark.",
+    "Expected: ticker daily return should be present for this daily mark.",
   ].join("\n");
   const params = new URLSearchParams({
     category: "BUG_REPORT",

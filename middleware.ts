@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const REDIRECT_HOSTS = new Set([
+  "www.youanalyst.com",
   "younalyst.com",
   "www.younalyst.com",
   "ifindata.com",

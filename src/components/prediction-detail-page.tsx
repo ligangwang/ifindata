@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
-import { formatPredictionStatus, formatPredictionThesisTitle, formatReturnPercent, formatTickerSymbol, markToneClass, PredictionAuthorSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { formatPredictionStatus, formatPredictionThesisTitle, formatReturnPercent, formatTickerSymbol, formatTimeHorizon, markToneClass, PredictionAuthorSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import {
   MAX_PREDICTION_THESIS_LENGTH,
   MAX_PREDICTION_THESIS_TITLE_LENGTH,
@@ -98,6 +98,41 @@ function formatDetailDate(value: string | null | undefined): string {
 
 function formatResultReturn(result: NonNullable<PredictionDetail["result"]>): string {
   return formatReturnPercent(result.returnValue);
+}
+
+function predictionUrl(predictionId: string): string {
+  return `https://youanalyst.com/predictions/${encodeURIComponent(predictionId)}`;
+}
+
+function predictionShareText(prediction: PredictionDetail, statusLabel: string, returnText: string): string {
+  const direction = prediction.direction === "UP" ? "Bullish" : "Bearish";
+  const title = formatPredictionThesisTitle(prediction.thesisTitle);
+  const horizon = formatTimeHorizon(prediction.timeHorizon);
+  const lines = [
+    "I'm tracking this stock call publicly on YouAnalyst:",
+    "",
+    `${direction} ${formatTickerSymbol(prediction.ticker)}`,
+    title,
+    `Status: ${statusLabel}`,
+    `Return: ${returnText}`,
+  ];
+
+  if (horizon) {
+    lines.push(`Open until: ${horizon}`);
+  }
+
+  lines.push("", "Full thesis and live track record:");
+
+  return lines.join("\n");
+}
+
+function predictionShareUrl(prediction: PredictionDetail, statusLabel: string, returnText: string): string {
+  const params = new URLSearchParams({
+    text: predictionShareText(prediction, statusLabel, returnText),
+    url: predictionUrl(prediction.id),
+  });
+
+  return `https://twitter.com/intent/tweet?${params.toString()}`;
 }
 
 export function PredictionDetailPage({ predictionId }: { predictionId: string }) {
@@ -417,6 +452,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           ? { action: "cancel" as const, label: "Cancel close" }
         : null;
   const statusLabel = isSettlementPending ? "Settles at next close" : formatPredictionStatus(prediction.status);
+  const xShareUrl = predictionShareUrl(prediction, statusLabel, returnText);
 
   return (
     <main className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-8">
@@ -436,6 +472,16 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             <span className="rounded-lg border border-cyan-400/30 px-2.5 py-1 text-xs font-medium text-cyan-100">
               {statusLabel}
             </span>
+            {isOwner ? (
+              <a
+                href={xShareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
+              >
+                Share to X
+              </a>
+            ) : null}
             {ownerAction ? (
               ownerAction.action === "close" ? (
                 <button

@@ -617,7 +617,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
               </p>
             ) : null}
             <p className="mt-1 text-xs text-slate-400">
-              Next EOD update runs around 8:00 PM ET on trading days.
+              Next EOD update runs around 9:00 PM ET on trading days.
             </p>
           </div>
         ) : null}

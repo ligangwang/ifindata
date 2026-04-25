@@ -197,7 +197,7 @@ jobs:
             gcloud scheduler jobs update http "$job_name" \
               --project "$GCP_PROJECT_ID" \
               --location "$GCP_REGION" \
-              --schedule "0 20 * * 1-5" \
+              --schedule "0 21 * * 1-5" \
               --time-zone "America/New_York" \
               --uri "$uri" \
               --http-method POST \
@@ -207,7 +207,7 @@ jobs:
             gcloud scheduler jobs create http "$job_name" \
               --project "$GCP_PROJECT_ID" \
               --location "$GCP_REGION" \
-              --schedule "0 20 * * 1-5" \
+              --schedule "0 21 * * 1-5" \
               --time-zone "America/New_York" \
               --uri "$uri" \
               --http-method POST \
@@ -376,7 +376,7 @@ jobs:
             gcloud scheduler jobs update http "$job_name" \
               --project "$GCP_PROJECT_ID" \
               --location "$GCP_REGION" \
-              --schedule "0 20 * * 1-5" \
+              --schedule "0 21 * * 1-5" \
               --time-zone "America/New_York" \
               --uri "$uri" \
               --http-method POST \
@@ -386,7 +386,7 @@ jobs:
             gcloud scheduler jobs create http "$job_name" \
               --project "$GCP_PROJECT_ID" \
               --location "$GCP_REGION" \
-              --schedule "0 20 * * 1-5" \
+              --schedule "0 21 * * 1-5" \
               --time-zone "America/New_York" \
               --uri "$uri" \
               --http-method POST \

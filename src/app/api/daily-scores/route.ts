@@ -46,6 +46,14 @@ function percentFromReturnValue(value: unknown): number | null {
   return parsed === null ? null : parsed * 100;
 }
 
+function dailyReturnChange(data: Record<string, unknown>): number | null {
+  if (data.isMissingPreviousDailyReturn === true) {
+    return null;
+  }
+
+  return percentFromReturnValue(data.returnValueChange);
+}
+
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -174,7 +182,7 @@ async function topDailyCalls(db: FirebaseFirestore.Firestore, date: string): Pro
       ticker: asString(data.ticker),
       direction: directionValue(data.direction),
       dailyScoreChange: asNumber(data.scoreChange),
-      dailyReturnChange: percentFromReturnValue(data.returnValueChange),
+      dailyReturnChange: dailyReturnChange(data),
       totalScore: asNumber(data.score),
       returnSinceEntry: percentFromReturnValue(data.markReturnValue),
       status: statusValue(data.status),

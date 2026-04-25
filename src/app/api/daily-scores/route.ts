@@ -141,7 +141,7 @@ async function topDailyCalls(db: FirebaseFirestore.Firestore, date: string): Pro
       ticker: asString(data.ticker),
       direction: directionValue(data.direction),
       dailyScoreChange: asNumber(data.scoreChange),
-      dailyReturnChange: percentFromReturnValue(data.returnValueChange) ?? percentFromReturnValue(data.markReturnValue),
+      dailyReturnChange: percentFromReturnValue(data.returnValueChange),
       totalScore: asNumber(data.score),
       returnSinceEntry: percentFromReturnValue(data.markReturnValue),
       status: statusValue(data.status),

@@ -108,7 +108,7 @@ function shareText(payload: DailyScoresResponse, url: string): string {
     "Think you're good at stocks?",
     "",
     "Someone nailed today\u2019s top call:",
-    `${directionArrow(call.direction)} ${formatTickerSymbol(call.ticker)} ${dailyReturnText(call.dailyReturnChange)} \uD83D\uDCCA`,
+    `${directionArrow(call.direction)} ${formatTickerSymbol(call.ticker)} ${dailyReturnText(displayedReturnValue(call))} \uD83D\uDCCA`,
     "",
     "Every prediction is tracked.",
     "No edits. No hiding.",
@@ -148,6 +148,14 @@ function dailyReturnText(value: number | null): string {
 
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
+}
+
+function displayedReturnValue(call: DailyCallHighlight): number | null {
+  return call.dailyReturnChange ?? call.returnSinceEntry;
+}
+
+function displayedReturnLabel(call: DailyCallHighlight): string {
+  return call.dailyReturnChange === null && call.returnSinceEntry !== null ? "since entry" : "today";
 }
 
 export function DailyScoresPage() {
@@ -333,12 +341,12 @@ export function DailyScoresPage() {
               <p className="mt-3 text-sm text-slate-400">{callDescription(callOfTheDay)}</p>
             </div>
             <div className="sm:text-right">
-              <p className={`text-4xl font-semibold ${returnTone(callOfTheDay.dailyReturnChange)}`}>
-                {dailyReturnText(callOfTheDay.dailyReturnChange)}
+              <p className={`text-4xl font-semibold ${returnTone(displayedReturnValue(callOfTheDay))}`}>
+                {dailyReturnText(displayedReturnValue(callOfTheDay))}
               </p>
-              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">today</p>
-              <p className="mt-1 text-xs text-slate-400">{scoreText(callOfTheDay.dailyScoreChange)} score</p>
-              {returnText(callOfTheDay.returnSinceEntry) && callOfTheDay.returnSinceEntry !== callOfTheDay.dailyReturnChange ? (
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{displayedReturnLabel(callOfTheDay)}</p>
+              <p className="mt-1 text-xs text-slate-400">{scoreText(callOfTheDay.dailyScoreChange)} score today</p>
+              {callOfTheDay.dailyReturnChange !== null && returnText(callOfTheDay.returnSinceEntry) && callOfTheDay.returnSinceEntry !== callOfTheDay.dailyReturnChange ? (
                 <p className="mt-1 text-xs text-slate-500">{returnText(callOfTheDay.returnSinceEntry)} since entry</p>
               ) : null}
             </div>
@@ -375,10 +383,10 @@ export function DailyScoresPage() {
                   <span>{userName(call)}</span>
                 </span>
                 <span className="text-right">
-                  <span className={`block text-sm font-semibold ${returnTone(call.dailyReturnChange)}`}>
-                    {dailyReturnText(call.dailyReturnChange)}
+                  <span className={`block text-sm font-semibold ${returnTone(displayedReturnValue(call))}`}>
+                    {dailyReturnText(displayedReturnValue(call))}
                   </span>
-                  <span className="block text-[11px] text-slate-500">{scoreText(call.dailyScoreChange)} score</span>
+                  <span className="block text-[11px] text-slate-500">{displayedReturnLabel(call)} · {scoreText(call.dailyScoreChange)} score today</span>
                 </span>
               </Link>
             ))}

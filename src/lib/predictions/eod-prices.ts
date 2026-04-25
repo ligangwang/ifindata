@@ -1,4 +1,3 @@
-import { FieldPath } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
   computePredictionOutcome,
@@ -23,6 +22,7 @@ const POSITION_SCAN_PAGE_SIZE = 500;
 const ROLL_FORWARD_PRICE_SCAN_PAGE_SIZE = 1000;
 const TWELVE_DATA_CHUNK_SIZE = 8;
 const ACTIVE_TICKER_LOCK_COLLECTION = "prediction_active_tickers";
+const PREVIOUS_EOD_PRICE_LOOKBACK_DAYS = 30;
 
 export type DailyEodMaintenanceInput = {
   runDate?: string;
@@ -165,6 +165,12 @@ function clampLimit(value: unknown): number {
 
 function isIsoDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00.000Z`).getTime());
+}
+
+function addUtcDays(isoDate: string, days: number): string {
+  const date = new Date(`${isoDate}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function getCurrentEasternDate(): string {
@@ -353,28 +359,23 @@ async function readPreviousEodPrice(
   db: FirebaseFirestore.Firestore,
   price: Pick<EodPrice, "market" | "ticker" | "tradingDate">,
 ): Promise<Pick<EodPrice, "close" | "tradingDate"> | null> {
-  const prefix = [price.market, price.ticker, ""].join("_");
-  const snapshot = await db
-    .collection("eod_prices")
-    .where(FieldPath.documentId(), ">=", prefix)
-    .where(FieldPath.documentId(), "<", eodPriceDocId(price.ticker, price.tradingDate, price.market))
-    .orderBy(FieldPath.documentId(), "desc")
-    .limit(1)
-    .get();
+  for (let offset = 1; offset <= PREVIOUS_EOD_PRICE_LOOKBACK_DAYS; offset += 1) {
+    const previousDate = addUtcDays(price.tradingDate, -offset);
+    const snapshot = await db
+      .collection("eod_prices")
+      .doc(eodPriceDocId(price.ticker, previousDate, price.market))
+      .get();
+    const previous = snapshot.exists ? toCachedEodPrice(snapshot.data()) : null;
 
-  if (snapshot.empty) {
-    return null;
+    if (previous && previous.close > 0) {
+      return {
+        close: previous.close,
+        tradingDate: previous.tradingDate,
+      };
+    }
   }
 
-  const previous = toCachedEodPrice(snapshot.docs[0].data());
-  if (!previous || previous.close <= 0) {
-    return null;
-  }
-
-  return {
-    close: previous.close,
-    tradingDate: previous.tradingDate,
-  };
+  return null;
 }
 
 async function withTickerDailyReturns(db: FirebaseFirestore.Firestore, prices: EodPrice[]): Promise<EodPrice[]> {

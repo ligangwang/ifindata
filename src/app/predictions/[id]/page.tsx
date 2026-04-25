@@ -34,12 +34,20 @@ export async function generateMetadata({
     const ticker = normalizeTicker(typeof prediction.ticker === "string" ? prediction.ticker : "");
     const direction = prediction.direction === "DOWN" ? "Down" : "Up";
     const rawTitle = typeof prediction.thesisTitle === "string" ? prediction.thesisTitle.trim() : "";
-    const authorDisplayName = typeof prediction.authorDisplayName === "string" ? prediction.authorDisplayName.trim() : "";
+    const predictionUserId = typeof prediction.userId === "string" ? prediction.userId.trim() : "";
+    let authorLabel = "";
+    if (predictionUserId) {
+      const userSnapshot = await db.collection("users").doc(predictionUserId).get();
+      const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+      const nickname = typeof userData?.nickname === "string" ? userData.nickname.trim() : "";
+      authorLabel = nickname ? `@${nickname}` : "";
+    }
+
     const title = rawTitle
       ? `${ticker}: ${rawTitle} | YouAnalyst`
       : `${direction} call on ${ticker} | YouAnalyst`;
-    const description = authorDisplayName
-      ? `${authorDisplayName}'s ${direction.toLowerCase()} call on ${ticker}, with live performance and discussion on YouAnalyst.`
+    const description = authorLabel
+      ? `${authorLabel}'s ${direction.toLowerCase()} call on ${ticker}, with live performance and discussion on YouAnalyst.`
       : `${direction} call on ${ticker}, with live performance and discussion on YouAnalyst.`;
 
     return {

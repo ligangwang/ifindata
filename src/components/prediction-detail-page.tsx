@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
+import { PredictionPriceChart, type PredictionPriceHistory } from "@/components/prediction-price-chart";
 import { formatPredictionStatus, formatPredictionThesisTitle, formatReturnPercent, formatTickerSymbol, formatTimeHorizon, markToneClass, PredictionAuthorSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import {
   MAX_PREDICTION_THESIS_LENGTH,
@@ -188,6 +189,9 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   const [ownerWatchlists, setOwnerWatchlists] = useState<WatchlistOption[]>([]);
   const [moveWatchlistId, setMoveWatchlistId] = useState("");
   const [moveSaving, setMoveSaving] = useState(false);
+  const [priceHistory, setPriceHistory] = useState<PredictionPriceHistory | null>(null);
+  const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
+  const [priceHistoryError, setPriceHistoryError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   async function loadAll() {
@@ -229,6 +233,51 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
     const interval = window.setInterval(() => setNow(Date.now()), 30 * 1000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!prediction || !prediction.entryDate || typeof prediction.entryPrice !== "number") {
+      setPriceHistory(null);
+      setPriceHistoryLoading(false);
+      setPriceHistoryError(null);
+      return;
+    }
+
+    setPriceHistoryLoading(true);
+    setPriceHistoryError(null);
+
+    void getIdToken()
+      .then(async (token) => {
+        const headers = token ? { authorization: `Bearer ${token}` } : undefined;
+        const response = await fetch(`/api/predictions/${prediction.id}/price-history`, { headers });
+        if (!response.ok) {
+          throw new Error("Unable to load price history.");
+        }
+
+        return (await response.json()) as PredictionPriceHistory;
+      })
+      .then((nextHistory) => {
+        if (!cancelled) {
+          setPriceHistory(nextHistory);
+        }
+      })
+      .catch((nextError) => {
+        if (!cancelled) {
+          setPriceHistory(null);
+          setPriceHistoryError(nextError instanceof Error ? nextError.message : "Unable to load price history.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPriceHistoryLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getIdToken, prediction]);
 
   useEffect(() => {
     if (!user || !prediction || user.uid !== prediction.userId) {
@@ -777,6 +826,8 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           </div>
         ) : null}
       </section>
+
+      <PredictionPriceChart history={priceHistory} loading={priceHistoryLoading} error={priceHistoryError} />
 
       <section className="rounded-2xl border border-white/15 bg-slate-950/55 p-5">
         <h2 className="mb-3 font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Discussion</h2>

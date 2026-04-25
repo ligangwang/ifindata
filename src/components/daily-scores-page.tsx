@@ -18,6 +18,8 @@ type DailyCallHighlight = {
   returnSinceEntry: number | null;
   status: "LIVE" | "SETTLED";
   createdAt: string;
+  thesisTitle: string | null;
+  thesis: string | null;
 };
 
 type DailyScoresResponse = {
@@ -98,6 +100,8 @@ function missingDailyReturnReportPath(call: DailyCallHighlight, date: string | n
     `Prediction ID: ${call.predictionId}`,
     `Prediction URL: ${predictionPath(call.predictionId)}`,
     `Prediction: ${directionArrow(call.direction)} ${formatTickerSymbol(call.ticker)}`,
+    `Thesis title: ${call.thesisTitle ?? "Unknown"}`,
+    `Thesis: ${call.thesis ?? "Unknown"}`,
     `User: ${userName(call)} (${call.userId})`,
     `Daily page date: ${date ?? "latest"}`,
     `Daily score change: ${scoreText(call.dailyScoreChange)}`,

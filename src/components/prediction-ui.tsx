@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import type { AiAnalystTheme } from "@/lib/ai-analyst/config";
+import { analystLevelName } from "@/lib/predictions/analytics";
 import type { PredictionDirection, PredictionStatus, PredictionTimeHorizon } from "@/lib/predictions/types";
 
 export type PredictionMarkFields = {
@@ -25,7 +26,7 @@ export type PredictionAuthorFields = {
   authorAccountType?: "HUMAN" | "AI_ANALYST" | null;
   authorAiAnalystTheme?: AiAnalystTheme | null;
   authorStats?: {
-    totalScore?: number | null;
+    level?: number | null;
     totalPredictions?: number | null;
   } | null;
 };
@@ -37,10 +38,6 @@ function formatSignedPercent(value: number): string {
 
 export function formatScorePercent(score: number): string {
   return formatSignedPercent(score / 100);
-}
-
-function formatScoreValue(score: number): string {
-  return `${Math.round(score).toLocaleString()}`;
 }
 
 export function formatTickerSymbol(ticker: string | null | undefined): string {
@@ -297,8 +294,8 @@ export function PredictionAuthorSummary({ author, className = "" }: { author: Pr
   const displayName = author.authorDisplayName?.trim();
   const label = nickname ? `@${nickname}` : displayName || "Anonymous";
   const avatarLabel = nickname?.slice(0, 1) ?? displayName?.slice(0, 1) ?? "?";
-  const totalScore = author.authorStats?.totalScore;
-  const hasScore = typeof totalScore === "number";
+  const level = author.authorStats?.level;
+  const hasLevel = typeof level === "number";
   const isAiAnalyst = author.authorAccountType === "AI_ANALYST";
 
   return (
@@ -326,10 +323,10 @@ export function PredictionAuthorSummary({ author, className = "" }: { author: Pr
           AI Analyst
         </span>
       ) : null}
-      {hasScore ? (
+      {hasLevel ? (
         <>
           <span className="text-slate-500">&middot;</span>
-          <span className="font-medium text-cyan-200">Score {formatScoreValue(totalScore)}</span>
+          <span>Level {Math.max(1, Math.floor(level))} &middot; {analystLevelName(level)}</span>
         </>
       ) : null}
     </Link>

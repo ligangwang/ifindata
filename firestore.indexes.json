@@ -197,20 +197,6 @@
       ]
     },
     {
-      "collectionGroup": "user_daily_scores",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "date",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "dailyScoreChange",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "eod_prices",
       "queryScope": "COLLECTION",
       "fields": [

@@ -1,4 +1,4 @@
-import { FieldPath, FieldValue } from "firebase-admin/firestore";
+import { FieldPath } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
   computePredictionOutcome,
@@ -693,6 +693,24 @@ function countMarksByStatus(
   return marks.filter((mark) => mark.status && statuses.includes(mark.status)).length;
 }
 
+function userStatsCounter(data: FirebaseFirestore.DocumentData | undefined, key: string): number {
+  const stats = (data?.stats as Record<string, unknown> | undefined) ?? {};
+  const parsed = Number(stats[key]);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function userStatsCounterUpdates(
+  data: FirebaseFirestore.DocumentData | undefined,
+  deltas: Record<string, number>,
+): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(deltas).map(([key, delta]) => [
+      `stats.${key}`,
+      Math.max(0, userStatsCounter(data, key) + delta),
+    ]),
+  );
+}
+
 async function readPreviousPredictionDailyScore(
   db: FirebaseFirestore.Firestore,
   predictionId: string,
@@ -1199,9 +1217,11 @@ export async function runDailyEodMaintenance(
               .collection("prediction_daily_marks")
               .doc(predictionDailyMarkDocId(prediction.id, price.tradingDate));
             const tickerLockRef = activeTickerLockRef(db, prediction.userId, prediction.ticker);
-            const [dailyMarkSnapshot, tickerLockSnapshot] = await Promise.all([
+            const userRef = db.collection("users").doc(prediction.userId);
+            const [dailyMarkSnapshot, tickerLockSnapshot, userSnapshot] = await Promise.all([
               tx.get(dailyMarkRef),
               tx.get(tickerLockRef),
+              tx.get(userRef),
             ]);
             if (tickerLockSnapshot.exists && tickerLockSnapshot.get("predictionId") !== prediction.id) {
               marking.skipped += 1;
@@ -1222,10 +1242,12 @@ export async function runDailyEodMaintenance(
               entryTime: "16:00:00",
               entryCapturedAt: price.loadedAt,
             });
-            tx.update(db.collection("users").doc(prediction.userId), {
+            tx.update(userRef, {
               updatedAt: nowIso,
-              "stats.openingPredictions": FieldValue.increment(-1),
-              "stats.openPredictions": FieldValue.increment(1),
+              ...userStatsCounterUpdates(userSnapshot.data(), {
+                openingPredictions: -1,
+                openPredictions: 1,
+              }),
             });
             tx.set(tickerLockRef, {
               predictionId: prediction.id,
@@ -1301,8 +1323,13 @@ export async function runDailyEodMaintenance(
           const openUntilTickerLockRef = shouldCloseForOpenUntil
             ? activeTickerLockRef(db, prediction.userId, prediction.ticker)
             : null;
+          const userRef = db.collection("users").doc(prediction.userId);
+          const needsUserCounterUpdate = latestStatus === "CLOSING" || shouldCloseForOpenUntil;
           const openUntilTickerLockSnapshot = openUntilTickerLockRef
             ? await tx.get(openUntilTickerLockRef)
+            : null;
+          const userSnapshot = needsUserCounterUpdate
+            ? await tx.get(userRef)
             : null;
           const previousScoreValue = recompute
             ? previousDaily.score
@@ -1387,10 +1414,12 @@ export async function runDailyEodMaintenance(
               xpEarned: mark.xpEarned,
               result,
             });
-            tx.update(db.collection("users").doc(prediction.userId), {
+            tx.update(userRef, {
               updatedAt: nowIso,
-              "stats.closingPredictions": FieldValue.increment(-1),
-              "stats.closedPredictions": FieldValue.increment(1),
+              ...userStatsCounterUpdates(userSnapshot?.data(), {
+                closingPredictions: -1,
+                closedPredictions: 1,
+              }),
             });
             marking.marked += 1;
             marking.closed += 1;
@@ -1413,10 +1442,12 @@ export async function runDailyEodMaintenance(
               xpEarned: mark.xpEarned,
               result,
             });
-            tx.update(db.collection("users").doc(prediction.userId), {
+            tx.update(userRef, {
               updatedAt: nowIso,
-              "stats.openPredictions": FieldValue.increment(-1),
-              "stats.closedPredictions": FieldValue.increment(1),
+              ...userStatsCounterUpdates(userSnapshot?.data(), {
+                openPredictions: -1,
+                closedPredictions: 1,
+              }),
             });
             if (
               openUntilTickerLockRef &&

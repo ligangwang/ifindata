@@ -562,7 +562,7 @@ function dailySnapshotStatus(prediction: EodPredictionRecord, tradingDate: strin
 function existingDailyPreviousScore(
   data: FirebaseFirestore.DocumentData | undefined,
   fallbackPreviousScore: number | null,
-): number {
+): number | null {
   const previousScore = finiteNumberOrNull(data?.previousScore);
   if (previousScore !== null) {
     return previousScore;
@@ -574,13 +574,13 @@ function existingDailyPreviousScore(
     return score - scoreChange;
   }
 
-  return fallbackPreviousScore ?? 0;
+  return fallbackPreviousScore;
 }
 
 function existingDailyPreviousReturnValue(
   data: FirebaseFirestore.DocumentData | undefined,
   fallbackPreviousReturnValue: number | null,
-): number {
+): number | null {
   const previousReturnValue = finiteNumberOrNull(data?.previousReturnValue);
   if (previousReturnValue !== null) {
     return previousReturnValue;
@@ -592,7 +592,7 @@ function existingDailyPreviousReturnValue(
     return returnValue - returnValueChange;
   }
 
-  return fallbackPreviousReturnValue ?? 0;
+  return fallbackPreviousReturnValue;
 }
 
 function markSummaryFromDoc(doc: FirebaseFirestore.QueryDocumentSnapshot): {
@@ -1232,18 +1232,29 @@ export async function runDailyEodMaintenance(
           const openUntilTickerLockSnapshot = openUntilTickerLockRef
             ? await tx.get(openUntilTickerLockRef)
             : null;
-          const previousScore = recompute
-            ? previousDaily.score ?? 0
+          const previousScoreValue = recompute
+            ? previousDaily.score
             : existingDailyPreviousScore(
                 dailyMarkSnapshot.data(),
                 previousDaily.score,
               );
-          const previousReturnValue = recompute
-            ? previousDaily.returnValue ?? 0
+          const previousReturnValueValue = recompute
+            ? previousDaily.returnValue
             : existingDailyPreviousReturnValue(
                 dailyMarkSnapshot.data(),
                 previousDaily.returnValue,
               );
+          const isOpeningDailyMark = prediction.entryDate === price.tradingDate;
+          const previousScore = previousScoreValue ?? (isOpeningDailyMark ? 0 : null);
+          const previousReturnValue = previousReturnValueValue ?? (isOpeningDailyMark ? 0 : null);
+          const isMissingPreviousDailyScore = previousScore === null;
+          const isMissingPreviousDailyReturn = previousReturnValue === null && prediction.entryDate !== price.tradingDate;
+          const dailyScoreChange = previousScore === null
+            ? null
+            : mark.score - previousScore;
+          const dailyReturnValueChange = previousReturnValue === null
+            ? null
+            : mark.returnValue - previousReturnValue;
           const snapshotStatus = dailySnapshotStatus(prediction, price.tradingDate);
           const nextStatus = ((latestStatus === "CLOSING") && shouldMutatePrediction) || shouldCloseForOpenUntil
             ? "SETTLED"
@@ -1267,9 +1278,11 @@ export async function runDailyEodMaintenance(
             markPredictionScore: mark.score,
             score: mark.score,
             previousScore,
-            scoreChange: mark.score - previousScore,
+            scoreChange: dailyScoreChange,
+            isMissingPreviousDailyScore,
             previousReturnValue,
-            returnValueChange: mark.returnValue - previousReturnValue,
+            returnValueChange: dailyReturnValueChange,
+            isMissingPreviousDailyReturn,
             isClosed: nextStatus === "SETTLED",
             createdAt: dailyMarkSnapshot.get("createdAt") ?? nowIso,
             updatedAt: nowIso,

@@ -89,10 +89,6 @@ async function getShareCardPrediction(predictionId: string): Promise<ShareCardPr
   const direction = prediction.direction === "DOWN" ? "DOWN" : "UP";
   const thesisTitle = typeof prediction.thesisTitle === "string" ? prediction.thesisTitle : "";
   const userId = typeof prediction.userId === "string" ? prediction.userId.trim() : "";
-  const authorDisplayName =
-    typeof prediction.authorDisplayName === "string" && prediction.authorDisplayName.trim()
-      ? prediction.authorDisplayName.trim()
-      : "Analyst";
   const result = prediction.result && typeof prediction.result === "object"
     ? prediction.result as Record<string, unknown>
     : null;
@@ -113,7 +109,7 @@ async function getShareCardPrediction(predictionId: string): Promise<ShareCardPr
             ? prediction.markScore
             : null;
 
-  let authorLabel = authorDisplayName;
+  let authorLabel = "YouAnalyst analyst";
   let authorLevel: number | null = null;
   if (userId) {
     const userSnapshot = await db.collection("users").doc(userId).get();
@@ -123,7 +119,7 @@ async function getShareCardPrediction(predictionId: string): Promise<ShareCardPr
       ? userData.stats as Record<string, unknown>
       : {};
 
-    authorLabel = nickname ? `@${nickname}` : authorDisplayName;
+    authorLabel = nickname ? `@${nickname}` : "YouAnalyst analyst";
     authorLevel = isPublicProfile(userData) ? numberFromStats(stats, "level") : null;
   }
 

@@ -90,6 +90,32 @@ function predictionPath(predictionId: string): string {
   return `/predictions/${predictionId}`;
 }
 
+function missingDailyReturnReportPath(call: DailyCallHighlight, date: string | null): string {
+  const subject = `Missing Daily Return: ${call.predictionId}`;
+  const message = [
+    "Missing daily return data on Top Calls Today.",
+    "",
+    `Prediction ID: ${call.predictionId}`,
+    `Prediction URL: ${predictionPath(call.predictionId)}`,
+    `Prediction: ${directionArrow(call.direction)} ${formatTickerSymbol(call.ticker)}`,
+    `User: ${userName(call)} (${call.userId})`,
+    `Daily page date: ${date ?? "latest"}`,
+    `Daily score change: ${scoreText(call.dailyScoreChange)}`,
+    `Status: ${call.status}`,
+    `Created at: ${call.createdAt || "Unknown"}`,
+    `Return since entry: ${returnText(call.returnSinceEntry) ?? "Unknown"}`,
+    "",
+    "Expected: daily return change should be present for this daily mark.",
+  ].join("\n");
+  const params = new URLSearchParams({
+    category: "BUG_REPORT",
+    subject,
+    message,
+  });
+
+  return `/feedback?${params.toString()}`;
+}
+
 function shareText(payload: DailyScoresResponse, url: string): string {
   const call = payload.callOfTheDay;
   if (!call) {
@@ -261,7 +287,6 @@ export function DailyScoresPage() {
 
   const topCalls = payload?.topCalls ?? [];
   const callOfTheDay = payload?.callOfTheDay ?? null;
-  const hasMissingDailyReturnData = topCalls.some((call) => call.dailyReturnChange === null);
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8">
@@ -349,31 +374,23 @@ export function DailyScoresPage() {
 
       {topCalls.length > 0 ? (
         <section className="mt-4 rounded-xl border border-white/10 bg-slate-950/55 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Top Calls Today</h2>
-              <p className="mt-1 text-sm text-slate-300">
-                The strongest prediction moves from the latest end-of-day update.
-              </p>
-            </div>
-            {hasMissingDailyReturnData ? (
-              <Link
-                href="/feedback"
-                className="w-fit rounded-lg border border-rose-400/35 px-3 py-1.5 text-xs font-semibold text-rose-200 hover:bg-rose-500/10"
-              >
-                Report issue
-              </Link>
-            ) : null}
+          <div>
+            <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Top Calls Today</h2>
+            <p className="mt-1 text-sm text-slate-300">
+              The strongest prediction moves from the latest end-of-day update.
+            </p>
           </div>
           <div className="mt-4 grid gap-2">
             {topCalls.map((call, index) => (
-              <Link
+              <article
                 key={call.predictionId}
-                href={predictionPath(call.predictionId)}
-                className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-white/10 p-3 hover:border-cyan-300/60"
+                className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-white/10 p-3"
               >
                 <span className="text-sm font-semibold text-cyan-200">#{index + 1}</span>
-                <span className="min-w-0 text-sm text-slate-100">
+                <Link
+                  href={predictionPath(call.predictionId)}
+                  className="min-w-0 text-sm text-slate-100 hover:text-cyan-100"
+                >
                   <span className="font-semibold text-cyan-200">
                     {directionArrow(call.direction) ? (
                       <span aria-hidden="true" className="mr-1">
@@ -384,14 +401,22 @@ export function DailyScoresPage() {
                   </span>
                   <span className="text-slate-500"> / </span>
                   <span>{userName(call)}</span>
-                </span>
+                </Link>
                 <span className="text-right">
                   <span className={`block text-sm font-semibold ${returnTone(call.dailyReturnChange)}`}>
                     {dailyReturnText(call.dailyReturnChange)}
                   </span>
                   <span className="block text-[11px] text-slate-500">today &middot; {scoreText(call.dailyScoreChange)} score today</span>
+                  {call.dailyReturnChange === null ? (
+                    <Link
+                      href={missingDailyReturnReportPath(call, payload?.date ?? null)}
+                      className="mt-1 inline-block text-[11px] font-semibold text-rose-300 hover:text-rose-200"
+                    >
+                      Report issue
+                    </Link>
+                  ) : null}
                 </span>
-              </Link>
+              </article>
             ))}
           </div>
         </section>

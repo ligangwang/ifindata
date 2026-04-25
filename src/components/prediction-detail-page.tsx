@@ -11,6 +11,7 @@ import {
   type PredictionStatus,
   type PredictionTimeHorizon,
   type PredictionTimeHorizonUnit,
+  type PredictionVisibility,
 } from "@/lib/predictions/types";
 
 type PredictionDetail = {
@@ -33,6 +34,7 @@ type PredictionDetail = {
   thesis: string;
   timeHorizon: PredictionTimeHorizon | null;
   status: PredictionStatus;
+  visibility?: PredictionVisibility;
   createdAt: string;
   closeRequestedAt?: string | null;
   closeTargetDate?: string | null;
@@ -427,6 +429,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
 
   const thesis = sanitizePredictionThesis(prediction.thesis);
   const isOwner = Boolean(user && user.uid === prediction.userId);
+  const canShareToX = isOwner && prediction.visibility === "PUBLIC";
   const createdAtMs = Date.parse(prediction.createdAt);
   const closeRequestedAtMs = Date.parse(prediction.closeRequestedAt ?? "");
   const createCancelWindowOpen = !Number.isNaN(createdAtMs) && now - createdAtMs <= 5 * 60 * 1000;
@@ -472,7 +475,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
             <span className="rounded-lg border border-cyan-400/30 px-2.5 py-1 text-xs font-medium text-cyan-100">
               {statusLabel}
             </span>
-            {isOwner ? (
+            {canShareToX ? (
               <a
                 href={xShareUrl}
                 target="_blank"

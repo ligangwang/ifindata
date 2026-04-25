@@ -147,9 +147,9 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: "
   const color = tone === "positive" ? "#34d399" : tone === "negative" ? "#fb7185" : "#bfdbfe";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ color: "#94a3b8", fontSize: 24, fontWeight: 700, textTransform: "uppercase" }}>{label}</div>
-      <div style={{ color, fontSize: 58, fontWeight: 900, lineHeight: 1 }}>{value}</div>
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ color: "#94a3b8", fontSize: 24, fontWeight: 700 }}>{label}</div>
+      <div style={{ color, fontSize: 58, fontWeight: 900, lineHeight: 1, marginTop: 8 }}>{value}</div>
     </div>
   );
 }
@@ -182,7 +182,7 @@ function shareCardImage(prediction: ShareCardPrediction) {
     prediction.returnValue === null ? "neutral" : prediction.returnValue > 0 ? "positive" : prediction.returnValue < 0 ? "negative" : "neutral";
   const scoreTone =
     prediction.score === null ? "neutral" : prediction.score > 0 ? "positive" : prediction.score < 0 ? "negative" : "neutral";
-  const authorMeta = prediction.authorLevel ? `${prediction.authorLabel}  /  Level ${Math.max(1, Math.floor(prediction.authorLevel))}` : prediction.authorLabel;
+  const authorMeta = prediction.authorLevel ? `${prediction.authorLabel} / Level ${Math.max(1, Math.floor(prediction.authorLevel))}` : prediction.authorLabel;
 
   return (
     <div
@@ -191,62 +191,50 @@ function shareCardImage(prediction: ShareCardPrediction) {
         color: "#f8fafc",
         display: "flex",
         height: "100%",
-        padding: 42,
+        position: "relative",
         width: "100%",
       }}
     >
-      <div
-        style={{
-          background: "#0f172a",
-          border: "2px solid #0e7490",
-          borderRadius: 36,
-          display: "flex",
-          flexDirection: "column",
-          height: "100%",
-          justifyContent: "space-between",
-          padding: 44,
-          width: "100%",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <Brand />
-          <div style={{ color: "#22d3ee", fontSize: 26, fontWeight: 800 }}>Public Track Record</div>
-        </div>
+      <div style={{ left: 58, position: "absolute", top: 42 }}>
+        <Brand />
+      </div>
+      <div style={{ color: "#22d3ee", fontSize: 26, fontWeight: 800, position: "absolute", right: 58, top: 50 }}>
+        Public Track Record
+      </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 48 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 675 }}>
-            <div style={{ color: accent, fontSize: 28, fontWeight: 800, textTransform: "uppercase" }}>
-              {directionText} stock call
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-              <div style={{ color: accent, fontSize: 82, fontWeight: 900, lineHeight: 1 }}>{isUp ? "UP" : "DOWN"}</div>
-              <div style={{ color: "#cffafe", fontSize: 86, fontWeight: 900, lineHeight: 1 }}>
-                {formatTickerSymbol(prediction.ticker)}
-              </div>
-            </div>
-            <div style={{ color: "#e2e8f0", fontSize: 33, fontWeight: 700, lineHeight: 1.2 }}>
-              {compactTitle(prediction.thesisTitle)}
-            </div>
-          </div>
+      <div style={{ color: accent, fontSize: 28, fontWeight: 800, left: 58, position: "absolute", top: 126 }}>
+        {directionText} stock call
+      </div>
+      <div style={{ color: accent, fontSize: 78, fontWeight: 900, left: 58, lineHeight: 1, position: "absolute", top: 170 }}>
+        {isUp ? "UP" : "DOWN"}
+      </div>
+      <div style={{ color: "#cffafe", fontSize: 84, fontWeight: 900, left: 198, lineHeight: 1, position: "absolute", top: 166 }}>
+        {formatTickerSymbol(prediction.ticker)}
+      </div>
+      <div style={{ color: "#e2e8f0", fontSize: 34, fontWeight: 700, left: 58, lineHeight: 1.25, position: "absolute", top: 278, width: 690 }}>
+        {compactTitle(prediction.thesisTitle)}
+      </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 34, minWidth: 285 }}>
-            <Metric
-              label="Current return"
-              value={prediction.returnValue === null ? "Pending" : formatReturnPercent(prediction.returnValue)}
-              tone={returnTone}
-            />
-            <Metric
-              label="Score"
-              value={prediction.score === null ? "Pending" : formatScore(prediction.score)}
-              tone={scoreTone}
-            />
-          </div>
-        </div>
+      <div style={{ position: "absolute", right: 72, top: 180 }}>
+        <Metric
+          label="Current return"
+          value={prediction.returnValue === null ? "Pending" : formatReturnPercent(prediction.returnValue)}
+          tone={returnTone}
+        />
+      </div>
+      <div style={{ position: "absolute", right: 72, top: 342 }}>
+        <Metric
+          label="Score"
+          value={prediction.score === null ? "Pending" : formatScore(prediction.score)}
+          tone={scoreTone}
+        />
+      </div>
 
-        <div style={{ alignItems: "center", display: "flex", justifyContent: "space-between" }}>
-          <div style={{ color: "#bae6fd", fontSize: 30, fontWeight: 700 }}>{authorMeta}</div>
-          <div style={{ color: "#94a3b8", fontSize: 26, fontWeight: 700 }}>{statusLabel(prediction.status)}</div>
-        </div>
+      <div style={{ bottom: 48, color: "#bae6fd", fontSize: 30, fontWeight: 700, left: 58, position: "absolute" }}>
+        {authorMeta}
+      </div>
+      <div style={{ bottom: 50, color: "#94a3b8", fontSize: 26, fontWeight: 700, position: "absolute", right: 58 }}>
+        {statusLabel(prediction.status)}
       </div>
     </div>
   );

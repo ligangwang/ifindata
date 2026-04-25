@@ -48,7 +48,7 @@ type ListPredictionsResult = {
     authorAccountType: "HUMAN" | "AI_ANALYST" | null;
     authorAiAnalystTheme: "AI_CHIPS" | null;
     authorStats: {
-      totalScore: number;
+      level: number;
       totalPredictions: number;
     } | null;
   }>;
@@ -281,7 +281,7 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
         nickname,
         accountType: userData?.accountType === "AI_ANALYST" ? "AI_ANALYST" : "HUMAN",
         aiAnalystTheme: aiAnalystProfile?.theme ?? null,
-        totalScore: canShowStats ? numberFromStats(stats, "totalScore") : null,
+        level: canShowStats ? numberFromStats(stats, "level") || 1 : null,
         totalPredictions: canShowStats ? numberFromStats(stats, "settledCalls") || numberFromStats(stats, "closedPredictions") : null,
       }] as const;
     }),
@@ -294,11 +294,11 @@ export async function listPredictions(input: ListPredictionsInput): Promise<List
     authorAccountType: authorByUserId.get(item.userId)?.accountType ?? null,
     authorAiAnalystTheme: authorByUserId.get(item.userId)?.aiAnalystTheme ?? null,
     authorStats:
-      authorByUserId.get(item.userId)?.totalScore === null ||
+      authorByUserId.get(item.userId)?.level === null ||
       authorByUserId.get(item.userId)?.totalPredictions === null
         ? null
         : {
-            totalScore: authorByUserId.get(item.userId)?.totalScore ?? 0,
+            level: authorByUserId.get(item.userId)?.level ?? 1,
             totalPredictions: authorByUserId.get(item.userId)?.totalPredictions ?? 0,
           },
   }));

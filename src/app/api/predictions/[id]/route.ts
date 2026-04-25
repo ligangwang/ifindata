@@ -18,6 +18,20 @@ function statusFromError(message: string): number {
   return 500;
 }
 
+function isPublicProfile(data: Record<string, unknown> | undefined): boolean {
+  const settings = data?.settings;
+  if (!settings || typeof settings !== "object") {
+    return true;
+  }
+
+  return (settings as Record<string, unknown>).isPublic !== false;
+}
+
+function numberFromStats(stats: Record<string, unknown>, key: string): number {
+  const value = stats[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -53,14 +67,25 @@ export async function GET(
     let authorNickname: string | null = null;
     let authorAccountType: "HUMAN" | "AI_ANALYST" | null = null;
     let authorAiAnalystTheme: "AI_CHIPS" | null = null;
+    let authorStats: { level: number; totalPredictions: number } | null = null;
     if (predictionUserId) {
       const userSnapshot = await db.collection("users").doc(predictionUserId).get();
       const userData = userSnapshot.data() as Record<string, unknown> | undefined;
       const nickname = typeof userData?.nickname === "string" ? userData.nickname.trim() : "";
       const aiAnalystProfile = getAiAnalystPublicProfileForUser(userData);
+      const stats = userData?.stats && typeof userData.stats === "object"
+        ? userData.stats as Record<string, unknown>
+        : {};
+      const canShowStats = isPublicProfile(userData);
       authorNickname = nickname || null;
       authorAccountType = userData?.accountType === "AI_ANALYST" ? "AI_ANALYST" : "HUMAN";
       authorAiAnalystTheme = aiAnalystProfile?.theme ?? null;
+      authorStats = canShowStats
+        ? {
+            level: numberFromStats(stats, "level") || 1,
+            totalPredictions: numberFromStats(stats, "settledCalls") || numberFromStats(stats, "closedPredictions"),
+          }
+        : null;
     }
 
     return NextResponse.json({
@@ -71,6 +96,7 @@ export async function GET(
       authorNickname,
       authorAccountType,
       authorAiAnalystTheme,
+      authorStats,
       thesisTitle: sanitizePredictionThesisTitle(typeof prediction.thesisTitle === "string" ? prediction.thesisTitle : ""),
       thesis: sanitizePredictionThesis(typeof prediction.thesis === "string" ? prediction.thesis : ""),
     });

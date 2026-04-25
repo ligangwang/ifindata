@@ -173,7 +173,7 @@ async function applyAuthorInfo(
       const canShowStats = isPublicProfile(userData);
       return [userId, {
         nickname: rawNickname || null,
-        totalScore: canShowStats ? numberFromStats(stats, "totalScore") : null,
+        level: canShowStats ? numberFromStats(stats, "level") || 1 : null,
         totalPredictions: canShowStats ? numberFromStats(stats, "settledCalls") || numberFromStats(stats, "closedPredictions") : null,
       }] as const;
     }),
@@ -184,11 +184,11 @@ async function applyAuthorInfo(
     ...item,
     authorNickname: authorByUserId.get(item.userId)?.nickname ?? null,
     authorStats:
-      authorByUserId.get(item.userId)?.totalScore === null ||
+      authorByUserId.get(item.userId)?.level === null ||
       authorByUserId.get(item.userId)?.totalPredictions === null
         ? null
         : {
-            totalScore: authorByUserId.get(item.userId)?.totalScore ?? 0,
+            level: authorByUserId.get(item.userId)?.level ?? 1,
             totalPredictions: authorByUserId.get(item.userId)?.totalPredictions ?? 0,
           },
   }));

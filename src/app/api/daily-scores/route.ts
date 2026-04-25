@@ -1,4 +1,5 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { sanitizePredictionThesis, sanitizePredictionThesisTitle } from "@/lib/predictions/types";
 import { NextRequest, NextResponse } from "next/server";
 
 type DailyCallHighlight = {
@@ -14,11 +15,18 @@ type DailyCallHighlight = {
   returnSinceEntry: number | null;
   status: "LIVE" | "SETTLED";
   createdAt: string;
+  thesisTitle: string | null;
+  thesis: string | null;
 };
 
 type UserProfileSummary = {
   displayName: string | null;
   nickname: string | null;
+};
+
+type PredictionContentSummary = {
+  thesisTitle: string | null;
+  thesis: string | null;
 };
 
 const TOP_CALL_LIMIT = 10;
@@ -93,6 +101,31 @@ async function readUserProfiles(
   return profiles;
 }
 
+async function readPredictionContent(
+  db: FirebaseFirestore.Firestore,
+  predictionIds: string[],
+): Promise<Map<string, PredictionContentSummary>> {
+  const uniqueIds = Array.from(new Set(predictionIds.filter(Boolean)));
+  const content = new Map<string, PredictionContentSummary>();
+
+  if (uniqueIds.length === 0) {
+    return content;
+  }
+
+  const snapshots = await db.getAll(...uniqueIds.map((predictionId) => db.collection("predictions").doc(predictionId)));
+
+  snapshots.forEach((snapshot, index) => {
+    const data = (snapshot.data() ?? {}) as Record<string, unknown>;
+
+    content.set(uniqueIds[index], {
+      thesisTitle: sanitizePredictionThesisTitle(typeof data.thesisTitle === "string" ? data.thesisTitle : ""),
+      thesis: sanitizePredictionThesis(typeof data.thesis === "string" ? data.thesis : ""),
+    });
+  });
+
+  return content;
+}
+
 async function topDailyCallCandidates(
   db: FirebaseFirestore.Firestore,
   date: string,
@@ -141,11 +174,13 @@ async function topDailyCalls(db: FirebaseFirestore.Firestore, date: string): Pro
       ticker: asString(data.ticker),
       direction: directionValue(data.direction),
       dailyScoreChange: asNumber(data.scoreChange),
-      dailyReturnChange: percentFromReturnValue(data.returnValueChange) ?? percentFromReturnValue(data.markReturnValue),
+      dailyReturnChange: percentFromReturnValue(data.returnValueChange),
       totalScore: asNumber(data.score),
       returnSinceEntry: percentFromReturnValue(data.markReturnValue),
       status: statusValue(data.status),
       createdAt: asString(data.predictionCreatedAt) ?? asString(data.createdAt) ?? "",
+      thesisTitle: null,
+      thesis: null,
     };
   })
     .filter((call) => call.predictionId && call.dailyScoreChange !== 0)
@@ -167,11 +202,15 @@ async function topDailyCalls(db: FirebaseFirestore.Firestore, date: string): Pro
     })
     .slice(0, TOP_CALL_LIMIT);
 
-  const profilesByUserId = await readUserProfiles(db, rankedCalls.map((call) => call.userId));
+  const [profilesByUserId, contentByPredictionId] = await Promise.all([
+    readUserProfiles(db, rankedCalls.map((call) => call.userId)),
+    readPredictionContent(db, rankedCalls.map((call) => call.predictionId)),
+  ]);
 
   return rankedCalls.map((call) => ({
     ...call,
     ...(profilesByUserId.get(call.userId) ?? { displayName: null, nickname: null }),
+    ...(contentByPredictionId.get(call.predictionId) ?? { thesisTitle: null, thesis: null }),
   }));
 }
 

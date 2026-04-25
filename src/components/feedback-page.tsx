@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 
 type FeedbackCategory = "FEATURE_REQUEST" | "BUG_REPORT" | "SUGGESTION";
@@ -23,6 +23,16 @@ const categoryOptions: Array<{ value: FeedbackCategory; label: string; help: str
   },
 ];
 
+function queryParam(searchParams: URLSearchParams, name: string, maxLength: number): string {
+  return (searchParams.get(name) ?? "").slice(0, maxLength);
+}
+
+function feedbackCategory(value: string): FeedbackCategory {
+  return value === "BUG_REPORT" || value === "SUGGESTION" || value === "FEATURE_REQUEST"
+    ? value
+    : "FEATURE_REQUEST";
+}
+
 export function FeedbackPage() {
   const { user, loading, getIdToken } = useAuth();
   const [category, setCategory] = useState<FeedbackCategory>("FEATURE_REQUEST");
@@ -35,6 +45,23 @@ export function FeedbackPage() {
 
   const resolvedContactEmail = useMemo(() => contactEmail.trim() || user?.email || "", [contactEmail, user?.email]);
   const canSubmit = subject.trim().length >= 4 && message.trim().length >= 10 && !submitting;
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const nextCategory = searchParams.get("category");
+    const nextSubject = queryParam(searchParams, "subject", 120);
+    const nextMessage = queryParam(searchParams, "message", 4000);
+
+    if (nextCategory) {
+      setCategory(feedbackCategory(nextCategory));
+    }
+    if (nextSubject) {
+      setSubject(nextSubject);
+    }
+    if (nextMessage) {
+      setMessage(nextMessage);
+    }
+  }, []);
 
   async function submitFeedback() {
     if (!canSubmit) {

@@ -20,7 +20,7 @@ type PredictionDetail = {
   authorNickname: string | null;
   authorPhotoURL?: string | null;
   authorStats?: {
-    totalScore?: number | null;
+    level?: number | null;
     totalPredictions?: number | null;
   } | null;
   ticker: string;

@@ -30,7 +30,7 @@ type PredictionContentSummary = {
 };
 
 const TOP_CALL_LIMIT = 10;
-const CANDIDATE_LIMIT = 25;
+const FALLBACK_CALL_LIMIT = 100;
 
 function asNumber(value: unknown): number {
   return Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -141,33 +141,41 @@ async function readPredictionContent(
   return content;
 }
 
-async function topDailyCallCandidates(
+async function dailyCallCandidates(
   db: FirebaseFirestore.Firestore,
   date: string,
-  order: "desc" | "asc",
 ): Promise<FirebaseFirestore.QueryDocumentSnapshot[]> {
   const snapshot = await db
     .collection("prediction_daily_marks")
     .where("date", "==", date)
-    .orderBy("scoreChange", order)
-    .limit(CANDIDATE_LIMIT)
+    .orderBy("directionDailyReturn", "desc")
+    .orderBy("scoreChange", "desc")
+    .orderBy("score", "desc")
+    .limit(TOP_CALL_LIMIT)
+    .get();
+
+  return snapshot.docs;
+}
+
+async function fallbackDailyCallCandidates(
+  db: FirebaseFirestore.Firestore,
+  date: string,
+): Promise<FirebaseFirestore.QueryDocumentSnapshot[]> {
+  const snapshot = await db
+    .collection("prediction_daily_marks")
+    .where("date", "==", date)
+    .orderBy("scoreChange", "desc")
+    .limit(FALLBACK_CALL_LIMIT)
     .get();
 
   return snapshot.docs;
 }
 
 async function topDailyCalls(db: FirebaseFirestore.Firestore, date: string): Promise<DailyCallHighlight[]> {
-  const [positiveCandidates, negativeCandidates] = await Promise.all([
-    topDailyCallCandidates(db, date, "desc"),
-    topDailyCallCandidates(db, date, "asc"),
-  ]);
-  const docsById = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
-
-  for (const doc of [...positiveCandidates, ...negativeCandidates]) {
-    docsById.set(doc.id, doc);
+  let candidateDocs = await dailyCallCandidates(db, date);
+  if (candidateDocs.length === 0) {
+    candidateDocs = await fallbackDailyCallCandidates(db, date);
   }
-
-  const candidateDocs = Array.from(docsById.values());
   const candidateData = candidateDocs.map((doc) => {
     const data = doc.data() as Record<string, unknown>;
 
@@ -200,17 +208,14 @@ async function topDailyCalls(db: FirebaseFirestore.Firestore, date: string): Pro
   })
     .filter((call) => call.predictionId && call.dailyScoreChange !== 0)
     .sort((a, b) => {
-      const positiveDelta = Number(b.dailyScoreChange > 0) - Number(a.dailyScoreChange > 0);
-      if (positiveDelta !== 0) {
-        return positiveDelta;
-      }
-
-      const positiveSort = b.dailyScoreChange - a.dailyScoreChange;
-      const fallbackSort = Math.abs(b.dailyScoreChange) - Math.abs(a.dailyScoreChange);
+      const dailyReturnSort = (b.dailyReturnChange ?? Number.NEGATIVE_INFINITY) -
+        (a.dailyReturnChange ?? Number.NEGATIVE_INFINITY);
+      const dailyScoreSort = b.dailyScoreChange - a.dailyScoreChange;
       const scoreSort = b.totalScore - a.totalScore;
       const createdSort = a.createdAt.localeCompare(b.createdAt);
 
-      return (a.dailyScoreChange > 0 || b.dailyScoreChange > 0 ? positiveSort : fallbackSort) ||
+      return dailyReturnSort ||
+        dailyScoreSort ||
         scoreSort ||
         createdSort ||
         a.predictionId.localeCompare(b.predictionId);

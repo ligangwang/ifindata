@@ -4,7 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import type { AiAnalystTheme } from "@/lib/ai-analyst/config";
-import { analystLevelName } from "@/lib/predictions/analytics";
 import type { PredictionDirection, PredictionStatus, PredictionTimeHorizon } from "@/lib/predictions/types";
 
 export type PredictionMarkFields = {
@@ -326,7 +325,7 @@ export function PredictionAuthorSummary({ author, className = "" }: { author: Pr
       {hasLevel ? (
         <>
           <span className="text-slate-500">&middot;</span>
-          <span>Level {Math.max(1, Math.floor(level))} &middot; {analystLevelName(level)}</span>
+          <span className="font-medium text-cyan-200">Level {Math.max(1, Math.floor(level))}</span>
         </>
       ) : null}
     </Link>

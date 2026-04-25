@@ -132,7 +132,8 @@ function predictionShareReturnText(prediction: PredictionDetail, returnText: str
 }
 
 function predictionUrl(predictionId: string): string {
-  return `https://youanalyst.com/predictions/${encodeURIComponent(predictionId)}`;
+  const origin = typeof window === "undefined" ? "https://youanalyst.com" : window.location.origin;
+  return `${origin}/predictions/${encodeURIComponent(predictionId)}`;
 }
 
 function predictionShareText(prediction: PredictionDetail, statusLabel: string, returnText: string): string {

@@ -4,10 +4,14 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 import { normalizeTicker } from "@/lib/predictions/types";
 import { noIndexRobots } from "@/lib/seo";
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function predictionMetadataTitle(ticker: string, thesisTitle: string, direction: string): string {
   const cleanTicker = ticker.replace(/^\$/, "");
   const trimmedTitle = thesisTitle.trim();
-  const duplicateTickerPattern = new RegExp(`^\\$?${cleanTicker}\\s*[:\\-–—]\\s*`, "i");
+  const duplicateTickerPattern = new RegExp(`^\\$?${escapeRegExp(cleanTicker)}\\s*[:\\-–—]\\s*`, "i");
   const titleWithoutTickerPrefix = trimmedTitle.replace(duplicateTickerPattern, "").trim();
 
   if (titleWithoutTickerPrefix) {

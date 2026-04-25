@@ -326,7 +326,7 @@ export function PredictionAuthorSummary({ author, className = "" }: { author: Pr
       {hasLevel ? (
         <>
           <span className="text-slate-500">&middot;</span>
-          <span>Level {Math.max(1, Math.floor(level))} &middot; {analystLevelName(level)}</span>
+          <span className="font-medium text-cyan-200">Level {Math.max(1, Math.floor(level))} &middot; {analystLevelName(level)}</span>
         </>
       ) : null}
     </Link>

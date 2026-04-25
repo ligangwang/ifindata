@@ -54,6 +54,7 @@ export async function generateMetadata({
         url: `/predictions/${id}`,
       },
       twitter: {
+        card: "summary_large_image",
         title,
         description,
       },

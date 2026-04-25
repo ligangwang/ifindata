@@ -102,8 +102,33 @@ function formatResultReturn(result: NonNullable<PredictionDetail["result"]>): st
   return formatReturnPercent(result.returnValue);
 }
 
-function predictionUrl(predictionId: string): string {
-  return `https://youanalyst.com/predictions/${encodeURIComponent(predictionId)}`;
+function parseDateOnly(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const [dateOnly] = value.split("T");
+  const timestamp = Date.parse(`${dateOnly}T00:00:00.000Z`);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function daysSinceCall(entryDate: string | null | undefined, markPriceDate: string | null | undefined): number | null {
+  const entryTimestamp = parseDateOnly(entryDate);
+  const markTimestamp = parseDateOnly(markPriceDate);
+  if (entryTimestamp === null || markTimestamp === null) {
+    return null;
+  }
+
+  return Math.max(0, Math.floor((markTimestamp - entryTimestamp) / (24 * 60 * 60 * 1000)));
+}
+
+function predictionShareReturnText(prediction: PredictionDetail, returnText: string): string {
+  if (typeof prediction.markReturnValue !== "number") {
+    return returnText;
+  }
+
+  const elapsedDays = daysSinceCall(prediction.entryDate, prediction.markPriceDate);
+  return elapsedDays === null ? returnText : `${returnText} (${elapsedDays}d)`;
 }
 
 function predictionShareText(prediction: PredictionDetail, statusLabel: string, returnText: string): string {
@@ -116,14 +141,12 @@ function predictionShareText(prediction: PredictionDetail, statusLabel: string, 
     `${direction} ${formatTickerSymbol(prediction.ticker)}`,
     title,
     `Status: ${statusLabel}`,
-    `Return: ${returnText}`,
+    `Return: ${predictionShareReturnText(prediction, returnText)}`,
   ];
 
   if (horizon) {
     lines.push(`Open until: ${horizon}`);
   }
-
-  lines.push("", "Full thesis and live track record:");
 
   return lines.join("\n");
 }
@@ -131,7 +154,6 @@ function predictionShareText(prediction: PredictionDetail, statusLabel: string, 
 function predictionShareUrl(prediction: PredictionDetail, statusLabel: string, returnText: string): string {
   const params = new URLSearchParams({
     text: predictionShareText(prediction, statusLabel, returnText),
-    url: predictionUrl(prediction.id),
   });
 
   return `https://twitter.com/intent/tweet?${params.toString()}`;

@@ -47,11 +47,18 @@ function percentFromReturnValue(value: unknown): number | null {
 }
 
 function dailyReturnChange(data: Record<string, unknown>): number | null {
-  if (data.isMissingPreviousDailyReturn === true) {
+  const directionDailyReturn = asNumberOrNull(data.directionDailyReturn);
+  if (directionDailyReturn !== null) {
+    return directionDailyReturn * 100;
+  }
+
+  const tickerDailyReturn = asNumberOrNull(data.tickerDailyReturn);
+  const direction = directionValue(data.direction);
+  if (tickerDailyReturn === null || direction === null) {
     return null;
   }
 
-  return percentFromReturnValue(data.returnValueChange);
+  return (direction === "UP" ? tickerDailyReturn : -tickerDailyReturn) * 100;
 }
 
 function asString(value: unknown): string | null {

@@ -1,4 +1,4 @@
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldPath } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
   computePredictionOutcome,
@@ -52,6 +52,9 @@ export type EodPrice = {
   micCode: string | null;
   loadedAt: string;
   isFinal: true;
+  previousClose: number | null;
+  previousTradingDate: string | null;
+  dailyReturn: number | null;
 };
 
 export type DailyEodMaintenanceResult = {
@@ -69,7 +72,7 @@ export type DailyEodMaintenanceResult = {
     loaded: number;
     failed: number;
     skipped: number;
-    prices: Array<Pick<EodPrice, "ticker" | "tradingDate" | "close" | "source">>;
+    prices: Array<Pick<EodPrice, "ticker" | "tradingDate" | "close" | "source" | "previousClose" | "previousTradingDate" | "dailyReturn">>;
     failures: Array<{ ticker: string; reason: string }>;
   };
   marking: {
@@ -265,6 +268,9 @@ function toCachedEodPrice(data: FirebaseFirestore.DocumentData | undefined): Eod
     micCode: typeof data.micCode === "string" ? data.micCode : null,
     loadedAt: typeof data.loadedAt === "string" ? data.loadedAt : new Date().toISOString(),
     isFinal: true,
+    previousClose: toFiniteNumber(data.previousClose),
+    previousTradingDate: typeof data.previousTradingDate === "string" ? data.previousTradingDate : null,
+    dailyReturn: toFiniteNumber(data.dailyReturn),
   };
 }
 
@@ -337,7 +343,67 @@ function parseTwelveDataPrice(
     micCode: payload.meta?.mic_code ?? null,
     loadedAt,
     isFinal: true,
+    previousClose: null,
+    previousTradingDate: null,
+    dailyReturn: null,
   };
+}
+
+async function readPreviousEodPrice(
+  db: FirebaseFirestore.Firestore,
+  price: Pick<EodPrice, "market" | "ticker" | "tradingDate">,
+): Promise<Pick<EodPrice, "close" | "tradingDate"> | null> {
+  const prefix = [price.market, price.ticker, ""].join("_");
+  const snapshot = await db
+    .collection("eod_prices")
+    .where(FieldPath.documentId(), ">=", prefix)
+    .where(FieldPath.documentId(), "<", eodPriceDocId(price.ticker, price.tradingDate, price.market))
+    .orderBy(FieldPath.documentId(), "desc")
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) {
+    return null;
+  }
+
+  const previous = toCachedEodPrice(snapshot.docs[0].data());
+  if (!previous || previous.close <= 0) {
+    return null;
+  }
+
+  return {
+    close: previous.close,
+    tradingDate: previous.tradingDate,
+  };
+}
+
+async function withTickerDailyReturns(db: FirebaseFirestore.Firestore, prices: EodPrice[]): Promise<EodPrice[]> {
+  return Promise.all(prices.map(async (price) => {
+    const previous = await readPreviousEodPrice(db, price);
+    if (!previous) {
+      return {
+        ...price,
+        previousClose: null,
+        previousTradingDate: null,
+        dailyReturn: null,
+      };
+    }
+
+    return {
+      ...price,
+      previousClose: previous.close,
+      previousTradingDate: previous.tradingDate,
+      dailyReturn: (price.close - previous.close) / previous.close,
+    };
+  }));
+}
+
+function directionAdjustedDailyReturn(direction: unknown, price: EodPrice): number | null {
+  if (price.dailyReturn === null || !isPredictionDirection(direction)) {
+    return null;
+  }
+
+  return direction === "UP" ? price.dailyReturn : -price.dailyReturn;
 }
 
 async function fetchTwelveDataEodPrices(
@@ -625,6 +691,24 @@ function countMarksByStatus(
   statuses: PredictionStatus[],
 ): number {
   return marks.filter((mark) => mark.status && statuses.includes(mark.status)).length;
+}
+
+function userStatsCounter(data: FirebaseFirestore.DocumentData | undefined, key: string): number {
+  const stats = (data?.stats as Record<string, unknown> | undefined) ?? {};
+  const parsed = Number(stats[key]);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function userStatsCounterUpdates(
+  data: FirebaseFirestore.DocumentData | undefined,
+  deltas: Record<string, number>,
+): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(deltas).map(([key, delta]) => [
+      `stats.${key}`,
+      Math.max(0, userStatsCounter(data, key) + delta),
+    ]),
+  );
 }
 
 async function readPreviousPredictionDailyScore(
@@ -1006,12 +1090,16 @@ export async function runDailyEodMaintenance(
 
       const tickersToFetch = requestedTickers.filter((ticker) => !cachedPrices.has(ticker));
       const fetched = await fetchTwelveDataEodPrices(tickersToFetch, runDate, nowIso);
+      const loadedPrices = await withTickerDailyReturns(db, [...cachedPrices.values(), ...fetched.prices]);
       priceLoad.loaded = fetched.prices.length;
       priceLoad.failed = fetched.failures.length;
-      priceLoad.prices = [...cachedPrices.values(), ...fetched.prices].map((price) => ({
+      priceLoad.prices = loadedPrices.map((price) => ({
         ticker: price.ticker,
         tradingDate: price.tradingDate,
         close: price.close,
+        previousClose: price.previousClose,
+        previousTradingDate: price.previousTradingDate,
+        dailyReturn: price.dailyReturn,
         source: price.source,
       }));
       priceLoad.failures = fetched.failures;
@@ -1027,7 +1115,7 @@ export async function runDailyEodMaintenance(
         failures: priceLoad.failures,
       });
 
-      for (const price of fetched.prices) {
+      for (const price of loadedPrices) {
         priceByTicker.set(price.ticker, price);
         if (!dryRun) {
           await db
@@ -1129,9 +1217,11 @@ export async function runDailyEodMaintenance(
               .collection("prediction_daily_marks")
               .doc(predictionDailyMarkDocId(prediction.id, price.tradingDate));
             const tickerLockRef = activeTickerLockRef(db, prediction.userId, prediction.ticker);
-            const [dailyMarkSnapshot, tickerLockSnapshot] = await Promise.all([
+            const userRef = db.collection("users").doc(prediction.userId);
+            const [dailyMarkSnapshot, tickerLockSnapshot, userSnapshot] = await Promise.all([
               tx.get(dailyMarkRef),
               tx.get(tickerLockRef),
+              tx.get(userRef),
             ]);
             if (tickerLockSnapshot.exists && tickerLockSnapshot.get("predictionId") !== prediction.id) {
               marking.skipped += 1;
@@ -1152,10 +1242,12 @@ export async function runDailyEodMaintenance(
               entryTime: "16:00:00",
               entryCapturedAt: price.loadedAt,
             });
-            tx.update(db.collection("users").doc(prediction.userId), {
+            tx.update(userRef, {
               updatedAt: nowIso,
-              "stats.openingPredictions": FieldValue.increment(-1),
-              "stats.openPredictions": FieldValue.increment(1),
+              ...userStatsCounterUpdates(userSnapshot.data(), {
+                openingPredictions: -1,
+                openPredictions: 1,
+              }),
             });
             tx.set(tickerLockRef, {
               predictionId: prediction.id,
@@ -1187,6 +1279,8 @@ export async function runDailyEodMaintenance(
               scoreChange: 0,
               previousReturnValue: 0,
               returnValueChange: 0,
+              tickerDailyReturn: price.dailyReturn,
+              directionDailyReturn: directionAdjustedDailyReturn(latest.direction, price),
               isClosed: false,
               createdAt: dailyMarkSnapshot.get("createdAt") ?? nowIso,
               updatedAt: nowIso,
@@ -1229,8 +1323,13 @@ export async function runDailyEodMaintenance(
           const openUntilTickerLockRef = shouldCloseForOpenUntil
             ? activeTickerLockRef(db, prediction.userId, prediction.ticker)
             : null;
+          const userRef = db.collection("users").doc(prediction.userId);
+          const needsUserCounterUpdate = latestStatus === "CLOSING" || shouldCloseForOpenUntil;
           const openUntilTickerLockSnapshot = openUntilTickerLockRef
             ? await tx.get(openUntilTickerLockRef)
+            : null;
+          const userSnapshot = needsUserCounterUpdate
+            ? await tx.get(userRef)
             : null;
           const previousScoreValue = recompute
             ? previousDaily.score
@@ -1283,6 +1382,8 @@ export async function runDailyEodMaintenance(
             previousReturnValue,
             returnValueChange: dailyReturnValueChange,
             isMissingPreviousDailyReturn,
+            tickerDailyReturn: price.dailyReturn,
+            directionDailyReturn: directionAdjustedDailyReturn(latest.direction, price),
             isClosed: nextStatus === "SETTLED",
             createdAt: dailyMarkSnapshot.get("createdAt") ?? nowIso,
             updatedAt: nowIso,
@@ -1313,10 +1414,12 @@ export async function runDailyEodMaintenance(
               xpEarned: mark.xpEarned,
               result,
             });
-            tx.update(db.collection("users").doc(prediction.userId), {
+            tx.update(userRef, {
               updatedAt: nowIso,
-              "stats.closingPredictions": FieldValue.increment(-1),
-              "stats.closedPredictions": FieldValue.increment(1),
+              ...userStatsCounterUpdates(userSnapshot?.data(), {
+                closingPredictions: -1,
+                closedPredictions: 1,
+              }),
             });
             marking.marked += 1;
             marking.closed += 1;
@@ -1339,10 +1442,12 @@ export async function runDailyEodMaintenance(
               xpEarned: mark.xpEarned,
               result,
             });
-            tx.update(db.collection("users").doc(prediction.userId), {
+            tx.update(userRef, {
               updatedAt: nowIso,
-              "stats.openPredictions": FieldValue.increment(-1),
-              "stats.closedPredictions": FieldValue.increment(1),
+              ...userStatsCounterUpdates(userSnapshot?.data(), {
+                openPredictions: -1,
+                closedPredictions: 1,
+              }),
             });
             if (
               openUntilTickerLockRef &&

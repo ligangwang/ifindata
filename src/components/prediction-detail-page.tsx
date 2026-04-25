@@ -133,7 +133,11 @@ function predictionShareReturnText(prediction: PredictionDetail, returnText: str
 
 function predictionUrl(predictionId: string): string {
   const origin = typeof window === "undefined" ? "https://youanalyst.com" : window.location.origin;
-  return `${origin}/predictions/${encodeURIComponent(predictionId)}`;
+  const url = new URL(`/predictions/${encodeURIComponent(predictionId)}`, origin);
+  url.searchParams.set("utm_source", "x");
+  url.searchParams.set("utm_medium", "social");
+  url.searchParams.set("utm_campaign", "prediction_share");
+  return url.toString();
 }
 
 function predictionShareText(prediction: PredictionDetail, statusLabel: string, returnText: string): string {

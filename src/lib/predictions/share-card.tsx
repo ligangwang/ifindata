@@ -201,11 +201,6 @@ function shareCardImage(prediction: ShareCardPrediction) {
             </div>
           </div>
         ) : null}
-        {prediction.authorNickname ? (
-          <div style={{ color: "#cbd5e1", display: "flex", fontSize: 28, marginTop: 18 }}>
-            {prediction.authorNickname}
-          </div>
-        ) : null}
       </div>
     </div>
   );

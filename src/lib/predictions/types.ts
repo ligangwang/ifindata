@@ -52,6 +52,9 @@ export type UserProfile = {
   settings: {
     isPublic: boolean;
   };
+  billing?: {
+    plan: "FREE" | "PRO";
+  };
 };
 
 export type PredictionResult = {

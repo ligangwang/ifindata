@@ -1,5 +1,5 @@
 import { FieldValue } from "firebase-admin/firestore";
-import { areProFeaturesEnabled } from "@/lib/features";
+import { areProFeaturesEnabled, canUseProFeaturesForUserData } from "@/lib/features";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
   canonicalPredictionStatus,
@@ -333,6 +333,11 @@ export async function createWatchlist(input: CreateWatchlistInput, user: AuthedU
       throw new Error("User profile not found. Complete bootstrap first.");
     }
 
+    const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+    if (!isPublic && !canUseProFeaturesForUserData(userData)) {
+      throw new Error("Private watchlists are part of Pro. Upgrade to create one.");
+    }
+
     const activeCount = existingSnapshot.docs.filter((doc) => !trimString(doc.get("archivedAt"))).length;
     if (activeCount >= MAX_WATCHLISTS_PER_USER) {
       throw new Error(`watchlist limit reached. You can create up to ${MAX_WATCHLISTS_PER_USER} watchlists.`);
@@ -371,9 +376,16 @@ export async function updateWatchlist(
   }
 
   await db.runTransaction(async (tx) => {
-    const watchlistSnapshot = await tx.get(watchlistRef);
+    const userRef = db.collection("users").doc(user.uid);
+    const [watchlistSnapshot, userSnapshot] = await Promise.all([
+      tx.get(watchlistRef),
+      tx.get(userRef),
+    ]);
     if (!watchlistSnapshot.exists) {
       throw new Error("Watchlist not found");
+    }
+    if (!userSnapshot.exists) {
+      throw new Error("User profile not found. Complete bootstrap first.");
     }
 
     const watchlist = mapWatchlistDoc(watchlistSnapshot);
@@ -387,6 +399,11 @@ export async function updateWatchlist(
 
     if (watchlist.isPublic && !isPublic) {
       throw new Error("Public watchlists cannot be made private. Close any predictions you no longer want to continue publicly and use a private watchlist for new ideas.");
+    }
+
+    const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+    if (!isPublic && !canUseProFeaturesForUserData(userData)) {
+      throw new Error("Private watchlists are part of Pro. Upgrade to use them.");
     }
 
     tx.update(watchlistRef, {
@@ -479,9 +496,16 @@ export async function movePredictionToWatchlist(
   let movedWatchlistName = "";
 
   await db.runTransaction(async (tx) => {
-    const predictionSnapshot = await tx.get(predictionRef);
+    const userRef = db.collection("users").doc(user.uid);
+    const [predictionSnapshot, userSnapshot] = await Promise.all([
+      tx.get(predictionRef),
+      tx.get(userRef),
+    ]);
     if (!predictionSnapshot.exists) {
       throw new Error("Prediction not found");
+    }
+    if (!userSnapshot.exists) {
+      throw new Error("User profile not found. Complete bootstrap first.");
     }
 
     const prediction = predictionSnapshot.data() as Prediction;
@@ -495,6 +519,10 @@ export async function movePredictionToWatchlist(
     }
 
     const watchlist = await assertWatchlistCanReceivePrediction(tx, watchlistRef, user.uid);
+    const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+    if (!watchlist.isPublic && !canUseProFeaturesForUserData(userData)) {
+      throw new Error("Private watchlists are part of Pro. Upgrade to use them.");
+    }
     if (prediction.visibility === "PUBLIC" && !watchlist.isPublic) {
       throw new Error("Public predictions cannot be moved into private watchlists. Close the prediction if you no longer want to continue it publicly.");
     }

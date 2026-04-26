@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       message.includes("must") ||
       message.includes("Invalid") ||
       message.includes("enabled") ||
+      /part of pro|upgrade/i.test(message) ||
       message.includes("limit")
         ? 400
         : 500;

@@ -51,6 +51,8 @@ type AuthProviderProps = {
 const DEFAULT_FEATURES: AppFeatures = {
   proFeaturesEnabled: false,
   billingEnabled: false,
+  proBillingBypass: false,
+  canUsePro: false,
 };
 
 function toMessage(error: unknown, fallback: string): string {

@@ -86,9 +86,10 @@ export async function POST(request: NextRequest) {
       ? 409
       :
         message.includes("required") ||
-          message.includes("must") ||
+        message.includes("must") ||
           message.includes("Invalid") ||
           message.includes("enabled") ||
+          /part of pro|upgrade/i.test(message) ||
           message.includes("future")
         ? 400
         : 500;

@@ -55,6 +55,7 @@ type PredictionDetail = {
 type WatchlistOption = {
   id: string;
   name: string;
+  isPublic: boolean;
 };
 
 type PredictionComment = {
@@ -293,8 +294,10 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
     }
 
     let cancelled = false;
-    void fetch(`/api/watchlists?userId=${encodeURIComponent(user.uid)}`)
-      .then(async (response) => {
+    void getIdToken()
+      .then(async (token) => {
+        const headers = token ? { authorization: `Bearer ${token}` } : undefined;
+        const response = await fetch(`/api/watchlists?userId=${encodeURIComponent(user.uid)}`, { headers });
         if (!response.ok) {
           throw new Error("Unable to load watchlists.");
         }
@@ -316,7 +319,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
     return () => {
       cancelled = true;
     };
-  }, [prediction, user]);
+  }, [getIdToken, prediction, user]);
 
   async function submitComment() {
     if (!commentText.trim()) {
@@ -804,7 +807,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
               >
                 {ownerWatchlists.map((watchlist) => (
                   <option key={watchlist.id} value={watchlist.id}>
-                    {watchlist.name}
+                    {watchlist.name}{watchlist.isPublic ? "" : " (Private)"}
                   </option>
                 ))}
               </select>
@@ -817,6 +820,11 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
                 {moveSaving ? "Moving..." : "Move"}
               </button>
             </div>
+            {ownerWatchlists.find((watchlist) => watchlist.id === moveWatchlistId)?.isPublic === false ? (
+              <p className="text-xs text-amber-200">
+                Moving this prediction into a private watchlist will make the prediction private too.
+              </p>
+            ) : null}
           </div>
         ) : null}
 

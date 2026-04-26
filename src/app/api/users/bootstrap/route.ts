@@ -1,4 +1,5 @@
 import { getAdminFirestore, verifyIdToken } from "@/lib/firebase/admin";
+import { getAppFeatures } from "@/lib/features";
 import { NextRequest, NextResponse } from "next/server";
 
 type BootstrapRequest = {
@@ -22,12 +23,13 @@ export async function POST(request: NextRequest) {
   try {
     const decoded = await verifyIdToken(token);
     const payload = (await request.json().catch(() => ({}))) as BootstrapRequest;
+    const features = getAppFeatures();
     const db = getAdminFirestore();
     const userRef = db.collection("users").doc(decoded.uid);
     const userSnapshot = await userRef.get();
 
     if (userSnapshot.exists) {
-      return NextResponse.json({ created: false });
+      return NextResponse.json({ created: false, features });
     }
 
     await userRef.set({
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ created: true });
+    return NextResponse.json({ created: true, features });
   } catch (error) {
     console.error("Failed to bootstrap user profile:", error);
     return NextResponse.json({ error: "Failed to bootstrap user profile" }, { status: 500 });

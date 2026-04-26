@@ -22,12 +22,14 @@ import {
 } from "react";
 import { FirebaseError } from "firebase/app";
 import { getFirebaseServices, isFirebaseConfigured } from "@/lib/firebase/client";
+import type { AppFeatures } from "@/lib/features";
 
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
   configured: boolean;
   error: string | null;
+  features: AppFeatures;
   signInWithGoogle: () => Promise<AuthActionResult>;
   signInWithEmail: (email: string, password: string) => Promise<AuthActionResult>;
   createAccountWithEmail: (email: string, password: string) => Promise<AuthActionResult>;
@@ -44,6 +46,11 @@ type AuthActionResult = {
 
 type AuthProviderProps = {
   children: ReactNode;
+};
+
+const DEFAULT_FEATURES: AppFeatures = {
+  proFeaturesEnabled: false,
+  billingEnabled: false,
 };
 
 function toMessage(error: unknown, fallback: string): string {
@@ -94,6 +101,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(() => configured);
   const [error, setError] = useState<string | null>(null);
+  const [features, setFeatures] = useState<AppFeatures>(DEFAULT_FEATURES);
 
   const bootstrapUserProfile = useCallback(async (nextUser: User) => {
     const token = await nextUser.getIdToken();
@@ -114,7 +122,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       throw new Error("Unable to create user profile.");
     }
 
-    return (await response.json()) as { created: boolean };
+    return (await response.json()) as { created: boolean; features?: AppFeatures };
   }, []);
 
   useEffect(() => {
@@ -128,12 +136,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoading(false);
 
       if (!nextUser) {
+        setFeatures(DEFAULT_FEATURES);
         return;
       }
 
-      void bootstrapUserProfile(nextUser).catch((nextError) => {
-        setError(toMessage(nextError, "Unable to create user profile."));
-      });
+      void bootstrapUserProfile(nextUser)
+        .then((payload) => {
+          setFeatures(payload.features ?? DEFAULT_FEATURES);
+        })
+        .catch((nextError) => {
+          setError(toMessage(nextError, "Unable to create user profile."));
+        });
     });
 
     void setPersistence(auth, browserLocalPersistence).catch((nextError) => {
@@ -155,7 +168,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const { auth, googleProvider } = getFirebaseServices();
       const credential = await signInWithPopup(auth, googleProvider);
       const additionalUserInfo = getAdditionalUserInfo(credential);
-      await bootstrapUserProfile(credential.user);
+      const payload = await bootstrapUserProfile(credential.user);
+      setFeatures(payload.features ?? DEFAULT_FEATURES);
 
       return {
         user: credential.user,
@@ -185,7 +199,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         const { auth } = getFirebaseServices();
         const credential = await signInWithEmailAndPassword(auth, email, password);
-        await bootstrapUserProfile(credential.user);
+        const payload = await bootstrapUserProfile(credential.user);
+        setFeatures(payload.features ?? DEFAULT_FEATURES);
 
         return {
           user: credential.user,
@@ -212,7 +227,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         const { auth } = getFirebaseServices();
         const credential = await createUserWithEmailAndPassword(auth, email, password);
-        await bootstrapUserProfile(credential.user);
+        const payload = await bootstrapUserProfile(credential.user);
+        setFeatures(payload.features ?? DEFAULT_FEATURES);
 
         return {
           user: credential.user,
@@ -238,6 +254,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const { auth } = getFirebaseServices();
       await firebaseSignOut(auth);
       setUser(null);
+      setFeatures(DEFAULT_FEATURES);
     } catch (nextError) {
       const friendly = friendlyError(nextError, "Sign-out failed.");
       setError(friendly.message);
@@ -258,6 +275,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       loading,
       configured,
       error,
+      features,
       signInWithGoogle,
       signInWithEmail,
       createAccountWithEmail,
@@ -269,6 +287,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       loading,
       configured,
       error,
+      features,
       signInWithGoogle,
       signInWithEmail,
       createAccountWithEmail,

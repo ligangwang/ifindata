@@ -37,6 +37,7 @@ type WatchlistSummary = {
   id: string;
   name: string;
   description?: string | null;
+  isPublic: boolean;
   metrics: WatchlistMetrics;
 };
 
@@ -45,6 +46,7 @@ type WatchlistDetail = {
   userId: string;
   name: string;
   description?: string | null;
+  isPublic: boolean;
   metrics: WatchlistMetrics;
   livePredictions: WatchlistPrediction[];
   settledPredictions: WatchlistPrediction[];
@@ -114,7 +116,7 @@ function WatchlistPredictionRow({ prediction }: { prediction: WatchlistPredictio
 }
 
 export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = {}) {
-  const { user, loading: authLoading, getIdToken } = useAuth();
+  const { user, loading: authLoading, getIdToken, features } = useAuth();
   const [watchlists, setWatchlists] = useState<WatchlistSummary[]>([]);
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | null>(null);
   const [watchlist, setWatchlist] = useState<WatchlistDetail | null>(null);
@@ -125,10 +127,12 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
   const [composerOpen, setComposerOpen] = useState(false);
   const [newWatchlistName, setNewWatchlistName] = useState("");
   const [newWatchlistDescription, setNewWatchlistDescription] = useState("");
+  const [newWatchlistIsPublic, setNewWatchlistIsPublic] = useState(true);
   const [creatingWatchlist, setCreatingWatchlist] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editIsPublic, setEditIsPublic] = useState(true);
   const [saving, setSaving] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddUpTickers, setQuickAddUpTickers] = useState("");
@@ -136,6 +140,7 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
   const [quickAddSubmitting, setQuickAddSubmitting] = useState(false);
   const [quickAddMessage, setQuickAddMessage] = useState<string | null>(null);
   const watchlistRequestIdRef = useRef(0);
+  const proFeaturesEnabled = features.proFeaturesEnabled;
 
   const selectedSummary = useMemo(
     () => watchlists.find((item) => item.id === selectedWatchlistId) ?? null,
@@ -159,7 +164,9 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
     setError(null);
 
     try {
-      const response = await fetch(`/api/watchlists/${nextWatchlistId}`);
+      const token = await getIdToken();
+      const headers = token ? { authorization: `Bearer ${token}` } : undefined;
+      const response = await fetch(`/api/watchlists/${nextWatchlistId}`, { headers });
       if (!response.ok) {
         throw new Error("Unable to load watchlist.");
       }
@@ -171,6 +178,7 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
       setWatchlist(payload.watchlist);
       setEditName(payload.watchlist.name);
       setEditDescription(payload.watchlist.description ?? "");
+      setEditIsPublic(payload.watchlist.isPublic);
     } catch (nextError) {
       if (watchlistRequestIdRef.current !== requestId) {
         return;
@@ -189,7 +197,9 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
     setError(null);
 
     try {
-      const response = await fetch(`/api/watchlists?userId=${encodeURIComponent(ownerId)}`);
+      const token = await getIdToken();
+      const headers = token ? { authorization: `Bearer ${token}` } : undefined;
+      const response = await fetch(`/api/watchlists?userId=${encodeURIComponent(ownerId)}`, { headers });
       if (!response.ok) {
         throw new Error("Unable to load watchlists.");
       }
@@ -210,12 +220,14 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
         setWatchlist(null);
         setEditName("");
         setEditDescription("");
+        setEditIsPublic(true);
       }
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to load watchlists.");
       setWatchlists([]);
       setSelectedWatchlistId(null);
       setWatchlist(null);
+      setEditIsPublic(true);
     } finally {
       setLoadingWorkspace(false);
     }
@@ -233,6 +245,8 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
       setWatchlist(null);
       setEditName("");
       setEditDescription("");
+      setNewWatchlistIsPublic(true);
+      setEditIsPublic(true);
       setComposerOpen(false);
       setEditing(false);
       setQuickAddOpen(false);
@@ -281,6 +295,7 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
         body: JSON.stringify({
           name,
           description: description || null,
+          isPublic: proFeaturesEnabled ? newWatchlistIsPublic : true,
         }),
       });
 
@@ -291,6 +306,7 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
 
       setNewWatchlistName("");
       setNewWatchlistDescription("");
+      setNewWatchlistIsPublic(true);
       setComposerOpen(false);
       await loadWorkspace(user.uid, payload.id);
     } catch (nextError) {
@@ -307,6 +323,7 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
 
     setEditName(watchlist.name);
     setEditDescription(watchlist.description ?? "");
+    setEditIsPublic(watchlist.isPublic);
     setEditing(true);
     setError(null);
   }
@@ -335,6 +352,7 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
         body: JSON.stringify({
           name: editName,
           description: editDescription,
+          isPublic: proFeaturesEnabled ? editIsPublic : true,
         }),
       });
 
@@ -414,7 +432,6 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
               thesisTitle: "",
               thesis: "",
               timeHorizon: null,
-              visibility: "PUBLIC",
             }),
           });
 
@@ -465,7 +482,7 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
     const content = (
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-6 text-center shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
         <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">My Watchlists</h1>
-        <p className="mt-3 text-sm text-slate-300">Sign in to create watchlists, organize predictions, and manage your public research workspace.</p>
+        <p className="mt-3 text-sm text-slate-300">Sign in to create watchlists, organize predictions, and manage your research workspace.</p>
         <Link
           href="/auth"
           className="mt-6 inline-flex rounded-full bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
@@ -498,7 +515,9 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
             <p className="text-sm font-medium uppercase tracking-wide text-cyan-300">Workspace</p>
             <h1 className="mt-2 font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">My Watchlists</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-              Create, edit, and review the public watchlists that organize your predictions.
+              {proFeaturesEnabled
+                ? "Create, edit, and review the public and private watchlists that organize your predictions."
+                : "Create, edit, and review the public watchlists that organize your predictions."}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -551,6 +570,27 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
                 {creatingWatchlist ? "Creating..." : "Create"}
               </button>
             </div>
+            {proFeaturesEnabled ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <span className="text-xs text-slate-400">New watchlist visibility</span>
+                <div className="inline-flex rounded-full border border-slate-700 bg-slate-900/70 p-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setNewWatchlistIsPublic(true)}
+                    className={`rounded-full px-3 py-1.5 transition ${newWatchlistIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"}`}
+                  >
+                    Public
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewWatchlistIsPublic(false)}
+                    className={`rounded-full px-3 py-1.5 transition ${!newWatchlistIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"}`}
+                  >
+                    Private
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -572,7 +612,7 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
                       : "border border-white/10 text-slate-300 hover:border-cyan-300/40 hover:text-cyan-100"
                   }`}
                 >
-                  {item.name}
+                  {item.name}{item.isPublic ? "" : " (Private)"}
                 </button>
               ))}
             </div>
@@ -603,6 +643,27 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
                       className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
                     />
                   </div>
+                  {proFeaturesEnabled ? (
+                    <div className="grid gap-1">
+                      <span className="text-xs text-slate-400">Visibility</span>
+                      <div className="inline-flex w-fit rounded-full border border-slate-700 bg-slate-900/70 p-1 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setEditIsPublic(true)}
+                          className={`rounded-full px-3 py-1.5 transition ${editIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"}`}
+                        >
+                          Public
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditIsPublic(false)}
+                          className={`rounded-full px-3 py-1.5 transition ${!editIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"}`}
+                        >
+                          Private
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -618,6 +679,7 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
                         setEditing(false);
                         setEditName(watchlist?.name ?? selectedSummary.name);
                         setEditDescription(watchlist?.description ?? selectedSummary.description ?? "");
+                        setEditIsPublic(watchlist?.isPublic ?? selectedSummary.isPublic);
                       }}
                       disabled={saving}
                       className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-slate-200 hover:border-white/30 disabled:opacity-60"
@@ -633,12 +695,17 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
                       <h2 className="font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
                         {selectedSummary.name}
                       </h2>
-                      <Link
-                        href={`/analysts/${user.uid}/watchlists/${selectedSummary.id}`}
-                        className="text-xs font-medium text-cyan-300 hover:text-cyan-100"
-                      >
-                        View public page
-                      </Link>
+                      <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-300">
+                        {selectedSummary.isPublic ? "Public" : "Private"}
+                      </span>
+                      {selectedSummary.isPublic ? (
+                        <Link
+                          href={`/analysts/${user.uid}/watchlists/${selectedSummary.id}`}
+                          className="text-xs font-medium text-cyan-300 hover:text-cyan-100"
+                        >
+                          View public page
+                        </Link>
+                      ) : null}
                     </div>
                     {selectedSummary.description ? (
                       <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{selectedSummary.description}</p>
@@ -682,6 +749,11 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
                     <p className="mt-1 text-sm text-slate-300">
                       Enter comma-separated tickers by direction. Thesis is optional, so these predictions will be created without a title or thesis.
                     </p>
+                    {!selectedSummary.isPublic ? (
+                      <p className="mt-2 text-xs text-amber-200">
+                        This watchlist is private, so quick-added predictions will be private too.
+                      </p>
+                    ) : null}
                   </div>
                   <div className="grid gap-3">
                     <div className="grid gap-1">

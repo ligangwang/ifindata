@@ -500,6 +500,7 @@ export async function createPredictionForUser(
         }
       : null;
     await assertOpenUntilAfterLatestEod(input.ticker, timeHorizon);
+    const visibility = watchlist.isPublic ? "PUBLIC" : "PRIVATE";
     const prediction: Prediction = {
       userId: user.uid,
       authorDisplayName:
@@ -521,7 +522,7 @@ export async function createPredictionForUser(
       thesis: sanitizePredictionThesis(input.thesis),
       timeHorizon,
       status: "CREATED",
-      visibility: input.visibility ?? "PUBLIC",
+      visibility,
       commentCount: 0,
       createdAt: nowIso,
       updatedAt: nowIso,

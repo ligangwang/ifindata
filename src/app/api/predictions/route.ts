@@ -88,6 +88,7 @@ export async function POST(request: NextRequest) {
         message.includes("required") ||
           message.includes("must") ||
           message.includes("Invalid") ||
+          message.includes("enabled") ||
           message.includes("future")
         ? 400
         : 500;

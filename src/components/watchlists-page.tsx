@@ -21,12 +21,13 @@ export function WatchlistsPage({
   initialTab?: string | null;
 }) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, features } = useAuth();
   const [activeTab, setActiveTab] = useState<WatchlistsTab>(normalizeTab(initialTab));
   const communityWatchlists = useMemo(
     () => publicWatchlists.filter((watchlist) => !user || watchlist.owner.id !== user.uid),
     [publicWatchlists, user],
   );
+  const proFeaturesEnabled = features.proFeaturesEnabled;
 
   useEffect(() => {
     setActiveTab(normalizeTab(initialTab));
@@ -44,7 +45,9 @@ export function WatchlistsPage({
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">Watchlists</h1>
             <p className="mt-1 max-w-3xl text-sm text-slate-300">
-              Browse top-performing community watchlists or manage your own public research workspace.
+              {proFeaturesEnabled
+                ? "Browse top-performing community watchlists or manage your own public and private research workspace."
+                : "Browse top-performing community watchlists or manage your own public research workspace."}
             </p>
           </div>
         </div>

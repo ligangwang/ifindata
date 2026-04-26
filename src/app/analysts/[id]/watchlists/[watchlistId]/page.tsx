@@ -30,7 +30,7 @@ export async function generateMetadata({
       ? user.settings as Record<string, unknown>
       : null;
 
-    if (watchlist.userId !== id || settings?.isPublic === false || watchlist.archivedAt) {
+    if (watchlist.userId !== id || watchlist.isPublic === false || settings?.isPublic === false || watchlist.archivedAt) {
       return {
         title: "Watchlist not found | YouAnalyst",
         robots: noIndexRobots(),

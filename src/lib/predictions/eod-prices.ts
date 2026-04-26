@@ -580,6 +580,7 @@ function finiteNumberOrNull(value: unknown): number | null {
 function buildMarkUpdate(
   price: EodPrice,
   mark: { returnValue: number; score: number; outcome: number; xpEarned: number },
+  scoreAppliedToUser: boolean,
   nowIso: string,
 ) {
   return {
@@ -591,7 +592,7 @@ function buildMarkUpdate(
     markReturnValue: mark.returnValue,
     markScore: mark.score,
     markPredictionScore: mark.score,
-    scoreAppliedToUser: null,
+    scoreAppliedToUser,
   };
 }
 
@@ -673,8 +674,9 @@ function markSummaryFromDoc(doc: FirebaseFirestore.QueryDocumentSnapshot): {
   const predictionId = typeof data.predictionId === "string" ? data.predictionId : "";
   const score = finiteNumberOrNull(data.score);
   const scoreChange = finiteNumberOrNull(data.scoreChange);
+  const scoreAppliedToUser = data.scoreAppliedToUser !== false && data.visibility !== "PRIVATE";
 
-  if (!predictionId || score === null || scoreChange === null) {
+  if (!predictionId || score === null || scoreChange === null || !scoreAppliedToUser) {
     return null;
   }
 
@@ -1263,6 +1265,7 @@ export async function runDailyEodMaintenance(
               predictionCreatedAt: prediction.createdAt,
               userId: prediction.userId,
               ticker: prediction.ticker,
+              visibility: latest.visibility === "PRIVATE" ? "PRIVATE" : "PUBLIC",
               direction: latest.direction,
               date: price.tradingDate,
               runDate,
@@ -1276,6 +1279,7 @@ export async function runDailyEodMaintenance(
               markScore: 0,
               markPredictionScore: 0,
               score: 0,
+              scoreAppliedToUser: latest.visibility === "PUBLIC",
               previousScore: 0,
               scoreChange: 0,
               previousReturnValue: 0,
@@ -1308,15 +1312,16 @@ export async function runDailyEodMaintenance(
             return;
           }
 
-          const entryUpdate = prediction.entryDate === price.tradingDate
-            ? {
-                entryPrice: price.close,
-                entryPriceSource: price.source,
-                entryCapturedAt: price.loadedAt,
-              }
-            : {};
-          const markUpdate = buildMarkUpdate(price, mark, nowIso);
-          const previousDaily = await readPreviousPredictionDailyScore(db, prediction.id, price.tradingDate);
+            const entryUpdate = prediction.entryDate === price.tradingDate
+              ? {
+                  entryPrice: price.close,
+                  entryPriceSource: price.source,
+                  entryCapturedAt: price.loadedAt,
+                }
+              : {};
+            const scoreAppliedToUser = latest.visibility === "PUBLIC";
+            const markUpdate = buildMarkUpdate(price, mark, scoreAppliedToUser, nowIso);
+            const previousDaily = await readPreviousPredictionDailyScore(db, prediction.id, price.tradingDate);
           const dailyMarkRef = db
             .collection("prediction_daily_marks")
             .doc(predictionDailyMarkDocId(prediction.id, price.tradingDate));
@@ -1359,14 +1364,15 @@ export async function runDailyEodMaintenance(
           const nextStatus = ((latestStatus === "CLOSING") && shouldMutatePrediction) || shouldCloseForOpenUntil
             ? "SETTLED"
             : snapshotStatus;
-          tx.set(dailyMarkRef, {
-            predictionId: prediction.id,
-            predictionCreatedAt: prediction.createdAt,
-            userId: prediction.userId,
-            ticker: prediction.ticker,
-            direction: latest.direction,
-            date: price.tradingDate,
-            runDate,
+            tx.set(dailyMarkRef, {
+              predictionId: prediction.id,
+              predictionCreatedAt: prediction.createdAt,
+              userId: prediction.userId,
+              ticker: prediction.ticker,
+              visibility: latest.visibility === "PRIVATE" ? "PRIVATE" : "PUBLIC",
+              direction: latest.direction,
+              date: price.tradingDate,
+              runDate,
             status: nextStatus,
             entryPrice,
             markPrice: price.close,
@@ -1375,9 +1381,10 @@ export async function runDailyEodMaintenance(
             markPriceCapturedAt: price.loadedAt,
             markReturnValue: mark.returnValue,
             markScore: mark.score,
-            markPredictionScore: mark.score,
-            score: mark.score,
-            previousScore,
+              markPredictionScore: mark.score,
+              score: mark.score,
+              scoreAppliedToUser,
+              previousScore,
             scoreChange: dailyScoreChange,
             isMissingPreviousDailyScore,
             previousReturnValue,

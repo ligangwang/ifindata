@@ -217,7 +217,7 @@ function shareCardImage(prediction: ShareCardPrediction) {
       </div>
 
       <div style={{ display: "flex", marginTop: 48, width: "100%" }}>
-        <div style={{ minWidth: 0, width: "58%" }}>
+        <div style={{ display: "flex", flexDirection: "column", minWidth: 0, width: "58%" }}>
           <div style={{ color: "#bae6fd", fontSize: 30, fontWeight: 700 }}>{authorMeta}</div>
           <div style={{ color: "#94a3b8", fontSize: 26, fontWeight: 700, marginTop: 20 }}>{statusLabel(prediction.status)}</div>
         </div>

@@ -173,7 +173,7 @@ function shareCardImage(prediction: ShareCardPrediction) {
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        justifyContent: "flex-start",
+        justifyContent: "space-between",
         padding: "56px 64px",
         width: "100%",
       }}
@@ -181,7 +181,7 @@ function shareCardImage(prediction: ShareCardPrediction) {
       <div style={{ display: "flex", flexDirection: "column" }}>
         <Brand />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", marginTop: 132, maxWidth: "1000px" }}>
+      <div style={{ display: "flex", flexDirection: "column", maxWidth: "1000px" }}>
         <div style={{ color: "#38bdf8", display: "flex", fontSize: 34, fontWeight: 700 }}>
           {`${directionLabel} ${prediction.ticker}`}
         </div>

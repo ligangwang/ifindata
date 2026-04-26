@@ -35,6 +35,7 @@ export async function PATCH(
     const message = error instanceof Error ? error.message : "Failed to move prediction";
     const isValidationError =
       /required|must|invalid|enabled/i.test(message) ||
+      /part of pro|upgrade/i.test(message) ||
       /public predictions cannot be moved into private watchlists/i.test(message);
     const status = /forbidden/i.test(message)
       ? 403

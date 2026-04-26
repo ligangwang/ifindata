@@ -385,6 +385,10 @@ export async function updateWatchlist(
       throw new Error("Watchlist not found");
     }
 
+    if (watchlist.isPublic && !isPublic) {
+      throw new Error("Public watchlists cannot be made private. Close any predictions you no longer want to continue publicly and use a private watchlist for new ideas.");
+    }
+
     tx.update(watchlistRef, {
       name: input.name,
       description: input.description ?? null,
@@ -491,6 +495,9 @@ export async function movePredictionToWatchlist(
     }
 
     const watchlist = await assertWatchlistCanReceivePrediction(tx, watchlistRef, user.uid);
+    if (prediction.visibility === "PUBLIC" && !watchlist.isPublic) {
+      throw new Error("Public predictions cannot be moved into private watchlists. Close the prediction if you no longer want to continue it publicly.");
+    }
     movedWatchlistId = watchlist.id;
     movedWatchlistName = watchlist.name;
     tx.update(predictionRef, {

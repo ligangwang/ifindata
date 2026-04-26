@@ -37,7 +37,7 @@ export async function PATCH(
       ? 403
       : /not found/i.test(message)
         ? 404
-        : /required|must|invalid|enabled/i.test(message)
+        : /required|must|invalid|enabled|cannot/i.test(message)
           ? 400
           : 500;
     return NextResponse.json({ error: message }, { status });

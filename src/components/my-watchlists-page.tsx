@@ -146,6 +146,7 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
     () => watchlists.find((item) => item.id === selectedWatchlistId) ?? null,
     [selectedWatchlistId, watchlists],
   );
+  const selectedWatchlistLockedPublic = Boolean((watchlist?.isPublic ?? selectedSummary?.isPublic) === true);
   const selectedMetrics = watchlist?.metrics ?? selectedSummary?.metrics ?? null;
   const selectedPredictions =
     watchlist && status === "LIVE"
@@ -656,12 +657,26 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
                         </button>
                         <button
                           type="button"
-                          onClick={() => setEditIsPublic(false)}
-                          className={`rounded-full px-3 py-1.5 transition ${!editIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"}`}
+                          onClick={() => {
+                            if (!selectedWatchlistLockedPublic) {
+                              setEditIsPublic(false);
+                            }
+                          }}
+                          disabled={selectedWatchlistLockedPublic}
+                          className={`rounded-full px-3 py-1.5 transition ${!editIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"} ${selectedWatchlistLockedPublic ? "cursor-not-allowed opacity-50" : ""}`}
                         >
                           Private
                         </button>
                       </div>
+                      {selectedWatchlistLockedPublic ? (
+                        <p className="text-xs text-slate-400">
+                          Public watchlists stay public once shared. Close predictions you no longer want to continue publicly, then use a private watchlist for new ideas.
+                        </p>
+                      ) : editIsPublic ? (
+                        <p className="text-xs text-slate-400">
+                          Once this watchlist is public, it stays public as part of your track record.
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                   <div className="flex flex-wrap gap-2">

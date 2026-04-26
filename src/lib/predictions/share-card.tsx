@@ -14,7 +14,6 @@ type ShareCardPrediction = {
   direction: PredictionDirection;
   thesisTitle: string;
   status: PredictionStatus;
-  authorNickname: string | null;
   entryDate: string | null;
   markPriceDate: string | null;
   returnValue: number | null;
@@ -62,7 +61,6 @@ async function getShareCardPrediction(predictionId: string): Promise<ShareCardPr
   const ticker = typeof data.ticker === "string" ? normalizeTicker(data.ticker) : "";
   const direction = data.direction === "DOWN" ? "DOWN" : data.direction === "UP" ? "UP" : null;
   const thesisTitle = typeof data.thesisTitle === "string" ? data.thesisTitle.trim() : "";
-  const userId = typeof data.userId === "string" ? data.userId.trim() : "";
   const entryDate = typeof data.entryDate === "string" ? data.entryDate : null;
   const markPriceDate = typeof data.markPriceDate === "string" ? data.markPriceDate : null;
   const markReturnValue =
@@ -75,20 +73,11 @@ async function getShareCardPrediction(predictionId: string): Promise<ShareCardPr
     return null;
   }
 
-  let authorNickname: string | null = null;
-  if (userId) {
-    const userSnapshot = await db.collection("users").doc(userId).get();
-    const userData = userSnapshot.data() as Record<string, unknown> | undefined;
-    const nickname = typeof userData?.nickname === "string" ? userData.nickname.trim() : "";
-    authorNickname = nickname ? `@${nickname}` : null;
-  }
-
   return {
     ticker,
     direction,
     thesisTitle,
     status,
-    authorNickname,
     entryDate,
     markPriceDate,
     returnValue: settledReturnValue ?? markReturnValue,

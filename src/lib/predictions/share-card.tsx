@@ -65,13 +65,11 @@ async function getShareCardPrediction(predictionId: string): Promise<ShareCardPr
   const userId = typeof data.userId === "string" ? data.userId.trim() : "";
   const entryDate = typeof data.entryDate === "string" ? data.entryDate : null;
   const markPriceDate = typeof data.markPriceDate === "string" ? data.markPriceDate : null;
-  const markReturnValue = typeof data.markReturnValue === "number" && Number.isFinite(data.markReturnValue)
-    ? data.markReturnValue
-    : null;
+  const markReturnValue =
+    typeof data.markReturnValue === "number" && Number.isFinite(data.markReturnValue) ? data.markReturnValue : null;
   const result = data.result && typeof data.result === "object" ? data.result as Record<string, unknown> : null;
-  const settledReturnValue = result && typeof result.returnValue === "number" && Number.isFinite(result.returnValue)
-    ? result.returnValue
-    : null;
+  const settledReturnValue =
+    result && typeof result.returnValue === "number" && Number.isFinite(result.returnValue) ? result.returnValue : null;
 
   if (visibility !== "PUBLIC" || status === null || status === "CANCELED" || !ticker || !direction) {
     return null;
@@ -149,10 +147,22 @@ function returnLabel(prediction: ShareCardPrediction): string | null {
   return elapsedDays === null ? formattedReturn : `${formattedReturn} (${elapsedDays}d)`;
 }
 
+function returnToneColor(returnValue: number): string {
+  if (returnValue > 0) {
+    return "#6ee7b7";
+  }
+  if (returnValue < 0) {
+    return "#fda4af";
+  }
+  return "#cbd5e1";
+}
+
 function shareCardImage(prediction: ShareCardPrediction) {
   const directionLabel = prediction.direction === "DOWN" ? "Bearish" : "Bullish";
   const title = prediction.thesisTitle || `${directionLabel} call on ${prediction.ticker}`;
   const shareReturn = returnLabel(prediction);
+  const shareReturnColor =
+    typeof prediction.returnValue === "number" ? returnToneColor(prediction.returnValue) : "#cbd5e1";
 
   return (
     <div
@@ -182,8 +192,13 @@ function shareCardImage(prediction: ShareCardPrediction) {
           {`Status: ${statusLabel(prediction.status)}`}
         </div>
         {shareReturn ? (
-          <div style={{ color: "#cbd5e1", display: "flex", fontSize: 30, marginTop: 18 }}>
-            {`Return: ${shareReturn}`}
+          <div style={{ alignItems: "baseline", display: "flex", fontSize: 30, gap: 12, marginTop: 18 }}>
+            <div style={{ color: "#cbd5e1", display: "flex" }}>
+              Return:
+            </div>
+            <div style={{ color: shareReturnColor, display: "flex" }}>
+              {shareReturn}
+            </div>
           </div>
         ) : null}
         {prediction.authorNickname ? (

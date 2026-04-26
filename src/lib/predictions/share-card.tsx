@@ -187,54 +187,52 @@ function shareCardImage(prediction: ShareCardPrediction) {
   return (
     <div
       style={{
+        alignItems: "stretch",
         background: "#020617",
         color: "#f8fafc",
         display: "flex",
+        flexDirection: "column",
         height: "100%",
-        position: "relative",
+        padding: "42px 52px",
         width: "100%",
       }}
     >
-      <div style={{ left: 58, position: "absolute", top: 42 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
         <Brand />
-      </div>
-      <div style={{ color: "#22d3ee", fontSize: 26, fontWeight: 800, position: "absolute", right: 58, top: 50 }}>
-        Public Track Record
+        <div style={{ color: "#22d3ee", fontSize: 24, fontWeight: 800 }}>Public Track Record</div>
       </div>
 
-      <div style={{ color: accent, fontSize: 28, fontWeight: 800, left: 58, position: "absolute", top: 126 }}>
+      <div style={{ color: accent, fontSize: 28, fontWeight: 800, marginTop: 42 }}>
         {directionText} stock call
       </div>
-      <div style={{ color: accent, fontSize: 78, fontWeight: 900, left: 58, lineHeight: 1, position: "absolute", top: 170 }}>
-        {isUp ? "UP" : "DOWN"}
+      <div style={{ display: "flex", marginTop: 18 }}>
+        <div style={{ color: accent, fontSize: 74, fontWeight: 900, lineHeight: 1 }}>{isUp ? "UP" : "DOWN"}</div>
+        <div style={{ color: "#cffafe", fontSize: 80, fontWeight: 900, lineHeight: 1, marginLeft: 28 }}>
+          {formatTickerSymbol(prediction.ticker)}
+        </div>
       </div>
-      <div style={{ color: "#cffafe", fontSize: 84, fontWeight: 900, left: 198, lineHeight: 1, position: "absolute", top: 166 }}>
-        {formatTickerSymbol(prediction.ticker)}
-      </div>
-      <div style={{ color: "#e2e8f0", fontSize: 34, fontWeight: 700, left: 58, lineHeight: 1.25, position: "absolute", top: 278, width: 690 }}>
+
+      <div style={{ color: "#e2e8f0", fontSize: 34, fontWeight: 700, lineHeight: 1.25, marginTop: 28, maxWidth: 720 }}>
         {compactTitle(prediction.thesisTitle)}
       </div>
 
-      <div style={{ position: "absolute", right: 72, top: 180 }}>
-        <Metric
-          label="Current return"
-          value={prediction.returnValue === null ? "Pending" : formatReturnPercent(prediction.returnValue)}
-          tone={returnTone}
-        />
-      </div>
-      <div style={{ position: "absolute", right: 72, top: 342 }}>
-        <Metric
-          label="Score"
-          value={prediction.score === null ? "Pending" : formatScore(prediction.score)}
-          tone={scoreTone}
-        />
-      </div>
-
-      <div style={{ bottom: 48, color: "#bae6fd", fontSize: 30, fontWeight: 700, left: 58, position: "absolute" }}>
-        {authorMeta}
-      </div>
-      <div style={{ bottom: 50, color: "#94a3b8", fontSize: 26, fontWeight: 700, position: "absolute", right: 58 }}>
-        {statusLabel(prediction.status)}
+      <div style={{ display: "flex", marginTop: 48, width: "100%" }}>
+        <div style={{ display: "flex", flexDirection: "column", minWidth: 0, width: "58%" }}>
+          <div style={{ color: "#bae6fd", fontSize: 30, fontWeight: 700 }}>{authorMeta}</div>
+          <div style={{ color: "#94a3b8", fontSize: 26, fontWeight: 700, marginTop: 20 }}>{statusLabel(prediction.status)}</div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", width: "42%" }}>
+          <Metric
+            label="Current return"
+            value={prediction.returnValue === null ? "Pending" : formatReturnPercent(prediction.returnValue)}
+            tone={returnTone}
+          />
+          <Metric
+            label="Score"
+            value={prediction.score === null ? "Pending" : formatScore(prediction.score)}
+            tone={scoreTone}
+          />
+        </div>
       </div>
     </div>
   );

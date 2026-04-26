@@ -173,7 +173,7 @@ function shareCardImage(prediction: ShareCardPrediction) {
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        justifyContent: "space-between",
+        justifyContent: "flex-start",
         padding: "56px 64px",
         width: "100%",
       }}
@@ -181,7 +181,7 @@ function shareCardImage(prediction: ShareCardPrediction) {
       <div style={{ display: "flex", flexDirection: "column" }}>
         <Brand />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", maxWidth: "1000px" }}>
+      <div style={{ display: "flex", flexDirection: "column", marginTop: 132, maxWidth: "1000px" }}>
         <div style={{ color: "#38bdf8", display: "flex", fontSize: 34, fontWeight: 700 }}>
           {`${directionLabel} ${prediction.ticker}`}
         </div>
@@ -202,7 +202,7 @@ function shareCardImage(prediction: ShareCardPrediction) {
           </div>
         ) : null}
         {prediction.authorNickname ? (
-          <div style={{ color: "#94a3b8", display: "flex", fontSize: 28, marginTop: 18 }}>
+          <div style={{ color: "#cbd5e1", display: "flex", fontSize: 28, marginTop: 18 }}>
             {prediction.authorNickname}
           </div>
         ) : null}

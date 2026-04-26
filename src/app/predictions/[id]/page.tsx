@@ -4,6 +4,8 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 import { normalizeTicker } from "@/lib/predictions/types";
 import { noIndexRobots } from "@/lib/seo";
 
+const PREDICTION_SHARE_CARD_VERSION = "v3";
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -19,6 +21,14 @@ function predictionMetadataTitle(ticker: string, thesisTitle: string, direction:
   }
 
   return `${direction} call on ${ticker} | YouAnalyst`;
+}
+
+function predictionShareVersion(id: string, prediction: Record<string, unknown>): string {
+  const updatedAt = typeof prediction.updatedAt === "string" ? prediction.updatedAt.trim() : "";
+  const createdAt = typeof prediction.createdAt === "string" ? prediction.createdAt.trim() : "";
+  const versionSource = updatedAt || createdAt || id;
+  const compactVersion = versionSource.replace(/[^0-9A-Za-z]/g, "");
+  return `${PREDICTION_SHARE_CARD_VERSION}-${compactVersion || id}`;
 }
 
 export async function generateMetadata({
@@ -49,6 +59,9 @@ export async function generateMetadata({
     }
 
     const ticker = normalizeTicker(typeof prediction.ticker === "string" ? prediction.ticker : "");
+    const shareVersion = predictionShareVersion(id, prediction);
+    const openGraphImage = `/predictions/${id}/opengraph-image?v=${shareVersion}`;
+    const twitterImage = `/predictions/${id}/twitter-image?v=${shareVersion}`;
     const direction = prediction.direction === "DOWN" ? "Down" : "Up";
     const rawTitle = typeof prediction.thesisTitle === "string" ? prediction.thesisTitle.trim() : "";
     const predictionUserId = typeof prediction.userId === "string" ? prediction.userId.trim() : "";
@@ -75,11 +88,20 @@ export async function generateMetadata({
         title,
         description,
         url: `/predictions/${id}`,
+        images: [
+          {
+            url: openGraphImage,
+            width: 1200,
+            height: 630,
+            alt: "YouAnalyst prediction share card",
+          },
+        ],
       },
       twitter: {
         card: "summary_large_image",
         title,
         description,
+        images: [twitterImage],
       },
     };
   } catch {

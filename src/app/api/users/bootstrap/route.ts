@@ -1,5 +1,5 @@
 import { getAdminFirestore, verifyIdToken } from "@/lib/firebase/admin";
-import { getAppFeatures } from "@/lib/features";
+import { canUseProFeaturesForUserData, getAppFeatures } from "@/lib/features";
 import { NextRequest, NextResponse } from "next/server";
 
 type BootstrapRequest = {
@@ -29,10 +29,17 @@ export async function POST(request: NextRequest) {
     const userSnapshot = await userRef.get();
 
     if (userSnapshot.exists) {
-      return NextResponse.json({ created: false, features });
+      const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+      return NextResponse.json({
+        created: false,
+        features: {
+          ...features,
+          canUsePro: canUseProFeaturesForUserData(userData),
+        },
+      });
     }
 
-    await userRef.set({
+    const userProfile = {
       displayName: payload.displayName ?? decoded.name ?? null,
       email: payload.email ?? decoded.email ?? null,
       photoURL: payload.photoURL ?? decoded.picture ?? null,
@@ -66,9 +73,20 @@ export async function POST(request: NextRequest) {
       settings: {
         isPublic: true,
       },
-    });
+      billing: {
+        plan: "FREE",
+      },
+    };
 
-    return NextResponse.json({ created: true, features });
+    await userRef.set(userProfile);
+
+    return NextResponse.json({
+      created: true,
+      features: {
+        ...features,
+        canUsePro: canUseProFeaturesForUserData(userProfile as Record<string, unknown>),
+      },
+    });
   } catch (error) {
     console.error("Failed to bootstrap user profile:", error);
     return NextResponse.json({ error: "Failed to bootstrap user profile" }, { status: 500 });

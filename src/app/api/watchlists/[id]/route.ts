@@ -45,6 +45,7 @@ export async function PATCH(
     const message = error instanceof Error ? error.message : "Failed to update watchlist";
     const isValidationError =
       /required|must|invalid|enabled/i.test(message) ||
+      /part of pro|upgrade/i.test(message) ||
       /public watchlists cannot be made private/i.test(message);
     const status = /forbidden/i.test(message)
       ? 403

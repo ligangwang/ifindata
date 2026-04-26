@@ -1,5 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { canUseProFeaturesForUserData } from "@/lib/features";
 import { getAiAnalystPublicProfileForUser } from "@/lib/ai-analyst/config";
 import { assertWatchlistCanReceivePrediction } from "@/lib/watchlists/service";
 import {
@@ -500,6 +501,9 @@ export async function createPredictionForUser(
         }
       : null;
     await assertOpenUntilAfterLatestEod(input.ticker, timeHorizon);
+    if (!watchlist.isPublic && !canUseProFeaturesForUserData(userData as Record<string, unknown>)) {
+      throw new Error("Private watchlists are part of Pro. Upgrade to use them.");
+    }
     const visibility = watchlist.isPublic ? "PUBLIC" : "PRIVATE";
     const prediction: Prediction = {
       userId: user.uid,

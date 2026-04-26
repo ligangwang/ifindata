@@ -141,6 +141,7 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
   const [quickAddMessage, setQuickAddMessage] = useState<string | null>(null);
   const watchlistRequestIdRef = useRef(0);
   const proFeaturesEnabled = features.proFeaturesEnabled;
+  const canUsePro = features.canUsePro;
 
   const selectedSummary = useMemo(
     () => watchlists.find((item) => item.id === selectedWatchlistId) ?? null,
@@ -296,7 +297,7 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
         body: JSON.stringify({
           name,
           description: description || null,
-          isPublic: proFeaturesEnabled ? newWatchlistIsPublic : true,
+          isPublic: proFeaturesEnabled && canUsePro ? newWatchlistIsPublic : true,
         }),
       });
 
@@ -353,7 +354,7 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
         body: JSON.stringify({
           name: editName,
           description: editDescription,
-          isPublic: proFeaturesEnabled ? editIsPublic : true,
+          isPublic: proFeaturesEnabled && canUsePro ? editIsPublic : true,
         }),
       });
 
@@ -520,6 +521,11 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
                 ? "Create, edit, and review the public and private watchlists that organize your predictions."
                 : "Create, edit, and review the public watchlists that organize your predictions."}
             </p>
+            {proFeaturesEnabled && !canUsePro ? (
+              <p className="mt-2 text-xs text-amber-200">
+                Private watchlists are part of Pro. Upgrade to unlock private tracking.
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             {watchlists.length < 5 ? (
@@ -584,12 +590,22 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
                   </button>
                   <button
                     type="button"
-                    onClick={() => setNewWatchlistIsPublic(false)}
-                    className={`rounded-full px-3 py-1.5 transition ${!newWatchlistIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"}`}
+                    onClick={() => {
+                      if (canUsePro) {
+                        setNewWatchlistIsPublic(false);
+                      }
+                    }}
+                    disabled={!canUsePro}
+                    className={`rounded-full px-3 py-1.5 transition ${!newWatchlistIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"} ${!canUsePro ? "cursor-not-allowed opacity-50" : ""}`}
                   >
                     Private
                   </button>
                 </div>
+                {!canUsePro ? (
+                  <p className="text-xs text-slate-400">
+                    Private watchlists unlock with Pro.
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -658,12 +674,12 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
                         <button
                           type="button"
                           onClick={() => {
-                            if (!selectedWatchlistLockedPublic) {
+                            if (!selectedWatchlistLockedPublic && canUsePro) {
                               setEditIsPublic(false);
                             }
                           }}
-                          disabled={selectedWatchlistLockedPublic}
-                          className={`rounded-full px-3 py-1.5 transition ${!editIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"} ${selectedWatchlistLockedPublic ? "cursor-not-allowed opacity-50" : ""}`}
+                          disabled={selectedWatchlistLockedPublic || !canUsePro}
+                          className={`rounded-full px-3 py-1.5 transition ${!editIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"} ${selectedWatchlistLockedPublic || !canUsePro ? "cursor-not-allowed opacity-50" : ""}`}
                         >
                           Private
                         </button>
@@ -671,6 +687,10 @@ export function MyWatchlistsPage({ embedded = false }: { embedded?: boolean } = 
                       {selectedWatchlistLockedPublic ? (
                         <p className="text-xs text-slate-400">
                           Public watchlists stay public once shared. Close predictions you no longer want to continue publicly, then use a private watchlist for new ideas.
+                        </p>
+                      ) : !canUsePro ? (
+                        <p className="text-xs text-slate-400">
+                          Private watchlists are part of Pro. Upgrade to move this watchlist into your private workspace.
                         </p>
                       ) : editIsPublic ? (
                         <p className="text-xs text-slate-400">

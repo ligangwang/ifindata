@@ -50,6 +50,7 @@ export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedW
     timeHorizonUnit === "NONE" ||
     (Number.isInteger(parsedTimeHorizonValue) && parsedTimeHorizonValue > 0);
   const proFeaturesEnabled = features.proFeaturesEnabled;
+  const canUsePro = features.canUsePro;
   const selectedWatchlist = useMemo(
     () => watchlists.find((item) => item.id === watchlistId) ?? null,
     [watchlistId, watchlists],
@@ -228,14 +229,14 @@ export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedW
           "content-type": "application/json",
           authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ name, isPublic: proFeaturesEnabled ? newWatchlistIsPublic : true }),
+        body: JSON.stringify({ name, isPublic: proFeaturesEnabled && canUsePro ? newWatchlistIsPublic : true }),
       });
       const payload = (await response.json()) as { id?: string; error?: string };
       if (!response.ok || !payload.id) {
         throw new Error(payload.error ?? "Failed to create watchlist");
       }
 
-      const next = { id: payload.id, name, isPublic: proFeaturesEnabled ? newWatchlistIsPublic : true };
+      const next = { id: payload.id, name, isPublic: proFeaturesEnabled && canUsePro ? newWatchlistIsPublic : true };
       setWatchlists((current) => [...current, next]);
       setWatchlistId(payload.id);
       setNewWatchlistName("");
@@ -336,12 +337,22 @@ export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedW
                       </button>
                       <button
                         type="button"
-                        onClick={() => setNewWatchlistIsPublic(false)}
-                        className={`rounded-full px-3 py-1.5 transition ${!newWatchlistIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"}`}
+                        onClick={() => {
+                          if (canUsePro) {
+                            setNewWatchlistIsPublic(false);
+                          }
+                        }}
+                        disabled={!canUsePro}
+                        className={`rounded-full px-3 py-1.5 transition ${!newWatchlistIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"} ${!canUsePro ? "cursor-not-allowed opacity-50" : ""}`}
                       >
                         Private
                       </button>
                     </div>
+                    {!canUsePro ? (
+                      <p className="text-xs text-slate-400">
+                        Private watchlists are part of Pro. Upgrade to unlock them.
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

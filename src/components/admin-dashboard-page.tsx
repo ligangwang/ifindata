@@ -104,6 +104,7 @@ export function AdminDashboardPage() {
 
     setPlanLoading(true);
     setPlanMessage(null);
+    setPlanLookup(null);
 
     try {
       if (!user) {
@@ -306,7 +307,7 @@ export function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={() => void savePlan()}
-                disabled={planSaving || planSelection === planLookup.plan}
+                disabled={planLoading || planSaving || planSelection === planLookup.plan}
                 className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-60"
               >
                 {planSaving ? "Saving..." : "Save plan"}

@@ -45,12 +45,20 @@ async function findUserByIdentifier(identifier: string): Promise<FirebaseFiresto
   }
 
   const [byEmail, byNickname] = await Promise.all([
-    db.collection("users").where("email", "==", identifier).limit(1).get(),
-    db.collection("users").where("nickname", "==", identifier).limit(1).get(),
+    db.collection("users").where("email", "==", identifier).limit(2).get(),
+    db.collection("users").where("nickname", "==", identifier).limit(2).get(),
   ]);
+
+  if (byEmail.size > 1) {
+    throw new Error("Multiple users matched that email. Use the user id instead.");
+  }
 
   if (!byEmail.empty) {
     return byEmail.docs[0];
+  }
+
+  if (byNickname.size > 1) {
+    throw new Error("Multiple users matched that nickname. Use the user id or email instead.");
   }
 
   if (!byNickname.empty) {
@@ -95,8 +103,14 @@ export async function GET(request: NextRequest) {
       features: getAppFeatures(),
     });
   } catch (error) {
-    console.error("Failed to load user plan:", error);
-    return NextResponse.json({ error: "Failed to load user plan." }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Failed to load user plan.";
+    if (error instanceof Error) {
+      console.error("Failed to load user plan:", error);
+    }
+    return NextResponse.json(
+      { error: message },
+      { status: /multiple users matched/i.test(message) ? 400 : 500 },
+    );
   }
 }
 
@@ -145,7 +159,13 @@ export async function PATCH(request: NextRequest) {
       features: getAppFeatures(),
     });
   } catch (error) {
-    console.error("Failed to update user plan:", error);
-    return NextResponse.json({ error: "Failed to update user plan." }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Failed to update user plan.";
+    if (error instanceof Error) {
+      console.error("Failed to update user plan:", error);
+    }
+    return NextResponse.json(
+      { error: message },
+      { status: /multiple users matched/i.test(message) ? 400 : 500 },
+    );
   }
 }

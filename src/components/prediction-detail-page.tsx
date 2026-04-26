@@ -548,6 +548,9 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
         : null;
   const statusLabel = isSettlementPending ? "Settles at next close" : formatPredictionStatus(prediction.status);
   const xShareUrl = predictionShareUrl(prediction, statusLabel, returnText);
+  const movingPublicPredictionToPrivate =
+    prediction.visibility === "PUBLIC" &&
+    ownerWatchlists.find((watchlist) => watchlist.id === moveWatchlistId)?.isPublic === false;
 
   return (
     <main className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-8">
@@ -806,21 +809,30 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
                 className="rounded-lg border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
               >
                 {ownerWatchlists.map((watchlist) => (
-                  <option key={watchlist.id} value={watchlist.id}>
-                    {watchlist.name}{watchlist.isPublic ? "" : " (Private)"}
+                  <option
+                    key={watchlist.id}
+                    value={watchlist.id}
+                    disabled={prediction.visibility === "PUBLIC" && !watchlist.isPublic}
+                  >
+                    {watchlist.name}
+                    {watchlist.isPublic ? "" : prediction.visibility === "PUBLIC" ? " (Private unavailable for public calls)" : " (Private)"}
                   </option>
                 ))}
               </select>
               <button
                 type="button"
                 onClick={() => void movePrediction()}
-                disabled={moveSaving || !moveWatchlistId || moveWatchlistId === prediction.watchlistId}
+                disabled={moveSaving || !moveWatchlistId || moveWatchlistId === prediction.watchlistId || movingPublicPredictionToPrivate}
                 className="rounded-lg border border-cyan-400/35 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/15 disabled:opacity-60"
               >
                 {moveSaving ? "Moving..." : "Move"}
               </button>
             </div>
-            {ownerWatchlists.find((watchlist) => watchlist.id === moveWatchlistId)?.isPublic === false ? (
+            {movingPublicPredictionToPrivate ? (
+              <p className="text-xs text-slate-400">
+                Public predictions stay public. Close this prediction if you no longer want to continue it publicly.
+              </p>
+            ) : ownerWatchlists.find((watchlist) => watchlist.id === moveWatchlistId)?.isPublic === false ? (
               <p className="text-xs text-amber-200">
                 Moving this prediction into a private watchlist will make the prediction private too.
               </p>

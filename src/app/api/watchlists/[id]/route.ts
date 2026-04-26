@@ -43,11 +43,14 @@ export async function PATCH(
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update watchlist";
+    const isValidationError =
+      /required|must|invalid|enabled/i.test(message) ||
+      /public watchlists cannot be made private/i.test(message);
     const status = /forbidden/i.test(message)
       ? 403
       : /not found/i.test(message)
         ? 404
-        : /required|must|invalid|enabled/i.test(message)
+        : isValidationError
           ? 400
           : 500;
     return NextResponse.json({ error: message }, { status });

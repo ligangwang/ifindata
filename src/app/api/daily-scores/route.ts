@@ -27,10 +27,12 @@ type UserProfileSummary = {
 type PredictionContentSummary = {
   thesisTitle: string | null;
   thesis: string | null;
+  visibility: "PUBLIC" | "PRIVATE" | null;
 };
 
 const TOP_CALL_LIMIT = 10;
-const FALLBACK_CALL_LIMIT = 100;
+const TOP_CALL_CANDIDATE_LIMIT = 50;
+const FALLBACK_CALL_LIMIT = 200;
 
 function asNumber(value: unknown): number {
   return Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -135,6 +137,7 @@ async function readPredictionContent(
     content.set(uniqueIds[index], {
       thesisTitle: sanitizePredictionThesisTitle(typeof data.thesisTitle === "string" ? data.thesisTitle : ""),
       thesis: sanitizePredictionThesis(typeof data.thesis === "string" ? data.thesis : ""),
+      visibility: data.visibility === "PRIVATE" ? "PRIVATE" : data.visibility === "PUBLIC" ? "PUBLIC" : null,
     });
   });
 
@@ -151,7 +154,7 @@ async function dailyCallCandidates(
     .orderBy("directionDailyReturn", "desc")
     .orderBy("scoreChange", "desc")
     .orderBy("score", "desc")
-    .limit(TOP_CALL_LIMIT)
+    .limit(TOP_CALL_CANDIDATE_LIMIT)
     .get();
 
   return snapshot.docs;
@@ -227,11 +230,34 @@ async function topDailyCalls(db: FirebaseFirestore.Firestore, date: string): Pro
     readPredictionContent(db, rankedCalls.map((call) => call.predictionId)),
   ]);
 
-  return rankedCalls.map((call) => ({
-    ...call,
-    ...(profilesByUserId.get(call.userId) ?? { displayName: null, nickname: null }),
-    ...(contentByPredictionId.get(call.predictionId) ?? { thesisTitle: null, thesis: null }),
-  }));
+  return rankedCalls.map((call) => {
+    const content = contentByPredictionId.get(call.predictionId) ?? { thesisTitle: null, thesis: null, visibility: null };
+    return {
+      ...call,
+      ...(profilesByUserId.get(call.userId) ?? { displayName: null, nickname: null }),
+      thesisTitle: content.thesisTitle,
+      thesis: content.thesis,
+      visibility: content.visibility,
+    };
+  })
+    .filter((call) => call.visibility === "PUBLIC")
+    .map((call) => ({
+      predictionId: call.predictionId,
+      userId: call.userId,
+      displayName: call.displayName,
+      nickname: call.nickname,
+      ticker: call.ticker,
+      direction: call.direction,
+      dailyScoreChange: call.dailyScoreChange,
+      dailyReturnChange: call.dailyReturnChange,
+      totalScore: call.totalScore,
+      returnSinceEntry: call.returnSinceEntry,
+      status: call.status,
+      createdAt: call.createdAt,
+      thesisTitle: call.thesisTitle,
+      thesis: call.thesis,
+    }))
+    .slice(0, TOP_CALL_LIMIT);
 }
 
 export async function GET(request: NextRequest) {

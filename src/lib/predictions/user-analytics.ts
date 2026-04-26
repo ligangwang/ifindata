@@ -41,13 +41,9 @@ export async function readUserAnalytics(
     .where("userId", "==", userId)
     .where("status", "in", ["SETTLED", "CLOSED"])
     .get();
-  const totalCalls = Math.max(
-    settledSnapshot.size,
-    Number.isFinite(Number(sourceStats.totalCalls ?? sourceStats.totalPredictions))
-      ? Number(sourceStats.totalCalls ?? sourceStats.totalPredictions)
-      : 0,
-  );
-  const settledAnalytics = settledSnapshot.docs
+  const publicSettledDocs = settledSnapshot.docs.filter((doc) => doc.get("visibility") === "PUBLIC");
+  const totalCalls = publicSettledDocs.length;
+  const settledAnalytics = publicSettledDocs
     .map((doc) => analyticsFromClosedPrediction(doc.data() as Record<string, unknown>))
     .filter((analytics): analytics is SettledPredictionAnalytics => analytics !== null);
   const computed = computeUserAnalytics(totalCalls, settledAnalytics);

@@ -15,6 +15,9 @@ type ShareCardPrediction = {
   thesisTitle: string;
   status: PredictionStatus;
   authorNickname: string | null;
+  entryDate: string | null;
+  markPriceDate: string | null;
+  returnValue: number | null;
 };
 
 function Brand() {
@@ -60,6 +63,15 @@ async function getShareCardPrediction(predictionId: string): Promise<ShareCardPr
   const direction = data.direction === "DOWN" ? "DOWN" : data.direction === "UP" ? "UP" : null;
   const thesisTitle = typeof data.thesisTitle === "string" ? data.thesisTitle.trim() : "";
   const userId = typeof data.userId === "string" ? data.userId.trim() : "";
+  const entryDate = typeof data.entryDate === "string" ? data.entryDate : null;
+  const markPriceDate = typeof data.markPriceDate === "string" ? data.markPriceDate : null;
+  const markReturnValue = typeof data.markReturnValue === "number" && Number.isFinite(data.markReturnValue)
+    ? data.markReturnValue
+    : null;
+  const result = data.result && typeof data.result === "object" ? data.result as Record<string, unknown> : null;
+  const settledReturnValue = result && typeof result.returnValue === "number" && Number.isFinite(result.returnValue)
+    ? result.returnValue
+    : null;
 
   if (visibility !== "PUBLIC" || status === null || status === "CANCELED" || !ticker || !direction) {
     return null;
@@ -79,6 +91,9 @@ async function getShareCardPrediction(predictionId: string): Promise<ShareCardPr
     thesisTitle,
     status,
     authorNickname,
+    entryDate,
+    markPriceDate,
+    returnValue: settledReturnValue ?? markReturnValue,
   };
 }
 
@@ -98,9 +113,46 @@ function statusLabel(status: PredictionStatus): string {
   return "Canceled";
 }
 
+function formatReturnPercent(returnValue: number): string {
+  const percent = returnValue * 100;
+  const sign = percent > 0 ? "+" : "";
+  return `${sign}${percent.toFixed(2)}%`;
+}
+
+function parseDateOnly(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const [dateOnly] = value.split("T");
+  const timestamp = Date.parse(`${dateOnly}T00:00:00.000Z`);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function daysSinceCall(entryDate: string | null, markPriceDate: string | null): number | null {
+  const entryTimestamp = parseDateOnly(entryDate);
+  const markTimestamp = parseDateOnly(markPriceDate);
+  if (entryTimestamp === null || markTimestamp === null) {
+    return null;
+  }
+
+  return Math.max(0, Math.floor((markTimestamp - entryTimestamp) / (24 * 60 * 60 * 1000)));
+}
+
+function returnLabel(prediction: ShareCardPrediction): string | null {
+  if (typeof prediction.returnValue !== "number") {
+    return null;
+  }
+
+  const formattedReturn = formatReturnPercent(prediction.returnValue);
+  const elapsedDays = daysSinceCall(prediction.entryDate, prediction.markPriceDate);
+  return elapsedDays === null ? formattedReturn : `${formattedReturn} (${elapsedDays}d)`;
+}
+
 function shareCardImage(prediction: ShareCardPrediction) {
   const directionLabel = prediction.direction === "DOWN" ? "Bearish" : "Bullish";
   const title = prediction.thesisTitle || `${directionLabel} call on ${prediction.ticker}`;
+  const shareReturn = returnLabel(prediction);
 
   return (
     <div
@@ -129,6 +181,11 @@ function shareCardImage(prediction: ShareCardPrediction) {
         <div style={{ color: "#cbd5e1", display: "flex", fontSize: 30, marginTop: 28 }}>
           {`Status: ${statusLabel(prediction.status)}`}
         </div>
+        {shareReturn ? (
+          <div style={{ color: "#cbd5e1", display: "flex", fontSize: 30, marginTop: 18 }}>
+            {`Return: ${shareReturn}`}
+          </div>
+        ) : null}
         {prediction.authorNickname ? (
           <div style={{ color: "#94a3b8", display: "flex", fontSize: 28, marginTop: 18 }}>
             {prediction.authorNickname}

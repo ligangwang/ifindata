@@ -143,17 +143,6 @@ function Brand() {
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone?: "positive" | "negative" | "neutral" }) {
-  const color = tone === "positive" ? "#34d399" : tone === "negative" ? "#fb7185" : "#bfdbfe";
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
-      <div style={{ color: "#94a3b8", fontSize: 24, fontWeight: 700 }}>{label}</div>
-      <div style={{ color, fontSize: 58, fontWeight: 900, lineHeight: 1, marginTop: 8 }}>{value}</div>
-    </div>
-  );
-}
-
 function fallbackImage() {
   return (
     <div
@@ -178,16 +167,18 @@ function shareCardImage(prediction: ShareCardPrediction) {
   const isUp = prediction.direction === "UP";
   const accent = isUp ? "#67e8f9" : "#fda4af";
   const directionText = isUp ? "Bullish" : "Bearish";
-  const returnTone =
-    prediction.returnValue === null ? "neutral" : prediction.returnValue > 0 ? "positive" : prediction.returnValue < 0 ? "negative" : "neutral";
-  const scoreTone =
-    prediction.score === null ? "neutral" : prediction.score > 0 ? "positive" : prediction.score < 0 ? "negative" : "neutral";
+  const returnColor =
+    prediction.returnValue === null ? "#bfdbfe" : prediction.returnValue > 0 ? "#34d399" : prediction.returnValue < 0 ? "#fb7185" : "#bfdbfe";
+  const scoreColor =
+    prediction.score === null ? "#bfdbfe" : prediction.score > 0 ? "#34d399" : prediction.score < 0 ? "#fb7185" : "#bfdbfe";
   const authorMeta = prediction.authorLevel ? `${prediction.authorLabel} / Level ${Math.max(1, Math.floor(prediction.authorLevel))}` : prediction.authorLabel;
+  const returnValue = prediction.returnValue === null ? "Pending" : formatReturnPercent(prediction.returnValue);
+  const scoreValue = prediction.score === null ? "Pending" : formatScore(prediction.score);
 
   return (
     <div
       style={{
-        alignItems: "stretch",
+        alignItems: "flex-start",
         background: "#020617",
         color: "#f8fafc",
         display: "flex",
@@ -216,23 +207,19 @@ function shareCardImage(prediction: ShareCardPrediction) {
         {compactTitle(prediction.thesisTitle)}
       </div>
 
-      <div style={{ display: "flex", marginTop: 48, width: "100%" }}>
-        <div style={{ display: "flex", flexDirection: "column", minWidth: 0, width: "58%" }}>
-          <div style={{ color: "#bae6fd", fontSize: 30, fontWeight: 700 }}>{authorMeta}</div>
-          <div style={{ color: "#94a3b8", fontSize: 26, fontWeight: 700, marginTop: 20 }}>{statusLabel(prediction.status)}</div>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", width: "42%" }}>
-          <Metric
-            label="Current return"
-            value={prediction.returnValue === null ? "Pending" : formatReturnPercent(prediction.returnValue)}
-            tone={returnTone}
-          />
-          <Metric
-            label="Score"
-            value={prediction.score === null ? "Pending" : formatScore(prediction.score)}
-            tone={scoreTone}
-          />
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", marginTop: 48 }}>
+        <div style={{ color: "#bae6fd", fontSize: 30, fontWeight: 700 }}>{authorMeta}</div>
+        <div style={{ color: "#94a3b8", fontSize: 26, fontWeight: 700, marginTop: 18 }}>{statusLabel(prediction.status)}</div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", marginTop: 40 }}>
+        <div style={{ color: "#94a3b8", fontSize: 24, fontWeight: 700 }}>Current return</div>
+        <div style={{ color: returnColor, fontSize: 58, fontWeight: 900, lineHeight: 1, marginTop: 8 }}>{returnValue}</div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", marginTop: 28 }}>
+        <div style={{ color: "#94a3b8", fontSize: 24, fontWeight: 700 }}>Score</div>
+        <div style={{ color: scoreColor, fontSize: 58, fontWeight: 900, lineHeight: 1, marginTop: 8 }}>{scoreValue}</div>
       </div>
     </div>
   );

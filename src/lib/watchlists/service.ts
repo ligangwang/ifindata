@@ -1,10 +1,12 @@
 import { FieldValue } from "firebase-admin/firestore";
+import { areProFeaturesEnabled } from "@/lib/features";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
   canonicalPredictionStatus,
   sanitizePredictionThesis,
   sanitizePredictionThesisTitle,
   type Prediction,
+  type PredictionVisibility,
 } from "@/lib/predictions/types";
 
 export const MAX_WATCHLISTS_PER_USER = 5;
@@ -23,7 +25,7 @@ export type Watchlist = {
   userId: string;
   name: string;
   description?: string | null;
-  isPublic: true;
+  isPublic: boolean;
   createdAt: string;
   updatedAt: string;
   archivedAt?: string | null;
@@ -62,6 +64,7 @@ export type WatchlistDetail = WatchlistSummary & {
 export type CreateWatchlistInput = {
   name: string;
   description?: string | null;
+  isPublic?: boolean;
 };
 
 export type UpdateWatchlistInput = CreateWatchlistInput;
@@ -93,7 +96,7 @@ function mapWatchlistDoc(doc: FirebaseFirestore.QueryDocumentSnapshot | Firebase
     userId: trimString(data.userId),
     name: trimString(data.name),
     description: trimString(data.description) || null,
-    isPublic: true,
+    isPublic: data.isPublic !== false,
     createdAt: trimString(data.createdAt),
     updatedAt: trimString(data.updatedAt),
     archivedAt: trimString(data.archivedAt) || null,
@@ -156,12 +159,23 @@ function watchlistPerformanceValue(metrics: WatchlistMetrics): number | null {
   return null;
 }
 
-async function listWatchlistPredictions(watchlistId: string): Promise<WatchlistPrediction[]> {
-  const snapshot = await getAdminFirestore()
+function predictionVisibilityForWatchlist(watchlist: Pick<Watchlist, "isPublic">): PredictionVisibility {
+  return watchlist.isPublic ? "PUBLIC" : "PRIVATE";
+}
+
+async function listWatchlistPredictions(
+  watchlistId: string,
+  options: { includePrivate?: boolean } = {},
+): Promise<WatchlistPrediction[]> {
+  let query = getAdminFirestore()
     .collection("predictions")
-    .where("watchlistId", "==", watchlistId)
-    .where("visibility", "==", "PUBLIC")
-    .get();
+    .where("watchlistId", "==", watchlistId) as FirebaseFirestore.Query;
+
+  if (options.includePrivate !== true) {
+    query = query.where("visibility", "==", "PUBLIC");
+  }
+
+  const snapshot = await query.get();
 
   return snapshot.docs
     .map(mapPredictionDoc)
@@ -177,6 +191,7 @@ export function validateCreateWatchlistInput(raw: unknown): CreateWatchlistInput
   const input = raw as Record<string, unknown>;
   const name = trimString(input.name);
   const description = trimString(input.description);
+  const isPublic = input.isPublic;
 
   if (!name) {
     throw new Error("watchlist name is required");
@@ -190,25 +205,34 @@ export function validateCreateWatchlistInput(raw: unknown): CreateWatchlistInput
     throw new Error(`watchlist description must be <= ${MAX_WATCHLIST_DESCRIPTION_LENGTH} chars`);
   }
 
+  if (isPublic !== undefined && typeof isPublic !== "boolean") {
+    throw new Error("watchlist visibility must be true or false");
+  }
+
   return {
     name,
     description: description || null,
+    isPublic: isPublic === false ? false : true,
   };
 }
 
 export const validateUpdateWatchlistInput = validateCreateWatchlistInput;
 
-export async function listWatchlistsForUser(userId: string): Promise<WatchlistSummary[]> {
+export async function listWatchlistsForUser(
+  userId: string,
+  options: { includePrivate?: boolean } = {},
+): Promise<WatchlistSummary[]> {
   const db = getAdminFirestore();
   const snapshot = await db.collection("watchlists").where("userId", "==", userId).get();
   const watchlists = snapshot.docs
     .map(mapWatchlistDoc)
     .filter((watchlist) => !watchlist.archivedAt)
+    .filter((watchlist) => options.includePrivate === true || watchlist.isPublic)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
   const summaries = await Promise.all(
     watchlists.map(async (watchlist) => {
-      const predictions = await listWatchlistPredictions(watchlist.id);
+      const predictions = await listWatchlistPredictions(watchlist.id, { includePrivate: options.includePrivate });
       return {
         ...watchlist,
         metrics: metricsForPredictions(predictions),
@@ -226,7 +250,7 @@ export async function listPublicWatchlists(limit = 24): Promise<PublicWatchlistS
   const snapshot = await db.collection("watchlists").orderBy("createdAt", "desc").limit(candidateLimit).get();
   const watchlists = snapshot.docs
     .map(mapWatchlistDoc)
-    .filter((watchlist) => !watchlist.archivedAt);
+    .filter((watchlist) => !watchlist.archivedAt && watchlist.isPublic);
 
   const ownerIds = Array.from(new Set(watchlists.map((watchlist) => watchlist.userId).filter(Boolean)));
   const ownerEntries = await Promise.all(
@@ -293,6 +317,11 @@ export async function createWatchlist(input: CreateWatchlistInput, user: AuthedU
   const nowIso = new Date().toISOString();
   const userRef = db.collection("users").doc(user.uid);
   const watchlistRef = db.collection("watchlists").doc();
+  const isPublic = input.isPublic !== false;
+
+  if (!isPublic && !areProFeaturesEnabled()) {
+    throw new Error("Private watchlists are not enabled.");
+  }
 
   await db.runTransaction(async (tx) => {
     const [userSnapshot, existingSnapshot] = await Promise.all([
@@ -313,7 +342,7 @@ export async function createWatchlist(input: CreateWatchlistInput, user: AuthedU
       userId: user.uid,
       name: input.name,
       description: input.description ?? null,
-      isPublic: true,
+      isPublic,
       createdAt: nowIso,
       updatedAt: nowIso,
       archivedAt: null,
@@ -335,6 +364,11 @@ export async function updateWatchlist(
   const db = getAdminFirestore();
   const nowIso = new Date().toISOString();
   const watchlistRef = db.collection("watchlists").doc(watchlistId);
+  const isPublic = input.isPublic !== false;
+
+  if (!isPublic && !areProFeaturesEnabled()) {
+    throw new Error("Private watchlists are not enabled.");
+  }
 
   await db.runTransaction(async (tx) => {
     const watchlistSnapshot = await tx.get(watchlistRef);
@@ -354,16 +388,19 @@ export async function updateWatchlist(
     tx.update(watchlistRef, {
       name: input.name,
       description: input.description ?? null,
+      isPublic,
       updatedAt: nowIso,
     });
   });
 
   const predictionSnapshot = await db.collection("predictions").where("watchlistId", "==", watchlistId).get();
+  const visibility = isPublic ? "PUBLIC" : "PRIVATE";
   let batch = db.batch();
   let batchSize = 0;
   for (const doc of predictionSnapshot.docs) {
     batch.update(doc.ref, {
       watchlistName: input.name,
+      visibility,
       updatedAt: nowIso,
     });
     batchSize += 1;
@@ -406,7 +443,7 @@ export async function getOrCreateDefaultWatchlistForUser(
   userId: string,
   name = "Main Watchlist",
 ): Promise<string> {
-  const existing = await listWatchlistsForUser(userId);
+  const existing = await listWatchlistsForUser(userId, { includePrivate: true });
   if (existing[0]) {
     return existing[0].id;
   }
@@ -459,6 +496,7 @@ export async function movePredictionToWatchlist(
     tx.update(predictionRef, {
       watchlistId: watchlist.id,
       watchlistName: watchlist.name,
+      visibility: predictionVisibilityForWatchlist(watchlist),
       updatedAt: nowIso,
     });
   });
@@ -559,6 +597,7 @@ export async function backfillLegacyPredictionWatchlists(
       await doc.ref.update({
         watchlistId: watchlist.id,
         watchlistName: watchlist.name,
+        visibility: predictionVisibilityForWatchlist(watchlist),
         updatedAt: nowIso,
       });
     }
@@ -576,7 +615,10 @@ export async function backfillLegacyPredictionWatchlists(
   };
 }
 
-export async function getWatchlistDetail(watchlistId: string): Promise<WatchlistDetail | null> {
+export async function getWatchlistDetail(
+  watchlistId: string,
+  options: { viewerUserId?: string | null } = {},
+): Promise<WatchlistDetail | null> {
   const snapshot = await getAdminFirestore().collection("watchlists").doc(watchlistId).get();
   if (!snapshot.exists) {
     return null;
@@ -587,7 +629,12 @@ export async function getWatchlistDetail(watchlistId: string): Promise<Watchlist
     return null;
   }
 
-  const predictions = await listWatchlistPredictions(watchlist.id);
+  const isOwner = Boolean(options.viewerUserId && options.viewerUserId === watchlist.userId);
+  if (!watchlist.isPublic && !isOwner) {
+    return null;
+  }
+
+  const predictions = await listWatchlistPredictions(watchlist.id, { includePrivate: isOwner });
   const metrics = metricsForPredictions(predictions);
 
   return {

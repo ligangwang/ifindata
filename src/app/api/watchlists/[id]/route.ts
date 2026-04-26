@@ -7,13 +7,14 @@ import {
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
 
   try {
-    const watchlist = await getWatchlistDetail(id);
+    const decoded = await getDecodedUserFromRequest(request);
+    const watchlist = await getWatchlistDetail(id, { viewerUserId: decoded?.uid ?? null });
     if (!watchlist) {
       return NextResponse.json({ error: "Watchlist not found" }, { status: 404 });
     }
@@ -46,7 +47,7 @@ export async function PATCH(
       ? 403
       : /not found/i.test(message)
         ? 404
-        : /required|must|invalid/i.test(message)
+        : /required|must|invalid|enabled/i.test(message)
           ? 400
           : 500;
     return NextResponse.json({ error: message }, { status });

@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const items = await listWatchlistsForUser(userId);
+    const decoded = await getDecodedUserFromRequest(request);
+    const items = await listWatchlistsForUser(userId, { includePrivate: Boolean(decoded && decoded.uid === userId) });
     return NextResponse.json({ items });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load watchlists";
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
       message.includes("required") ||
       message.includes("must") ||
       message.includes("Invalid") ||
+      message.includes("enabled") ||
       message.includes("limit")
         ? 400
         : 500;

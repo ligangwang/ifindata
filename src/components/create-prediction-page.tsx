@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { TickerSearchInput } from "@/components/ticker-search-input";
@@ -17,11 +17,12 @@ type WatchlistOption = {
   id: string;
   name: string;
   description?: string | null;
+  isPublic: boolean;
 };
 
 export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedWatchlistId?: string }) {
   const router = useRouter();
-  const { user, loading, getIdToken } = useAuth();
+  const { user, loading, getIdToken, features } = useAuth();
   const [ticker, setTicker] = useState("");
   const [direction, setDirection] = useState<"UP" | "DOWN">("UP");
   const [thesisTitle, setThesisTitle] = useState("");
@@ -29,6 +30,7 @@ export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedW
   const [watchlists, setWatchlists] = useState<WatchlistOption[]>([]);
   const [watchlistId, setWatchlistId] = useState("");
   const [newWatchlistName, setNewWatchlistName] = useState("");
+  const [newWatchlistIsPublic, setNewWatchlistIsPublic] = useState(true);
   const [creatingWatchlist, setCreatingWatchlist] = useState(false);
   const [timeHorizonUnit, setTimeHorizonUnit] = useState<"NONE" | PredictionTimeHorizonUnit>("NONE");
   const [timeHorizonValue, setTimeHorizonValue] = useState("");
@@ -47,6 +49,11 @@ export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedW
   const isValidTimeHorizon =
     timeHorizonUnit === "NONE" ||
     (Number.isInteger(parsedTimeHorizonValue) && parsedTimeHorizonValue > 0);
+  const proFeaturesEnabled = features.proFeaturesEnabled;
+  const selectedWatchlist = useMemo(
+    () => watchlists.find((item) => item.id === watchlistId) ?? null,
+    [watchlistId, watchlists],
+  );
   const tickerErrorMessage = ticker && !isValidTicker
     ? "Ticker must be 1-12 letters, numbers, dots, or hyphens."
     : null;
@@ -71,8 +78,10 @@ export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedW
     }
 
     let cancelled = false;
-    void fetch(`/api/watchlists?userId=${encodeURIComponent(user.uid)}`)
-      .then(async (response) => {
+    void getIdToken()
+      .then(async (token) => {
+        const headers = token ? { authorization: `Bearer ${token}` } : undefined;
+        const response = await fetch(`/api/watchlists?userId=${encodeURIComponent(user.uid)}`, { headers });
         if (!response.ok) {
           throw new Error("Unable to load watchlists.");
         }
@@ -102,7 +111,7 @@ export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedW
     return () => {
       cancelled = true;
     };
-  }, [requestedWatchlistId, user]);
+  }, [getIdToken, requestedWatchlistId, user]);
 
   if (loading) {
     return <main className="mx-auto w-full max-w-3xl px-4 py-8 text-sm text-slate-300">Loading...</main>;
@@ -181,7 +190,6 @@ export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedW
                 value: parsedTimeHorizonValue,
                 unit: timeHorizonUnit,
               },
-          visibility: "PUBLIC",
         }),
       });
 
@@ -220,17 +228,18 @@ export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedW
           "content-type": "application/json",
           authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, isPublic: proFeaturesEnabled ? newWatchlistIsPublic : true }),
       });
       const payload = (await response.json()) as { id?: string; error?: string };
       if (!response.ok || !payload.id) {
         throw new Error(payload.error ?? "Failed to create watchlist");
       }
 
-      const next = { id: payload.id, name };
+      const next = { id: payload.id, name, isPublic: proFeaturesEnabled ? newWatchlistIsPublic : true };
       setWatchlists((current) => [...current, next]);
       setWatchlistId(payload.id);
       setNewWatchlistName("");
+      setNewWatchlistIsPublic(true);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Failed to create watchlist");
     } finally {
@@ -280,33 +289,61 @@ export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedW
               >
                 {watchlists.map((watchlist) => (
                   <option key={watchlist.id} value={watchlist.id}>
-                    {watchlist.name}
+                    {watchlist.name}{watchlist.isPublic ? "" : " (Private)"}
                   </option>
                 ))}
               </select>
             ) : (
               <p className="rounded-xl border border-dashed border-cyan-400/25 bg-cyan-500/5 px-3 py-2 text-sm text-slate-300">
-                Create your first public watchlist before publishing this prediction.
+                Create your first watchlist before publishing this prediction.
               </p>
             )}
+            {selectedWatchlist && !selectedWatchlist.isPublic ? (
+              <p className="text-xs text-amber-200">
+                This watchlist is private, so this prediction will be private too.
+              </p>
+            ) : null}
             {watchlists.length < 5 ? (
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                <input
-                  type="text"
-                  value={newWatchlistName}
-                  onChange={(event) => setNewWatchlistName(event.target.value)}
-                  maxLength={80}
-                  placeholder="New watchlist name"
-                  className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
-                />
-                <button
-                  type="button"
-                  onClick={() => void createNewWatchlist()}
-                  disabled={creatingWatchlist}
-                  className="rounded-xl border border-cyan-400/35 px-3 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-500/15 disabled:opacity-60"
-                >
-                  {creatingWatchlist ? "Creating..." : "Create watchlist"}
-                </button>
+              <div className="grid gap-2">
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <input
+                    type="text"
+                    value={newWatchlistName}
+                    onChange={(event) => setNewWatchlistName(event.target.value)}
+                    maxLength={80}
+                    placeholder="New watchlist name"
+                    className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none ring-cyan-400/40 focus:ring"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void createNewWatchlist()}
+                    disabled={creatingWatchlist}
+                    className="rounded-xl border border-cyan-400/35 px-3 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-500/15 disabled:opacity-60"
+                  >
+                    {creatingWatchlist ? "Creating..." : "Create watchlist"}
+                  </button>
+                </div>
+                {proFeaturesEnabled ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-xs text-slate-400">New watchlist visibility</span>
+                    <div className="inline-flex rounded-full border border-slate-700 bg-slate-900/70 p-1 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setNewWatchlistIsPublic(true)}
+                        className={`rounded-full px-3 py-1.5 transition ${newWatchlistIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"}`}
+                      >
+                        Public
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewWatchlistIsPublic(false)}
+                        className={`rounded-full px-3 py-1.5 transition ${!newWatchlistIsPublic ? "bg-cyan-500 text-slate-950" : "text-slate-200 hover:text-white"}`}
+                      >
+                        Private
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>

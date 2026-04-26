@@ -4,6 +4,23 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 import { normalizeTicker } from "@/lib/predictions/types";
 import { noIndexRobots } from "@/lib/seo";
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function predictionMetadataTitle(ticker: string, thesisTitle: string, direction: string): string {
+  const cleanTicker = ticker.replace(/^\$/, "");
+  const trimmedTitle = thesisTitle.trim();
+  const duplicateTickerPattern = new RegExp(`^\\$?${escapeRegExp(cleanTicker)}\\s*[:\\-–—]\\s*`, "i");
+  const titleWithoutTickerPrefix = trimmedTitle.replace(duplicateTickerPattern, "").trim();
+
+  if (titleWithoutTickerPrefix) {
+    return `${ticker}: ${titleWithoutTickerPrefix} | YouAnalyst`;
+  }
+
+  return `${direction} call on ${ticker} | YouAnalyst`;
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -43,9 +60,7 @@ export async function generateMetadata({
       authorLabel = nickname ? `@${nickname}` : "";
     }
 
-    const title = rawTitle
-      ? `${ticker}: ${rawTitle} | YouAnalyst`
-      : `${direction} call on ${ticker} | YouAnalyst`;
+    const title = predictionMetadataTitle(ticker, rawTitle, direction);
     const description = authorLabel
       ? `${authorLabel}'s ${direction.toLowerCase()} call on ${ticker}, with live performance and discussion on YouAnalyst.`
       : `${direction} call on ${ticker}, with live performance and discussion on YouAnalyst.`;

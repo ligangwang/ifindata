@@ -37,6 +37,7 @@ type PredictionDetail = {
   status: PredictionStatus;
   visibility?: PredictionVisibility;
   createdAt: string;
+  updatedAt?: string | null;
   closeRequestedAt?: string | null;
   closeTargetDate?: string | null;
   closeReason?: string | null;
@@ -132,12 +133,19 @@ function predictionShareReturnText(prediction: PredictionDetail, returnText: str
   return elapsedDays === null ? returnText : `${returnText} (${elapsedDays}d)`;
 }
 
-function predictionUrl(predictionId: string): string {
+function predictionShareVersion(prediction: PredictionDetail): string {
+  const versionSource = prediction.updatedAt || prediction.createdAt || prediction.id;
+  const compactVersion = versionSource.replace(/[^0-9A-Za-z]/g, "");
+  return `v3-${compactVersion || prediction.id}`;
+}
+
+function predictionUrl(prediction: PredictionDetail): string {
   const origin = typeof window === "undefined" ? "https://youanalyst.com" : window.location.origin;
-  const url = new URL(`/predictions/${encodeURIComponent(predictionId)}`, origin);
+  const url = new URL(`/predictions/${encodeURIComponent(prediction.id)}`, origin);
   url.searchParams.set("utm_source", "x");
   url.searchParams.set("utm_medium", "social");
   url.searchParams.set("utm_campaign", "prediction_share");
+  url.searchParams.set("share", predictionShareVersion(prediction));
   return url.toString();
 }
 
@@ -164,7 +172,7 @@ function predictionShareText(prediction: PredictionDetail, statusLabel: string, 
 function predictionShareUrl(prediction: PredictionDetail, statusLabel: string, returnText: string): string {
   const params = new URLSearchParams({
     text: predictionShareText(prediction, statusLabel, returnText),
-    url: predictionUrl(prediction.id),
+    url: predictionUrl(prediction),
   });
 
   return `https://twitter.com/intent/tweet?${params.toString()}`;

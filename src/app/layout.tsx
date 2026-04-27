@@ -24,7 +24,7 @@ const ibmPlexSans = IBM_Plex_Sans({
 export const metadata: Metadata = {
   metadataBase: getSiteUrl(),
   title: "YouAnalyst | Your watchlist. Your track record.",
-  description: "Make public stock predictions, organize them into watchlists, and build an analyst track record in public.",
+  description: "Create watchlists, publish stock predictions, and build a public track record on YouAnalyst.",
   applicationName: "YouAnalyst",
   alternates: {
     canonical: "/",
@@ -34,12 +34,12 @@ export const metadata: Metadata = {
     url: "/",
     siteName: "YouAnalyst",
     title: "YouAnalyst | Your watchlist. Your track record.",
-    description: "Make public stock predictions, organize them into watchlists, and build an analyst track record in public.",
+    description: "Create watchlists, publish stock predictions, and build a public track record on YouAnalyst.",
   },
   twitter: {
     card: "summary",
     title: "YouAnalyst | Your watchlist. Your track record.",
-    description: "Make public stock predictions, organize them into watchlists, and build an analyst track record in public.",
+    description: "Create watchlists, publish stock predictions, and build a public track record on YouAnalyst.",
   },
   robots: isProductionAppEnvironment()
     ? {
@@ -59,7 +59,7 @@ export default function RootLayout({
     "@type": "WebSite",
     name: "YouAnalyst",
     url: absoluteUrl("/"),
-    description: "Make public stock predictions, organize them into watchlists, and build an analyst track record in public.",
+    description: "Create watchlists, publish stock predictions, and build a public track record on YouAnalyst.",
   };
 
   return (

@@ -10,6 +10,6 @@ export default async function Image({
 }: {
   params: Promise<{ id: string; watchlistId: string }>;
 }) {
-  const { id, watchlistId } = await params;
-  return createWatchlistShareImage(id, watchlistId);
+  const { watchlistId } = await params;
+  return createWatchlistShareImage(watchlistId);
 }

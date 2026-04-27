@@ -8,8 +8,8 @@ export const contentType = watchlistShareCardContentType;
 export default async function Image({
   params,
 }: {
-  params: Promise<{ id: string; watchlistId: string }>;
+  params: Promise<{ id: string }>;
 }) {
-  const { watchlistId } = await params;
-  return createWatchlistShareImage(watchlistId);
+  const { id } = await params;
+  return createWatchlistShareImage(id);
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatTickerSymbol, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
+import { watchlistCanonicalPath, watchlistShareVersion } from "@/lib/watchlists/public-share";
 
 type WatchlistPrediction = {
   id: string;
@@ -59,18 +60,12 @@ function returnText(value: number | null): string {
   return `${sign}${percent.toFixed(2)}%`;
 }
 
-function watchlistShareVersion(watchlist: Pick<WatchlistDetail, "id" | "createdAt" | "updatedAt">): string {
-  const versionSource = watchlist.updatedAt || watchlist.createdAt || watchlist.id;
-  const compactVersion = versionSource.replace(/[^0-9A-Za-z]/g, "");
-  return `v1-${compactVersion || watchlist.id}`;
-}
-
 function watchlistShareUrl(watchlist: Pick<WatchlistDetail, "id" | "createdAt" | "updatedAt">): string {
-  const url = new URL(window.location.href);
+  const url = new URL(watchlistCanonicalPath(watchlist.id), window.location.origin);
   url.searchParams.set("utm_source", "x");
   url.searchParams.set("utm_medium", "social");
   url.searchParams.set("utm_campaign", "watchlist_share");
-  url.searchParams.set("share", watchlistShareVersion(watchlist));
+  url.searchParams.set("share", watchlistShareVersion(watchlist.id, watchlist));
   return url.toString();
 }
 

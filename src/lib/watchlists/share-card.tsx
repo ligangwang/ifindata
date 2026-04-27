@@ -101,14 +101,16 @@ function metricTone(watchlist: ShareCardWatchlist): string {
   return "#cbd5e1";
 }
 
-async function getShareCardWatchlist(ownerId: string, watchlistId: string): Promise<ShareCardWatchlist | null> {
-  const db = getAdminFirestore();
-  const [userSnapshot, watchlist] = await Promise.all([
-    db.collection("users").doc(ownerId).get(),
-    getWatchlistDetail(watchlistId),
-  ]);
+async function getShareCardWatchlist(watchlistId: string): Promise<ShareCardWatchlist | null> {
+  const watchlist = await getWatchlistDetail(watchlistId);
+  if (!watchlist) {
+    return null;
+  }
 
-  if (!userSnapshot.exists || !watchlist) {
+  const db = getAdminFirestore();
+  const userSnapshot = await db.collection("users").doc(watchlist.userId).get();
+
+  if (!userSnapshot.exists) {
     return null;
   }
 
@@ -118,7 +120,7 @@ async function getShareCardWatchlist(ownerId: string, watchlistId: string): Prom
       ? (user.settings as Record<string, unknown>)
       : null;
 
-  if (watchlist.userId !== ownerId || watchlist.isPublic === false || settings?.isPublic === false || watchlist.archivedAt) {
+  if (watchlist.isPublic === false || settings?.isPublic === false || watchlist.archivedAt) {
     return null;
   }
 
@@ -142,7 +144,7 @@ async function getShareCardWatchlist(ownerId: string, watchlistId: string): Prom
 }
 
 function shareCardImage(watchlist: ShareCardWatchlist) {
-  const summary = `${watchlist.livePredictionCount} live call${watchlist.livePredictionCount === 1 ? "" : "s"} • ${watchlist.settledPredictionCount} settled`;
+  const summary = `${watchlist.livePredictionCount} live call${watchlist.livePredictionCount === 1 ? "" : "s"} - ${watchlist.settledPredictionCount} settled`;
 
   return (
     <div
@@ -177,7 +179,7 @@ function shareCardImage(watchlist: ShareCardWatchlist) {
         </div>
         {watchlist.tickers.length > 0 ? (
           <div style={{ color: "#38bdf8", display: "flex", fontSize: 28, fontWeight: 600, marginTop: 18 }}>
-            {watchlist.tickers.map((ticker) => `$${ticker}`).join(" · ")}
+            {watchlist.tickers.map((ticker) => `$${ticker}`).join(" - ")}
           </div>
         ) : null}
       </div>
@@ -185,10 +187,10 @@ function shareCardImage(watchlist: ShareCardWatchlist) {
   );
 }
 
-export async function createWatchlistShareImage(ownerId: string, watchlistId: string): Promise<ImageResponse> {
+export async function createWatchlistShareImage(watchlistId: string): Promise<ImageResponse> {
   let watchlist: ShareCardWatchlist | null = null;
   try {
-    watchlist = await getShareCardWatchlist(ownerId, watchlistId);
+    watchlist = await getShareCardWatchlist(watchlistId);
   } catch {
     watchlist = null;
   }

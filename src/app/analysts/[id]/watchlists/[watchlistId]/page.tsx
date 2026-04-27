@@ -3,6 +3,16 @@ import { WatchlistDetailPage } from "@/components/watchlist-detail-page";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { noIndexRobots } from "@/lib/seo";
 
+const WATCHLIST_SHARE_CARD_VERSION = "v1";
+
+function watchlistShareVersion(watchlistId: string, watchlist: Record<string, unknown>): string {
+  const updatedAt = typeof watchlist.updatedAt === "string" ? watchlist.updatedAt.trim() : "";
+  const createdAt = typeof watchlist.createdAt === "string" ? watchlist.createdAt.trim() : "";
+  const versionSource = updatedAt || createdAt || watchlistId;
+  const compactVersion = versionSource.replace(/[^0-9A-Za-z]/g, "");
+  return `${WATCHLIST_SHARE_CARD_VERSION}-${compactVersion || watchlistId}`;
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -44,6 +54,9 @@ export async function generateMetadata({
     const descriptionValue = typeof watchlist.description === "string" ? watchlist.description.trim() : "";
     const title = `${watchlistName} | ${ownerLabel} | YouAnalyst`;
     const description = descriptionValue || `${ownerLabel}'s public ${watchlistName} watchlist on YouAnalyst.`;
+    const shareVersion = watchlistShareVersion(watchlistId, watchlist);
+    const openGraphImage = `/analysts/${id}/watchlists/${watchlistId}/opengraph-image?v=${shareVersion}`;
+    const twitterImage = `/analysts/${id}/watchlists/${watchlistId}/twitter-image?v=${shareVersion}`;
 
     return {
       title,
@@ -55,10 +68,20 @@ export async function generateMetadata({
         title,
         description,
         url: `/analysts/${id}/watchlists/${watchlistId}`,
+        images: [
+          {
+            url: openGraphImage,
+            width: 1200,
+            height: 630,
+            alt: "YouAnalyst watchlist share card",
+          },
+        ],
       },
       twitter: {
+        card: "summary_large_image",
         title,
         description,
+        images: [twitterImage],
       },
     };
   } catch {

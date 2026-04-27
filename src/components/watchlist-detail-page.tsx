@@ -31,6 +31,8 @@ type WatchlistDetail = {
   name: string;
   description?: string | null;
   isPublic: boolean;
+  createdAt: string;
+  updatedAt: string;
   metrics: {
     liveReturn: number | null;
     settledReturn: number | null;
@@ -57,26 +59,36 @@ function returnText(value: number | null): string {
   return `${sign}${percent.toFixed(2)}%`;
 }
 
-function watchlistShareUrl(): string {
+function watchlistShareVersion(watchlist: Pick<WatchlistDetail, "id" | "createdAt" | "updatedAt">): string {
+  const versionSource = watchlist.updatedAt || watchlist.createdAt || watchlist.id;
+  const compactVersion = versionSource.replace(/[^0-9A-Za-z]/g, "");
+  return `v1-${compactVersion || watchlist.id}`;
+}
+
+function watchlistShareUrl(watchlist: Pick<WatchlistDetail, "id" | "createdAt" | "updatedAt">): string {
   const url = new URL(window.location.href);
   url.searchParams.set("utm_source", "x");
   url.searchParams.set("utm_medium", "social");
   url.searchParams.set("utm_campaign", "watchlist_share");
+  url.searchParams.set("share", watchlistShareVersion(watchlist));
   return url.toString();
 }
 
 function watchlistShareText(watchlist: WatchlistDetail): string {
   const liveCount = watchlist.metrics.livePredictionCount;
   const settledCount = watchlist.metrics.settledPredictionCount;
-  const lines = [`Tracking this public watchlist on YouAnalyst: ${watchlist.name}`];
+  const lines = [`Tracking ${watchlist.name} on my public YouAnalyst watchlist.`];
 
   if (watchlist.description?.trim()) {
     lines.push("", watchlist.description.trim());
   }
 
-  lines.push("", `${liveCount} live call${liveCount === 1 ? "" : "s"}`);
-  if (settledCount > 0) {
-    lines.push(`${settledCount} settled call${settledCount === 1 ? "" : "s"}`);
+  if (typeof watchlist.metrics.liveReturn === "number") {
+    lines.push("", `Current live return: ${returnText(watchlist.metrics.liveReturn)} across ${liveCount} live call${liveCount === 1 ? "" : "s"}.`);
+  } else if (settledCount > 0) {
+    lines.push("", `${liveCount} live call${liveCount === 1 ? "" : "s"} and ${settledCount} settled call${settledCount === 1 ? "" : "s"} on the board.`);
+  } else {
+    lines.push("", `${liveCount} live call${liveCount === 1 ? "" : "s"} on the board.`);
   }
 
   return lines.join("\n");
@@ -85,7 +97,7 @@ function watchlistShareText(watchlist: WatchlistDetail): string {
 function watchlistShareIntentUrl(watchlist: WatchlistDetail): string {
   const params = new URLSearchParams({
     text: watchlistShareText(watchlist),
-    url: watchlistShareUrl(),
+    url: watchlistShareUrl(watchlist),
   });
 
   return `https://twitter.com/intent/tweet?${params.toString()}`;

@@ -36,7 +36,8 @@ export async function PATCH(
     const isValidationError =
       /required|must|invalid|enabled/i.test(message) ||
       /part of pro|upgrade/i.test(message) ||
-      /public predictions cannot be moved into private watchlists/i.test(message);
+      /public predictions cannot be moved into private watchlists/i.test(message) ||
+      /limit reached|already exists in that watchlist/i.test(message);
     const status = /forbidden/i.test(message)
       ? 403
       : /not found/i.test(message)

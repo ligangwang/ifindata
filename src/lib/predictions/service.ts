@@ -58,7 +58,7 @@ type ListPredictionsResult = {
 
 const PUBLIC_PREDICTION_STATUSES = ["CREATED", "OPEN", "SETTLED", "OPENING", "CLOSING", "CLOSED"] as const;
 const ACTIVE_PREDICTION_STATUSES = ["CREATED", "OPEN", "OPENING", "CLOSING"] as const;
-const ACTIVE_TICKER_LOCK_COLLECTION = "prediction_active_tickers";
+const MAX_ACTIVE_PREDICTIONS_PER_TICKER = 2;
 const CANCEL_WINDOW_MS = 5 * 60 * 1000;
 const TIME_HORIZON_LIMITS: Record<PredictionTimeHorizonUnit, number> = {
   DAYS: 3650,
@@ -137,14 +137,6 @@ function computeTimeHorizonTargetDate(baseDate: string, value: number, unit: Pre
 
 function eodRunDocId(runDate: string, market = "US"): string {
   return [market, runDate].join("_");
-}
-
-function activeTickerLockDocId(userId: string, ticker: string): string {
-  return [userId, ticker].join("__");
-}
-
-function activeTickerLockRef(db: FirebaseFirestore.Firestore, userId: string, ticker: string) {
-  return db.collection(ACTIVE_TICKER_LOCK_COLLECTION).doc(activeTickerLockDocId(userId, ticker));
 }
 
 function predictionPerformanceValue(
@@ -435,6 +427,57 @@ async function assertOpenUntilAfterLatestEod(ticker: string, timeHorizon: Predic
   );
 }
 
+async function listActivePredictionsForTickerInTransaction(
+  tx: FirebaseFirestore.Transaction,
+  db: FirebaseFirestore.Firestore,
+  userId: string,
+  ticker: string,
+): Promise<Array<{ id: string; watchlistId: string; status: PredictionStatus }>> {
+  const snapshot = await tx.get(
+    db.collection("predictions")
+      .where("userId", "==", userId)
+      .where("ticker", "==", ticker),
+  );
+
+  return snapshot.docs
+    .map((doc) => {
+      const data = doc.data() as Prediction;
+      const status = canonicalPredictionStatus(data.status);
+      const watchlistId = typeof data.watchlistId === "string" ? data.watchlistId.trim() : "";
+      if (!status || !ACTIVE_PREDICTION_STATUSES.includes(status as (typeof ACTIVE_PREDICTION_STATUSES)[number]) || !watchlistId) {
+        return null;
+      }
+
+      return {
+        id: doc.id,
+        watchlistId,
+        status,
+      };
+    })
+    .filter((prediction): prediction is { id: string; watchlistId: string; status: PredictionStatus } => prediction !== null);
+}
+
+function assertTickerActivePredictionLimit(
+  activePredictions: Array<{ id: string; watchlistId: string }>,
+  targetWatchlistId: string,
+  options: { excludePredictionId?: string } = {},
+): void {
+  const relevantPredictions = options.excludePredictionId
+    ? activePredictions.filter((prediction) => prediction.id !== options.excludePredictionId)
+    : activePredictions;
+
+  if (relevantPredictions.some((prediction) => prediction.watchlistId === targetWatchlistId)) {
+    throw new Error("An active prediction for this ticker already exists in that watchlist.");
+  }
+
+  const distinctWatchlistCount = new Set(relevantPredictions.map((prediction) => prediction.watchlistId)).size;
+  if (distinctWatchlistCount >= MAX_ACTIVE_PREDICTIONS_PER_TICKER) {
+    throw new Error(
+      `Active prediction limit reached for this ticker. You can track the same ticker in up to ${MAX_ACTIVE_PREDICTIONS_PER_TICKER} distinct watchlists at a time.`,
+    );
+  }
+}
+
 export function validateUpdatePredictionInput(raw: unknown, baseDate: string): UpdatePredictionInput {
   if (!raw || typeof raw !== "object") {
     throw new Error("Invalid request body");
@@ -467,8 +510,6 @@ export async function createPredictionForUser(
   const predictionRef = db.collection("predictions").doc();
   const userRef = db.collection("users").doc(user.uid);
   const watchlistRef = db.collection("watchlists").doc(input.watchlistId);
-  const tickerLockRef = activeTickerLockRef(db, user.uid, input.ticker);
-
 
   await db.runTransaction(async (tx) => {
     const [userSnapshot, entryTargetDate, watchlist] = await Promise.all([
@@ -480,18 +521,16 @@ export async function createPredictionForUser(
       throw new Error("User profile not found. Complete bootstrap first.");
     }
 
-    const duplicateKey = [user.uid, input.ticker, entryTargetDate].join("__");
+    const duplicateKey = [user.uid, input.ticker, input.watchlistId, entryTargetDate].join("__");
     const uniqueRef = db.collection("prediction_uniques").doc(duplicateKey);
-    const [uniqueSnapshot, tickerLockSnapshot] = await Promise.all([
+    const [uniqueSnapshot, activeTickerPredictions] = await Promise.all([
       tx.get(uniqueRef),
-      tx.get(tickerLockRef),
+      listActivePredictionsForTickerInTransaction(tx, db, user.uid, input.ticker),
     ]);
     if (uniqueSnapshot.exists) {
-      throw new Error("Duplicate prediction exists for the same user, ticker, and entry target date.");
+      throw new Error("Duplicate prediction exists for the same user, ticker, watchlist, and entry target date.");
     }
-    if (tickerLockSnapshot.exists) {
-      throw new Error("Duplicate open prediction exists for this ticker.");
-    }
+    assertTickerActivePredictionLimit(activeTickerPredictions, input.watchlistId);
 
     const userData = userSnapshot.data() ?? {};
     const timeHorizon = input.timeHorizon
@@ -549,17 +588,10 @@ export async function createPredictionForUser(
       predictionId: predictionRef.id,
       userId: user.uid,
       ticker: input.ticker,
+      watchlistId: input.watchlistId,
       direction: input.direction,
       entryTargetDate,
       createdAt: nowIso,
-    });
-    tx.set(tickerLockRef, {
-      predictionId: predictionRef.id,
-      userId: user.uid,
-      ticker: input.ticker,
-      status: "CREATED",
-      createdAt: nowIso,
-      updatedAt: nowIso,
     });
 
     // If user is still 'user', promote to 'analyst' on first prediction
@@ -630,8 +662,6 @@ export async function closePredictionWithReason(predictionId: string, reason: st
       throw new Error("Prediction must remain open through at least one completed market day before settlement.");
     }
 
-    const tickerLockRef = activeTickerLockRef(db, user.uid, prediction.ticker);
-    const tickerLockSnapshot = await tx.get(tickerLockRef);
     tx.update(predictionRef, {
       status: "CLOSING",
       updatedAt: nowIso,
@@ -644,9 +674,6 @@ export async function closePredictionWithReason(predictionId: string, reason: st
       "stats.openPredictions": FieldValue.increment(-1),
       "stats.closingPredictions": FieldValue.increment(1),
     });
-    if (!tickerLockSnapshot.exists || tickerLockSnapshot.get("predictionId") === predictionId) {
-      tx.delete(tickerLockRef);
-    }
   });
 
   return { closed: false, status: resultStatus };
@@ -734,8 +761,6 @@ export async function cancelPrediction(predictionId: string, user: AuthedUser) {
         throw new Error("Create cancel window expired.");
       }
 
-      const tickerLockRef = activeTickerLockRef(db, user.uid, prediction.ticker);
-      const tickerLockSnapshot = await tx.get(tickerLockRef);
       nextStatus = "CANCELED";
       tx.update(predictionRef, {
         status: "CANCELED",
@@ -748,21 +773,12 @@ export async function cancelPrediction(predictionId: string, user: AuthedUser) {
         "stats.openingPredictions": FieldValue.increment(-1),
         "stats.canceledPredictions": FieldValue.increment(1),
       });
-      if (!tickerLockSnapshot.exists || tickerLockSnapshot.get("predictionId") === predictionId) {
-        tx.delete(tickerLockRef);
-      }
       return;
     }
 
     if (status === "CLOSING") {
       if (!hasCancelWindow(prediction.closeRequestedAt)) {
         throw new Error("Close cancel window expired.");
-      }
-
-      const tickerLockRef = activeTickerLockRef(db, user.uid, prediction.ticker);
-      const tickerLockSnapshot = await tx.get(tickerLockRef);
-      if (tickerLockSnapshot.exists && tickerLockSnapshot.get("predictionId") !== predictionId) {
-        throw new Error("Duplicate open prediction exists for this ticker.");
       }
 
       nextStatus = "OPEN";
@@ -778,14 +794,6 @@ export async function cancelPrediction(predictionId: string, user: AuthedUser) {
         "stats.closingPredictions": FieldValue.increment(-1),
         "stats.openPredictions": FieldValue.increment(1),
       });
-      tx.set(tickerLockRef, {
-        predictionId,
-        userId: user.uid,
-        ticker: prediction.ticker,
-        status: "OPEN",
-        createdAt: nowIso,
-        updatedAt: nowIso,
-      }, { merge: true });
       return;
     }
 

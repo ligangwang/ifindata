@@ -520,6 +520,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   }
 
   const thesis = sanitizePredictionThesis(prediction.thesis);
+  const thesisTitle = prediction.thesisTitle.trim();
   const isOwner = Boolean(user && user.uid === prediction.userId);
   const canShareToX = isOwner && prediction.visibility === "PUBLIC";
   const createdAtMs = Date.parse(prediction.createdAt);
@@ -756,12 +757,16 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           </div>
         ) : (
           <>
-            <h2 className="mb-2 font-[var(--font-sora)] text-2xl font-semibold text-slate-100">
-              {formatPredictionThesisTitle(prediction.thesisTitle)}
-            </h2>
-            <p className="text-sm text-slate-200">
-              <PredictionThesisText text={thesis} />
-            </p>
+            {thesisTitle ? (
+              <h2 className="mb-2 font-[var(--font-sora)] text-2xl font-semibold text-slate-100">
+                {formatPredictionThesisTitle(prediction.thesisTitle)}
+              </h2>
+            ) : null}
+            {thesis ? (
+              <p className="text-sm text-slate-200">
+                <PredictionThesisText text={thesis} />
+              </p>
+            ) : null}
           </>
         )}
         <div className="mt-4 grid gap-6 text-sm text-slate-300 sm:grid-cols-2">

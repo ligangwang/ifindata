@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { PredictionPriceChart, type PredictionPriceHistory } from "@/components/prediction-price-chart";
-import { formatPredictionStatus, formatPredictionThesisTitle, formatReturnPercent, formatTickerSymbol, formatTimeHorizon, markToneClass, PredictionAuthorSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { formatPredictionStatus, formatPredictionThesisTitle, formatReturnPercent, formatTickerSymbol, markToneClass, PredictionAuthorSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import {
   MAX_PREDICTION_THESIS_LENGTH,
   MAX_PREDICTION_THESIS_TITLE_LENGTH,
@@ -151,23 +151,19 @@ function predictionUrl(prediction: PredictionDetail): string {
 }
 
 function predictionShareText(prediction: PredictionDetail, statusLabel: string, returnText: string): string {
-  const direction = prediction.direction === "UP" ? "Bullish" : "Bearish";
-  const title = formatPredictionThesisTitle(prediction.thesisTitle);
-  const horizon = formatTimeHorizon(prediction.timeHorizon);
-  const lines = [
-    "I'm tracking this stock call publicly on YouAnalyst:",
-    "",
-    `${direction} ${formatTickerSymbol(prediction.ticker)}`,
-    title,
-    `Status: ${statusLabel}`,
-    `Return: ${predictionShareReturnText(prediction, returnText)}`,
-  ];
+  const ticker = formatTickerSymbol(prediction.ticker);
+  const shareReturn = predictionShareReturnText(prediction, returnText);
+  const title = prediction.thesisTitle.trim();
 
-  if (horizon) {
-    lines.push(`Open until: ${horizon}`);
+  if (typeof prediction.markReturnValue === "number") {
+    return title
+      ? `${ticker} is ${shareReturn} on my public YouAnalyst track record.\n\n${title}`
+      : `${ticker} is ${shareReturn} on my public YouAnalyst track record.`;
   }
 
-  return lines.join("\n");
+  return title
+    ? `Tracking this public ${ticker} call on YouAnalyst.\n\n${title}\nStatus: ${statusLabel}`
+    : `Tracking this public ${ticker} call on YouAnalyst.\nStatus: ${statusLabel}`;
 }
 
 function predictionShareUrl(prediction: PredictionDetail, statusLabel: string, returnText: string): string {

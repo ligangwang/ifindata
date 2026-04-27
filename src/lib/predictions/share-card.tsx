@@ -89,22 +89,6 @@ async function getShareCardPrediction(predictionId: string): Promise<ShareCardPr
   };
 }
 
-function statusLabel(status: PredictionStatus): string {
-  if (status === "CREATED") {
-    return "Awaiting entry";
-  }
-  if (status === "OPEN") {
-    return "Live";
-  }
-  if (status === "CLOSING") {
-    return "Closing";
-  }
-  if (status === "SETTLED") {
-    return "Settled";
-  }
-  return "Canceled";
-}
-
 function formatReturnPercent(returnValue: number): string {
   const percent = returnValue * 100;
   const sign = percent > 0 ? "+" : "";
@@ -182,11 +166,8 @@ function shareCardImage(prediction: ShareCardPrediction) {
         <div style={{ color: "#f8fafc", display: "flex", fontSize: 54, fontWeight: 700, marginTop: 22 }}>
           {title}
         </div>
-        <div style={{ color: "#cbd5e1", display: "flex", fontSize: 30, marginTop: 28 }}>
-          {`Status: ${statusLabel(prediction.status)}`}
-        </div>
         {shareReturn ? (
-          <div style={{ alignItems: "baseline", display: "flex", fontSize: 30, gap: 12, marginTop: 18 }}>
+          <div style={{ alignItems: "baseline", display: "flex", fontSize: 30, gap: 12, marginTop: 28 }}>
             <div style={{ color: "#cbd5e1", display: "flex" }}>
               Return:
             </div>

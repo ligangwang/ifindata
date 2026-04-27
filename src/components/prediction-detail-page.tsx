@@ -150,7 +150,7 @@ function predictionUrl(prediction: PredictionDetail): string {
   return url.toString();
 }
 
-function predictionShareText(prediction: PredictionDetail, statusLabel: string, returnText: string): string {
+function predictionShareText(prediction: PredictionDetail, returnText: string): string {
   const ticker = formatTickerSymbol(prediction.ticker);
   const shareReturn = predictionShareReturnText(prediction, returnText);
   const title = prediction.thesisTitle.trim();
@@ -162,13 +162,13 @@ function predictionShareText(prediction: PredictionDetail, statusLabel: string, 
   }
 
   return title
-    ? `Tracking this public ${ticker} call on YouAnalyst.\n\n${title}\nStatus: ${statusLabel}`
-    : `Tracking this public ${ticker} call on YouAnalyst.\nStatus: ${statusLabel}`;
+    ? `Tracking this public ${ticker} call on YouAnalyst.\n\n${title}`
+    : `Tracking this public ${ticker} call on YouAnalyst.`;
 }
 
-function predictionShareUrl(prediction: PredictionDetail, statusLabel: string, returnText: string): string {
+function predictionShareUrl(prediction: PredictionDetail, returnText: string): string {
   const params = new URLSearchParams({
-    text: predictionShareText(prediction, statusLabel, returnText),
+    text: predictionShareText(prediction, returnText),
     url: predictionUrl(prediction),
   });
 
@@ -544,7 +544,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           ? { action: "cancel" as const, label: "Cancel close" }
         : null;
   const statusLabel = isSettlementPending ? "Settles at next close" : formatPredictionStatus(prediction.status);
-  const xShareUrl = predictionShareUrl(prediction, statusLabel, returnText);
+  const xShareUrl = predictionShareUrl(prediction, returnText);
   const movingPublicPredictionToPrivate =
     prediction.visibility === "PUBLIC" &&
     ownerWatchlists.find((watchlist) => watchlist.id === moveWatchlistId)?.isPublic === false;

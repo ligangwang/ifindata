@@ -580,8 +580,10 @@ export async function movePredictionToWatchlist(
     if (prediction.visibility === "PUBLIC" && !watchlist.isPublic) {
       throw new Error("Public predictions cannot be moved into private watchlists. Close the prediction if you no longer want to continue it publicly.");
     }
-    const activePredictions = await listActivePredictionsForTickerInTransaction(tx, db, user.uid, prediction.ticker);
-    assertTickerActivePredictionLimit(activePredictions, watchlist.id, { excludePredictionId: predictionId });
+    if (ACTIVE_PREDICTION_STATUSES.includes(status as (typeof ACTIVE_PREDICTION_STATUSES)[number])) {
+      const activePredictions = await listActivePredictionsForTickerInTransaction(tx, db, user.uid, prediction.ticker);
+      assertTickerActivePredictionLimit(activePredictions, watchlist.id, { excludePredictionId: predictionId });
+    }
     movedWatchlistId = watchlist.id;
     movedWatchlistName = watchlist.name;
     tx.update(predictionRef, {

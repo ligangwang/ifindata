@@ -3,6 +3,7 @@ import { areProFeaturesEnabled, canUseProFeaturesForUserData } from "@/lib/featu
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
   canonicalPredictionStatus,
+  type PredictionStatus,
   sanitizePredictionThesis,
   sanitizePredictionThesisTitle,
   type Prediction,
@@ -15,6 +16,8 @@ export const MAX_WATCHLIST_DESCRIPTION_LENGTH = 500;
 
 const LIVE_STATUSES = new Set(["CREATED", "OPEN", "CLOSING"]);
 const SETTLED_STATUSES = new Set(["SETTLED"]);
+const ACTIVE_PREDICTION_STATUSES = ["CREATED", "OPEN", "OPENING", "CLOSING"] as const;
+const MAX_ACTIVE_PREDICTIONS_PER_TICKER = 2;
 
 type AuthedUser = {
   uid: string;
@@ -161,6 +164,57 @@ function watchlistPerformanceValue(metrics: WatchlistMetrics): number | null {
 
 function predictionVisibilityForWatchlist(watchlist: Pick<Watchlist, "isPublic">): PredictionVisibility {
   return watchlist.isPublic ? "PUBLIC" : "PRIVATE";
+}
+
+async function listActivePredictionsForTickerInTransaction(
+  tx: FirebaseFirestore.Transaction,
+  db: FirebaseFirestore.Firestore,
+  userId: string,
+  ticker: string,
+): Promise<Array<{ id: string; watchlistId: string; status: PredictionStatus }>> {
+  const snapshot = await tx.get(
+    db.collection("predictions")
+      .where("userId", "==", userId)
+      .where("ticker", "==", ticker),
+  );
+
+  return snapshot.docs
+    .map((doc) => {
+      const data = doc.data() as Prediction;
+      const status = canonicalPredictionStatus(data.status);
+      const watchlistId = typeof data.watchlistId === "string" ? data.watchlistId.trim() : "";
+      if (!status || !ACTIVE_PREDICTION_STATUSES.includes(status as (typeof ACTIVE_PREDICTION_STATUSES)[number]) || !watchlistId) {
+        return null;
+      }
+
+      return {
+        id: doc.id,
+        watchlistId,
+        status,
+      };
+    })
+    .filter((prediction): prediction is { id: string; watchlistId: string; status: PredictionStatus } => prediction !== null);
+}
+
+function assertTickerActivePredictionLimit(
+  activePredictions: Array<{ id: string; watchlistId: string }>,
+  targetWatchlistId: string,
+  options: { excludePredictionId?: string } = {},
+): void {
+  const relevantPredictions = options.excludePredictionId
+    ? activePredictions.filter((prediction) => prediction.id !== options.excludePredictionId)
+    : activePredictions;
+
+  if (relevantPredictions.some((prediction) => prediction.watchlistId === targetWatchlistId)) {
+    throw new Error("An active prediction for this ticker already exists in that watchlist.");
+  }
+
+  const distinctWatchlistCount = new Set(relevantPredictions.map((prediction) => prediction.watchlistId)).size;
+  if (distinctWatchlistCount >= MAX_ACTIVE_PREDICTIONS_PER_TICKER) {
+    throw new Error(
+      `Active prediction limit reached for this ticker. You can track the same ticker in up to ${MAX_ACTIVE_PREDICTIONS_PER_TICKER} distinct watchlists at a time.`,
+    );
+  }
 }
 
 async function listWatchlistPredictions(
@@ -525,6 +579,10 @@ export async function movePredictionToWatchlist(
     }
     if (prediction.visibility === "PUBLIC" && !watchlist.isPublic) {
       throw new Error("Public predictions cannot be moved into private watchlists. Close the prediction if you no longer want to continue it publicly.");
+    }
+    if (ACTIVE_PREDICTION_STATUSES.includes(status as (typeof ACTIVE_PREDICTION_STATUSES)[number])) {
+      const activePredictions = await listActivePredictionsForTickerInTransaction(tx, db, user.uid, prediction.ticker);
+      assertTickerActivePredictionLimit(activePredictions, watchlist.id, { excludePredictionId: predictionId });
     }
     movedWatchlistId = watchlist.id;
     movedWatchlistName = watchlist.name;

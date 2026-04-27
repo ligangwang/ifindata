@@ -90,7 +90,8 @@ export async function POST(request: NextRequest) {
           message.includes("Invalid") ||
           message.includes("enabled") ||
           /part of pro|upgrade/i.test(message) ||
-          message.includes("future")
+          message.includes("future") ||
+          /limit reached|already exists in that watchlist/i.test(message)
         ? 400
         : 500;
 

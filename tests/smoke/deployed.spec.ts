@@ -14,7 +14,7 @@ test("homepage renders predictions feed", async ({ page }) => {
 
   // Verify navigation is present
   await expect(page.getByRole("link", { name: "Feed", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Predict/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Predict", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Top Calls" })).toBeVisible();
   
   // Verify simplified predictions feed is on the page

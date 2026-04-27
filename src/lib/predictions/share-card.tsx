@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getAdminFirestore } from "@/lib/firebase/admin";
-import { canonicalPredictionStatus, normalizeTicker, type PredictionDirection, type PredictionStatus } from "@/lib/predictions/types";
+import { normalizeTicker, type PredictionDirection } from "@/lib/predictions/types";
 
 export const predictionShareCardSize = {
   width: 1200,
@@ -13,7 +13,6 @@ type ShareCardPrediction = {
   ticker: string;
   direction: PredictionDirection;
   thesisTitle: string;
-  status: PredictionStatus;
   entryDate: string | null;
   markPriceDate: string | null;
   returnValue: number | null;
@@ -62,7 +61,6 @@ async function getShareCardPrediction(predictionId: string): Promise<ShareCardPr
 
   const data = snapshot.data() as Record<string, unknown>;
   const visibility = typeof data.visibility === "string" ? data.visibility : "";
-  const status = canonicalPredictionStatus(data.status);
   const ticker = typeof data.ticker === "string" ? normalizeTicker(data.ticker) : "";
   const direction = data.direction === "DOWN" ? "DOWN" : data.direction === "UP" ? "UP" : null;
   const thesisTitle = typeof data.thesisTitle === "string" ? data.thesisTitle.trim() : "";
@@ -74,7 +72,7 @@ async function getShareCardPrediction(predictionId: string): Promise<ShareCardPr
   const settledReturnValue =
     result && typeof result.returnValue === "number" && Number.isFinite(result.returnValue) ? result.returnValue : null;
 
-  if (visibility !== "PUBLIC" || status === null || status === "CANCELED" || !ticker || !direction) {
+  if (visibility !== "PUBLIC" || !ticker || !direction) {
     return null;
   }
 
@@ -82,7 +80,6 @@ async function getShareCardPrediction(predictionId: string): Promise<ShareCardPr
     ticker,
     direction,
     thesisTitle,
-    status,
     entryDate,
     markPriceDate,
     returnValue: settledReturnValue ?? markReturnValue,
@@ -137,7 +134,8 @@ function returnToneColor(returnValue: number): string {
 
 function shareCardImage(prediction: ShareCardPrediction) {
   const directionLabel = prediction.direction === "DOWN" ? "Bearish" : "Bullish";
-  const title = prediction.thesisTitle || `${directionLabel} call on ${prediction.ticker}`;
+  const hasCustomTitle = Boolean(prediction.thesisTitle);
+  const title = hasCustomTitle ? prediction.thesisTitle : `${directionLabel} ${prediction.ticker}`;
   const shareReturn = returnLabel(prediction);
   const shareReturnColor =
     typeof prediction.returnValue === "number" ? returnToneColor(prediction.returnValue) : "#cbd5e1";
@@ -151,7 +149,7 @@ function shareCardImage(prediction: ShareCardPrediction) {
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        justifyContent: "space-between",
+        justifyContent: "flex-start",
         padding: "56px 64px",
         width: "100%",
       }}
@@ -159,10 +157,12 @@ function shareCardImage(prediction: ShareCardPrediction) {
       <div style={{ display: "flex", flexDirection: "column" }}>
         <Brand />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", maxWidth: "1000px" }}>
-        <div style={{ color: "#38bdf8", display: "flex", fontSize: 34, fontWeight: 700 }}>
-          {`${directionLabel} ${prediction.ticker}`}
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", marginTop: 104, maxWidth: "1000px" }}>
+        {hasCustomTitle ? (
+          <div style={{ color: "#38bdf8", display: "flex", fontSize: 34, fontWeight: 700 }}>
+            {`${directionLabel} ${prediction.ticker}`}
+          </div>
+        ) : null}
         <div style={{ color: "#f8fafc", display: "flex", fontSize: 54, fontWeight: 700, marginTop: 22 }}>
           {title}
         </div>

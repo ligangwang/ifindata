@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { PredictionPriceChart, type PredictionPriceHistory } from "@/components/prediction-price-chart";
-import { formatPredictionStatus, formatPredictionThesisTitle, formatReturnPercent, formatTickerSymbol, formatTimeHorizon, markToneClass, PredictionAuthorSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
+import { formatPredictionStatus, formatPredictionThesisTitle, formatReturnPercent, formatTickerSymbol, markToneClass, PredictionAuthorSummary, PredictionThesisText, RelativeTime } from "@/components/prediction-ui";
 import {
   MAX_PREDICTION_THESIS_LENGTH,
   MAX_PREDICTION_THESIS_TITLE_LENGTH,
@@ -150,29 +150,25 @@ function predictionUrl(prediction: PredictionDetail): string {
   return url.toString();
 }
 
-function predictionShareText(prediction: PredictionDetail, statusLabel: string, returnText: string): string {
-  const direction = prediction.direction === "UP" ? "Bullish" : "Bearish";
-  const title = formatPredictionThesisTitle(prediction.thesisTitle);
-  const horizon = formatTimeHorizon(prediction.timeHorizon);
-  const lines = [
-    "I'm tracking this stock call publicly on YouAnalyst:",
-    "",
-    `${direction} ${formatTickerSymbol(prediction.ticker)}`,
-    title,
-    `Status: ${statusLabel}`,
-    `Return: ${predictionShareReturnText(prediction, returnText)}`,
-  ];
+function predictionShareText(prediction: PredictionDetail, returnText: string): string {
+  const ticker = formatTickerSymbol(prediction.ticker);
+  const shareReturn = predictionShareReturnText(prediction, returnText);
+  const title = prediction.thesisTitle.trim();
 
-  if (horizon) {
-    lines.push(`Open until: ${horizon}`);
+  if (typeof prediction.markReturnValue === "number") {
+    return title
+      ? `${ticker} is ${shareReturn} on my public YouAnalyst track record.\n\n${title}`
+      : `${ticker} is ${shareReturn} on my public YouAnalyst track record.`;
   }
 
-  return lines.join("\n");
+  return title
+    ? `Tracking this public ${ticker} call on YouAnalyst.\n\n${title}`
+    : `Tracking this public ${ticker} call on YouAnalyst.`;
 }
 
-function predictionShareUrl(prediction: PredictionDetail, statusLabel: string, returnText: string): string {
+function predictionShareUrl(prediction: PredictionDetail, returnText: string): string {
   const params = new URLSearchParams({
-    text: predictionShareText(prediction, statusLabel, returnText),
+    text: predictionShareText(prediction, returnText),
     url: predictionUrl(prediction),
   });
 
@@ -520,6 +516,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
   }
 
   const thesis = sanitizePredictionThesis(prediction.thesis);
+  const thesisTitle = prediction.thesisTitle.trim();
   const isOwner = Boolean(user && user.uid === prediction.userId);
   const canShareToX = isOwner && prediction.visibility === "PUBLIC";
   const createdAtMs = Date.parse(prediction.createdAt);
@@ -547,7 +544,7 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           ? { action: "cancel" as const, label: "Cancel close" }
         : null;
   const statusLabel = isSettlementPending ? "Settles at next close" : formatPredictionStatus(prediction.status);
-  const xShareUrl = predictionShareUrl(prediction, statusLabel, returnText);
+  const xShareUrl = predictionShareUrl(prediction, returnText);
   const movingPublicPredictionToPrivate =
     prediction.visibility === "PUBLIC" &&
     ownerWatchlists.find((watchlist) => watchlist.id === moveWatchlistId)?.isPublic === false;
@@ -756,12 +753,16 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
           </div>
         ) : (
           <>
-            <h2 className="mb-2 font-[var(--font-sora)] text-2xl font-semibold text-slate-100">
-              {formatPredictionThesisTitle(prediction.thesisTitle)}
-            </h2>
-            <p className="text-sm text-slate-200">
-              <PredictionThesisText text={thesis} />
-            </p>
+            {thesisTitle ? (
+              <h2 className="mb-2 font-[var(--font-sora)] text-2xl font-semibold text-slate-100">
+                {formatPredictionThesisTitle(prediction.thesisTitle)}
+              </h2>
+            ) : null}
+            {thesis ? (
+              <p className="text-sm text-slate-200">
+                <PredictionThesisText text={thesis} />
+              </p>
+            ) : null}
           </>
         )}
         <div className="mt-4 grid gap-6 text-sm text-slate-300 sm:grid-cols-2">

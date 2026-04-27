@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatTickerSymbol, PredictionReturnSummary } from "@/components/prediction-ui";
 import { type PredictionStatus } from "@/lib/predictions/types";
+import { watchlistCanonicalPath, watchlistShareVersion } from "@/lib/watchlists/public-share";
 
 type WatchlistPrediction = {
   id: string;
@@ -30,6 +31,9 @@ type WatchlistDetail = {
   userId: string;
   name: string;
   description?: string | null;
+  isPublic: boolean;
+  createdAt: string;
+  updatedAt: string;
   metrics: {
     liveReturn: number | null;
     settledReturn: number | null;
@@ -54,6 +58,44 @@ function returnText(value: number | null): string {
   const percent = value * 100;
   const sign = percent > 0 ? "+" : "";
   return `${sign}${percent.toFixed(2)}%`;
+}
+
+function watchlistShareUrl(watchlist: Pick<WatchlistDetail, "id" | "createdAt" | "updatedAt">): string {
+  const url = new URL(watchlistCanonicalPath(watchlist.id), window.location.origin);
+  url.searchParams.set("utm_source", "x");
+  url.searchParams.set("utm_medium", "social");
+  url.searchParams.set("utm_campaign", "watchlist_share");
+  url.searchParams.set("share", watchlistShareVersion(watchlist.id, watchlist));
+  return url.toString();
+}
+
+function watchlistShareText(watchlist: WatchlistDetail): string {
+  const liveCount = watchlist.metrics.livePredictionCount;
+  const settledCount = watchlist.metrics.settledPredictionCount;
+  const lines = [`Tracking ${watchlist.name} on my public YouAnalyst watchlist.`];
+
+  if (watchlist.description?.trim()) {
+    lines.push("", watchlist.description.trim());
+  }
+
+  if (typeof watchlist.metrics.liveReturn === "number") {
+    lines.push("", `Current live return: ${returnText(watchlist.metrics.liveReturn)} across ${liveCount} live call${liveCount === 1 ? "" : "s"}.`);
+  } else if (settledCount > 0) {
+    lines.push("", `${liveCount} live call${liveCount === 1 ? "" : "s"} and ${settledCount} settled call${settledCount === 1 ? "" : "s"} on the board.`);
+  } else {
+    lines.push("", `${liveCount} live call${liveCount === 1 ? "" : "s"} on the board.`);
+  }
+
+  return lines.join("\n");
+}
+
+function watchlistShareIntentUrl(watchlist: WatchlistDetail): string {
+  const params = new URLSearchParams({
+    text: watchlistShareText(watchlist),
+    url: watchlistShareUrl(watchlist),
+  });
+
+  return `https://twitter.com/intent/tweet?${params.toString()}`;
 }
 
 function PredictionRow({ prediction }: { prediction: WatchlistPrediction }) {
@@ -128,6 +170,13 @@ export function WatchlistDetailPage({
     };
   }, [watchlistId]);
 
+  function openShareIntent(): void {
+    if (!watchlist) {
+      return;
+    }
+    window.open(watchlistShareIntentUrl(watchlist), "_blank", "noopener,noreferrer");
+  }
+
   if (loading) {
     return <main className="mx-auto w-full max-w-5xl px-4 py-8 text-sm text-slate-300">Loading watchlist...</main>;
   }
@@ -139,8 +188,21 @@ export function WatchlistDetailPage({
   return (
     <main className="mx-auto grid w-full max-w-5xl gap-4 px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
-        <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">{watchlist.name}</h1>
-        {watchlist.description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{watchlist.description}</p> : null}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">{watchlist.name}</h1>
+            {watchlist.description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{watchlist.description}</p> : null}
+          </div>
+          {watchlist.isPublic ? (
+            <button
+              type="button"
+              onClick={openShareIntent}
+              className="rounded-lg bg-cyan-500 px-3 py-1.5 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+            >
+              Share to X
+            </button>
+          ) : null}
+        </div>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

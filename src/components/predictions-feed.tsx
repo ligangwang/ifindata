@@ -102,7 +102,7 @@ export function PredictionsFeed() {
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-4 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
         <div className="mb-4">
           <h1 className="text-lg font-semibold tracking-tight text-white sm:text-xl">Top Calls</h1>
-          <p className="mt-1 text-sm text-slate-300">Best-performing community predictions, with newer calls breaking ties.</p>
+          <p className="mt-1 text-sm text-slate-300">Create watchlists, publish stock calls, and let performance speak for itself.</p>
         </div>
 
         {loading ? <p className="text-sm text-slate-300">Loading feed...</p> : null}

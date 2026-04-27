@@ -2,19 +2,19 @@ import type { Metadata } from "next";
 import { PredictionsFeed } from "@/components/predictions-feed";
 
 export const metadata: Metadata = {
-  title: "Top stock predictions | YouAnalyst",
-  description: "Browse top-performing public stock predictions and analyst calls from the YouAnalyst community.",
+  title: "Build your track record in public | YouAnalyst",
+  description: "Create watchlists, publish stock calls, and let performance speak for itself on YouAnalyst.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Top stock predictions | YouAnalyst",
-    description: "Browse top-performing public stock predictions and analyst calls from the YouAnalyst community.",
+    title: "Build your track record in public | YouAnalyst",
+    description: "Create watchlists, publish stock calls, and let performance speak for itself on YouAnalyst.",
     url: "/",
   },
   twitter: {
-    title: "Top stock predictions | YouAnalyst",
-    description: "Browse top-performing public stock predictions and analyst calls from the YouAnalyst community.",
+    title: "Build your track record in public | YouAnalyst",
+    description: "Create watchlists, publish stock calls, and let performance speak for itself on YouAnalyst.",
   },
 };
 

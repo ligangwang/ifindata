@@ -21,8 +21,13 @@ type ShareCardPrediction = {
 
 function Brand() {
   return (
-    <div style={{ display: "flex", alignItems: "center", fontSize: 34, fontWeight: 800, color: "#f8fafc" }}>
-      You<span style={{ color: "#22c55e" }}>Analyst</span>
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", fontSize: 34, fontWeight: 800, color: "#f8fafc" }}>
+        You<span style={{ color: "#22c55e" }}>Analyst</span>
+      </div>
+      <div style={{ color: "#94a3b8", display: "flex", fontSize: 18, marginTop: 8 }}>
+        Your watchlist. Your track record.
+      </div>
     </div>
   );
 }

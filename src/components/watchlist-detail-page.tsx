@@ -30,6 +30,7 @@ type WatchlistDetail = {
   userId: string;
   name: string;
   description?: string | null;
+  isPublic: boolean;
   metrics: {
     liveReturn: number | null;
     settledReturn: number | null;
@@ -54,6 +55,40 @@ function returnText(value: number | null): string {
   const percent = value * 100;
   const sign = percent > 0 ? "+" : "";
   return `${sign}${percent.toFixed(2)}%`;
+}
+
+function watchlistShareUrl(): string {
+  const url = new URL(window.location.href);
+  url.searchParams.set("utm_source", "x");
+  url.searchParams.set("utm_medium", "social");
+  url.searchParams.set("utm_campaign", "watchlist_share");
+  return url.toString();
+}
+
+function watchlistShareText(watchlist: WatchlistDetail): string {
+  const liveCount = watchlist.metrics.livePredictionCount;
+  const settledCount = watchlist.metrics.settledPredictionCount;
+  const lines = [`Tracking this public watchlist on YouAnalyst: ${watchlist.name}`];
+
+  if (watchlist.description?.trim()) {
+    lines.push("", watchlist.description.trim());
+  }
+
+  lines.push("", `${liveCount} live call${liveCount === 1 ? "" : "s"}`);
+  if (settledCount > 0) {
+    lines.push(`${settledCount} settled call${settledCount === 1 ? "" : "s"}`);
+  }
+
+  return lines.join("\n");
+}
+
+function watchlistShareIntentUrl(watchlist: WatchlistDetail): string {
+  const params = new URLSearchParams({
+    text: watchlistShareText(watchlist),
+    url: watchlistShareUrl(),
+  });
+
+  return `https://twitter.com/intent/tweet?${params.toString()}`;
 }
 
 function PredictionRow({ prediction }: { prediction: WatchlistPrediction }) {
@@ -128,6 +163,13 @@ export function WatchlistDetailPage({
     };
   }, [watchlistId]);
 
+  function openShareIntent(): void {
+    if (!watchlist) {
+      return;
+    }
+    window.open(watchlistShareIntentUrl(watchlist), "_blank", "noopener,noreferrer");
+  }
+
   if (loading) {
     return <main className="mx-auto w-full max-w-5xl px-4 py-8 text-sm text-slate-300">Loading watchlist...</main>;
   }
@@ -139,8 +181,21 @@ export function WatchlistDetailPage({
   return (
     <main className="mx-auto grid w-full max-w-5xl gap-4 px-4 py-8">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
-        <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">{watchlist.name}</h1>
-        {watchlist.description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{watchlist.description}</p> : null}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="font-[var(--font-sora)] text-3xl font-semibold text-cyan-100">{watchlist.name}</h1>
+            {watchlist.description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{watchlist.description}</p> : null}
+          </div>
+          {watchlist.isPublic ? (
+            <button
+              type="button"
+              onClick={openShareIntent}
+              className="rounded-lg bg-cyan-500 px-3 py-1.5 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+            >
+              Share to X
+            </button>
+          ) : null}
+        </div>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

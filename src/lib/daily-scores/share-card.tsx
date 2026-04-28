@@ -109,7 +109,6 @@ function fallbackImage() {
 
 function shareCardImage(date: string | null, topCalls: DailyCallHighlight[]) {
   const callOfTheDay = topCalls[0] ?? null;
-  const listCalls = topCalls.slice(0, 4);
 
   return (
     <div
@@ -129,24 +128,40 @@ function shareCardImage(date: string | null, topCalls: DailyCallHighlight[]) {
       <div style={{ color: "#38bdf8", display: "flex", fontSize: 26, fontWeight: 700, marginTop: 60 }}>
         {dateLabel(date)}
       </div>
-      <div style={{ color: "#f8fafc", display: "flex", fontSize: 56, fontWeight: 800, marginTop: 14 }}>
-        Best Calls Today
+      <div style={{ color: "#f8fafc", display: "flex", fontSize: 52, fontWeight: 800, marginTop: 14 }}>
+        Top Call Today
       </div>
       {callOfTheDay ? (
-        <div style={{ display: "flex", flexDirection: "column", marginTop: 28, width: "100%" }}>
-          <div style={{ alignItems: "baseline", display: "flex", gap: 18 }}>
-            <div style={{ color: "#bae6fd", display: "flex", fontSize: 36, fontWeight: 800 }}>
-              {directionArrow(callOfTheDay.direction)} {tickerText(callOfTheDay)}
+        <div
+          style={{
+            borderColor: "rgba(148, 163, 184, 0.22)",
+            borderRadius: 24,
+            borderStyle: "solid",
+            borderWidth: 1,
+            display: "flex",
+            flexDirection: "column",
+            marginTop: 38,
+            padding: "34px 38px",
+            width: "100%",
+          }}
+        >
+          <div style={{ alignItems: "flex-start", display: "flex", justifyContent: "space-between", width: "100%" }}>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ color: "#bae6fd", display: "flex", fontSize: 42, fontWeight: 800 }}>
+                {directionArrow(callOfTheDay.direction)} {tickerText(callOfTheDay)}
+              </div>
+              <div style={{ color: "#cbd5e1", display: "flex", fontSize: 26, marginTop: 14 }}>
+                by {userName(callOfTheDay)}
+              </div>
             </div>
-            <div style={{ color: returnToneColor(callOfTheDay.dailyReturnChange), display: "flex", fontSize: 40, fontWeight: 800 }}>
-              {dailyReturnText(callOfTheDay.dailyReturnChange)}
+            <div style={{ alignItems: "flex-end", display: "flex", flexDirection: "column" }}>
+              <div style={{ color: returnToneColor(callOfTheDay.dailyReturnChange), display: "flex", fontSize: 62, fontWeight: 800 }}>
+                {dailyReturnText(callOfTheDay.dailyReturnChange)}
+              </div>
+              <div style={{ color: "#94a3b8", display: "flex", fontSize: 24, marginTop: 8 }}>
+                {scoreText(callOfTheDay.dailyScoreChange)} score today
+              </div>
             </div>
-            <div style={{ color: "#94a3b8", display: "flex", fontSize: 24 }}>
-              {scoreText(callOfTheDay.dailyScoreChange)} score today
-            </div>
-          </div>
-          <div style={{ color: "#cbd5e1", display: "flex", fontSize: 24, marginTop: 8 }}>
-            Call of the day by {userName(callOfTheDay)}
           </div>
         </div>
       ) : (
@@ -154,46 +169,6 @@ function shareCardImage(date: string | null, topCalls: DailyCallHighlight[]) {
           No daily highlights yet.
         </div>
       )}
-      {listCalls.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 30, width: "100%" }}>
-          {listCalls.map((call, index) => (
-            <div
-              key={call.predictionId}
-              style={{
-                alignItems: "center",
-                borderColor: "rgba(148, 163, 184, 0.22)",
-                borderRadius: 14,
-                borderStyle: "solid",
-                borderWidth: 1,
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "12px 18px",
-                width: "100%",
-              }}
-            >
-              <div style={{ alignItems: "baseline", display: "flex", gap: 14 }}>
-                <div style={{ color: "#67e8f9", display: "flex", fontSize: 24, fontWeight: 800 }}>
-                  #{index + 1}
-                </div>
-                <div style={{ color: "#bae6fd", display: "flex", fontSize: 26, fontWeight: 800 }}>
-                  {directionArrow(call.direction)} {tickerText(call)}
-                </div>
-                <div style={{ color: "#e2e8f0", display: "flex", fontSize: 22 }}>
-                  {userName(call)}
-                </div>
-              </div>
-              <div style={{ alignItems: "baseline", display: "flex", gap: 12 }}>
-                <div style={{ color: returnToneColor(call.dailyReturnChange), display: "flex", fontSize: 26, fontWeight: 800 }}>
-                  {dailyReturnText(call.dailyReturnChange)}
-                </div>
-                <div style={{ color: "#94a3b8", display: "flex", fontSize: 20 }}>
-                  {scoreText(call.dailyScoreChange)}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -2,15 +2,14 @@ import type { Metadata } from "next";
 import { dailyCanonicalPath, dailyShareImageDate, dailyShareVersion } from "@/lib/daily-scores/public-share";
 import { getDailyScores } from "@/lib/daily-scores/service";
 
-export async function dailyScoresMetadata(date: string | null): Promise<Metadata> {
-  const result = await getDailyScores(date);
-  const title = result.date ? `Best Calls Today - ${result.date} | YouAnalyst` : "Daily score moves | YouAnalyst";
-  const description = result.callOfTheDay
+function buildDailyScoresMetadata(date: string | null, hasCallOfTheDay: boolean): Metadata {
+  const title = date ? `Best Calls Today - ${date} | YouAnalyst` : "Daily score moves | YouAnalyst";
+  const description = hasCallOfTheDay
     ? "See today's top public stock calls and daily performance moves on YouAnalyst."
     : "Track daily score changes and recent analyst performance moves on YouAnalyst.";
-  const canonical = dailyCanonicalPath(result.date);
-  const imageDate = dailyShareImageDate(result.date);
-  const version = dailyShareVersion(result.date);
+  const canonical = dailyCanonicalPath(date);
+  const imageDate = dailyShareImageDate(date);
+  const version = dailyShareVersion(date);
   const openGraphImage = `/daily/share/${imageDate}/opengraph-image?v=${version}`;
   const twitterImage = `/daily/share/${imageDate}/twitter-image?v=${version}`;
 
@@ -40,4 +39,13 @@ export async function dailyScoresMetadata(date: string | null): Promise<Metadata
       images: [twitterImage],
     },
   };
+}
+
+export async function dailyScoresMetadata(date: string | null): Promise<Metadata> {
+  try {
+    const result = await getDailyScores(date);
+    return buildDailyScoresMetadata(result.date, Boolean(result.callOfTheDay));
+  } catch {
+    return buildDailyScoresMetadata(date, false);
+  }
 }

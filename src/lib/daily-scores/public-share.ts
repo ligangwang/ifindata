@@ -1,7 +1,7 @@
 const DAILY_SHARE_CARD_VERSION = "v1";
 
 export function dailyCanonicalPath(date: string | null): string {
-  return date ? `/daily?date=${encodeURIComponent(date)}` : "/daily";
+  return date ? `/daily/${encodeURIComponent(date)}` : "/daily";
 }
 
 export function dailyShareImageDate(date: string | null): string {

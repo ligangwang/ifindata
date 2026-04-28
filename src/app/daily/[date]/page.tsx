@@ -10,7 +10,11 @@ export async function generateMetadata({
   params: Promise<{ date: string }>;
 }): Promise<Metadata> {
   const { date } = await params;
-  return dailyScoresMetadata(isDailyScoreDate(date) ? date : null);
+  if (!isDailyScoreDate(date)) {
+    notFound();
+  }
+
+  return dailyScoresMetadata(date);
 }
 
 export default async function DailyDateRoutePage({

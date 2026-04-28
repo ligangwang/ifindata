@@ -1,4 +1,4 @@
-const DAILY_SHARE_CARD_VERSION = "v1";
+const DAILY_SHARE_CARD_VERSION = "v2";
 
 export function dailyCanonicalPath(date: string | null): string {
   return date ? `/daily/${encodeURIComponent(date)}` : "/daily";

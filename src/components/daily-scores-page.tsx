@@ -169,7 +169,7 @@ function dailyReturnText(value: number | null): string {
   return `${sign}${value.toFixed(1)}%`;
 }
 
-export function DailyScoresPage() {
+export function DailyScoresPage({ initialDate = null }: { initialDate?: string | null }) {
   const { user, loading: authLoading, getIdToken } = useAuth();
   const [payload, setPayload] = useState<DailyScoresResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -183,9 +183,9 @@ export function DailyScoresPage() {
       return "/api/daily-scores";
     }
 
-    const date = new URLSearchParams(window.location.search).get("date");
+    const date = initialDate ?? new URLSearchParams(window.location.search).get("date");
     return date ? `/api/daily-scores?date=${encodeURIComponent(date)}` : "/api/daily-scores";
-  }, []);
+  }, [initialDate]);
 
   useEffect(() => {
     let cancelled = false;

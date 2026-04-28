@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatTickerSymbol } from "@/components/prediction-ui";
 import { useAuth } from "@/components/providers/auth-provider";
+import { dailyCanonicalPath, dailyShareVersion } from "@/lib/daily-scores/public-share";
 
 type DailyCallHighlight = {
   predictionId: string;
@@ -84,10 +85,6 @@ function absoluteUrl(path: string): string {
   return `${window.location.origin}${path}`;
 }
 
-function dailyPath(date: string | null): string {
-  return date ? `/daily?date=${encodeURIComponent(date)}` : "/daily";
-}
-
 function predictionPath(predictionId: string): string {
   return `/predictions/${predictionId}`;
 }
@@ -120,40 +117,32 @@ function missingDailyReturnReportPath(call: DailyCallHighlight, date: string | n
   return `/feedback?${params.toString()}`;
 }
 
-function shareText(payload: DailyScoresResponse, url: string): string {
+function dailySharePath(date: string | null): string {
+  const path = dailyCanonicalPath(date);
+  const url = new URL(path, typeof window === "undefined" ? "https://youanalyst.com" : window.location.origin);
+  url.searchParams.set("utm_source", "x");
+  url.searchParams.set("utm_medium", "social");
+  url.searchParams.set("utm_campaign", "daily_share");
+  url.searchParams.set("share", dailyShareVersion(date));
+  return `${url.pathname}${url.search}`;
+}
+
+function shareText(payload: DailyScoresResponse): string {
   const call = payload.callOfTheDay;
   if (!call) {
-    return [
-      "Think you're good at stocks?",
-      "",
-      "Every prediction is tracked on YouAnalyst.",
-      "Leaderboard decides who\u2019s actually good.",
-      "",
-      "Prove it:",
-      url,
-    ].join("\n");
+    return "Daily stock-call results are live on YouAnalyst.";
   }
 
-  return [
-    "Think you're good at stocks?",
-    "",
-    "Someone nailed today\u2019s top call:",
-    `${directionArrow(call.direction)} ${formatTickerSymbol(call.ticker)} ${dailyReturnText(call.dailyReturnChange)} \uD83D\uDCCA`,
-    "",
-    "Every prediction is tracked.",
-    "No edits. No hiding.",
-    "",
-    "Leaderboard decides who\u2019s actually good.",
-    "",
-    "Prove it:",
-    url,
-  ].join("\n");
+  return `Daily stock-call results are live on YouAnalyst. Top call: ${formatTickerSymbol(call.ticker)}.`;
 }
 
 function xShareUrl(payload: DailyScoresResponse): string {
-  const url = absoluteUrl(dailyPath(payload.date));
-  const text = shareText(payload, url);
-  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+  const url = absoluteUrl(dailySharePath(payload.date));
+  const params = new URLSearchParams({
+    text: shareText(payload),
+    url,
+  });
+  return `https://twitter.com/intent/tweet?${params.toString()}`;
 }
 
 function callDescription(call: DailyCallHighlight): string {
@@ -277,7 +266,7 @@ export function DailyScoresPage() {
     }
 
     try {
-      await navigator.clipboard.writeText(absoluteUrl(dailyPath(payload.date)));
+      await navigator.clipboard.writeText(absoluteUrl(dailyCanonicalPath(payload.date)));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {

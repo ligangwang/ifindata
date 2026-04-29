@@ -351,7 +351,7 @@ export function WatchlistDetailPage({
         <section className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-5">
           <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Unlock the full watchlist</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-            Create a free account to view all public calls, full watchlist history, and performance details.
+            Sign in to view all public calls, full watchlist history, and performance details.
             {hiddenPredictionCount > 0 ? ` ${hiddenPredictionCount.toLocaleString()} more call${hiddenPredictionCount === 1 ? "" : "s"} are waiting behind this preview.` : ""}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -359,7 +359,7 @@ export function WatchlistDetailPage({
               href="/auth"
               className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
             >
-              Create free account to unlock full watchlist
+              Sign in to unlock full watchlist
             </Link>
             <Link
               href="/predictions/new"

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { noIndexRobots } from "@/lib/seo";
 import { watchlistCanonicalPath, watchlistShareVersion } from "@/lib/watchlists/public-share";
+import { getWatchlistDetail } from "@/lib/watchlists/service";
 
 export async function generatePublicWatchlistMetadata(watchlistId: string): Promise<Metadata> {
   const db = getAdminFirestore();
@@ -53,7 +54,11 @@ export async function generatePublicWatchlistMetadata(watchlistId: string): Prom
     const title = `${watchlistName} | ${ownerLabel} | YouAnalyst`;
     const description = descriptionValue || `${ownerLabel}'s public ${watchlistName} watchlist on YouAnalyst.`;
     const canonical = watchlistCanonicalPath(watchlistId);
-    const shareVersion = watchlistShareVersion(watchlistId, watchlist);
+    const detail = await getWatchlistDetail(watchlistId);
+    const shareVersion = watchlistShareVersion(watchlistId, {
+      ...watchlist,
+      metrics: detail?.metrics,
+    });
     const openGraphImage = `${canonical}/opengraph-image?v=${shareVersion}`;
     const twitterImage = `${canonical}/twitter-image?v=${shareVersion}`;
 

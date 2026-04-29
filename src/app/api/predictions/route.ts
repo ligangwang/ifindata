@@ -1,5 +1,5 @@
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
-import { createPrediction, listPredictions, validateCreatePredictionInput } from "@/lib/predictions/service";
+import { createPrediction, listPredictions, PUBLIC_FEED_PREVIEW_LIMIT, validateCreatePredictionInput } from "@/lib/predictions/service";
 import { type PredictionStatus } from "@/lib/predictions/types";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -37,26 +37,31 @@ export async function GET(request: NextRequest) {
   }
 
   const includePrivate = includePrivateParam === "true";
+  const decoded = await getDecodedUserFromRequest(request);
   let includePrivateForQuery = false;
 
   if (includePrivate) {
-    const decoded = await getDecodedUserFromRequest(request);
     includePrivateForQuery = Boolean(decoded && userId && decoded.uid === userId);
   }
+
+  const isAnonymousPublicFeed = !decoded && !userId && !includePrivateForQuery;
+  const effectiveLimit = isAnonymousPublicFeed ? Math.min(limit, PUBLIC_FEED_PREVIEW_LIMIT) : limit;
 
   try {
     const result = await listPredictions({
       status: isPredictionStatus(statusParam) ? statusParam : undefined,
       userId: userId || undefined,
       includePrivate: includePrivateForQuery,
-      cursorCreatedAt: cursorCreatedAt || undefined,
-      limit,
+      cursorCreatedAt: isAnonymousPublicFeed ? undefined : cursorCreatedAt || undefined,
+      limit: effectiveLimit,
       sort: isPredictionSort(sortParam) ? sortParam : undefined,
     });
 
     return NextResponse.json({
       items: result.items,
-      nextCursor: result.nextCursor,
+      nextCursor: isAnonymousPublicFeed ? null : result.nextCursor,
+      viewerAccess: isAnonymousPublicFeed ? "preview" : "full",
+      previewLimit: isAnonymousPublicFeed ? PUBLIC_FEED_PREVIEW_LIMIT : null,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch predictions";

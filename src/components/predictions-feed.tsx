@@ -174,14 +174,14 @@ export function PredictionsFeed() {
           <section className="mt-4 rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-5">
             <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">See more public calls</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-              Create a free account to unlock more than the top {previewLimit ?? 10} public calls and follow the ideas you care about.
+              Sign in to explore more than the top {previewLimit ?? 10} public calls and follow the ideas you care about.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Link
                 href="/auth"
                 className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
               >
-                Create free account to see more public calls
+                Sign in to see more calls
               </Link>
               <Link
                 href="/predictions/new"

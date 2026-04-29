@@ -20,10 +20,16 @@ type WatchlistOption = {
   isPublic: boolean;
 };
 
-export function CreatePredictionPage({ requestedWatchlistId = "" }: { requestedWatchlistId?: string }) {
+export function CreatePredictionPage({
+  requestedTicker = "",
+  requestedWatchlistId = "",
+}: {
+  requestedTicker?: string;
+  requestedWatchlistId?: string;
+}) {
   const router = useRouter();
   const { user, loading, getIdToken, features } = useAuth();
-  const [ticker, setTicker] = useState("");
+  const [ticker, setTicker] = useState(requestedTicker.trim().toUpperCase());
   const [direction, setDirection] = useState<"UP" | "DOWN">("UP");
   const [thesisTitle, setThesisTitle] = useState("");
   const [thesis, setThesis] = useState("");

@@ -4,11 +4,14 @@ import { generatePublicWatchlistMetadata } from "@/lib/watchlists/public-page";
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; watchlistId: string }>;
+  searchParams: Promise<{ share?: string | string[] }>;
 }): Promise<Metadata> {
   const { watchlistId } = await params;
-  return generatePublicWatchlistMetadata(watchlistId);
+  const { share } = await searchParams;
+  return generatePublicWatchlistMetadata(watchlistId, { share });
 }
 
 export default async function AnalystWatchlistPage({

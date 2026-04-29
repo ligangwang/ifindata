@@ -4,7 +4,19 @@ import { noIndexRobots } from "@/lib/seo";
 import { watchlistCanonicalPath, watchlistShareVersion } from "@/lib/watchlists/public-share";
 import { getWatchlistDetail } from "@/lib/watchlists/service";
 
-export async function generatePublicWatchlistMetadata(watchlistId: string): Promise<Metadata> {
+function sanitizeShareVersion(value: string | string[] | undefined): string | null {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  if (!candidate || candidate.length > 160 || !/^[0-9A-Za-z._-]+$/.test(candidate)) {
+    return null;
+  }
+
+  return candidate;
+}
+
+export async function generatePublicWatchlistMetadata(
+  watchlistId: string,
+  options: { share?: string | string[] } = {},
+): Promise<Metadata> {
   const db = getAdminFirestore();
 
   try {
@@ -55,10 +67,12 @@ export async function generatePublicWatchlistMetadata(watchlistId: string): Prom
     const description = descriptionValue || `${ownerLabel}'s public ${watchlistName} watchlist on YouAnalyst.`;
     const canonical = watchlistCanonicalPath(watchlistId);
     const detail = await getWatchlistDetail(watchlistId);
-    const shareVersion = watchlistShareVersion(watchlistId, {
+    const generatedShareVersion = watchlistShareVersion(watchlistId, {
       ...watchlist,
       metrics: detail?.metrics,
     });
+    const shareVersion = sanitizeShareVersion(options.share) ?? generatedShareVersion;
+    const socialUrl = `${canonical}?share=${encodeURIComponent(shareVersion)}`;
     const openGraphImage = `${canonical}/opengraph-image?v=${shareVersion}`;
     const twitterImage = `${canonical}/twitter-image?v=${shareVersion}`;
 
@@ -71,7 +85,7 @@ export async function generatePublicWatchlistMetadata(watchlistId: string): Prom
       openGraph: {
         title,
         description,
-        url: canonical,
+        url: socialUrl,
         images: [
           {
             url: openGraphImage,

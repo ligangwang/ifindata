@@ -41,7 +41,7 @@ type FeedResponse = {
   previewLimit?: number | null;
 };
 
-const FEED_QUERY = "limit=20&sort=performance";
+const FEED_QUERY = "limit=20&sort=createdAt";
 
 export function PredictionsFeed() {
   const { loading: authLoading, getIdToken } = useAuth();
@@ -50,6 +50,7 @@ export function PredictionsFeed() {
   const [viewerAccess, setViewerAccess] = useState<"preview" | "full">("full");
   const [previewLimit, setPreviewLimit] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -102,24 +103,30 @@ export function PredictionsFeed() {
   }, [authLoading, getIdToken]);
 
   async function loadMore() {
-    if (!nextCursor) {
+    if (!nextCursor || loadingMore) {
       return;
     }
 
     const params = new URLSearchParams(FEED_QUERY);
     params.set("cursorCreatedAt", nextCursor);
 
-    const token = await getIdToken();
-    const response = await fetch(`/api/predictions?${params.toString()}`, {
-      headers: token ? { authorization: `Bearer ${token}` } : undefined,
-    });
-    if (!response.ok) {
-      return;
-    }
+    setLoadingMore(true);
 
-    const payload = (await response.json()) as FeedResponse;
-    setItems((prev) => [...prev, ...payload.items]);
-    setNextCursor(payload.nextCursor);
+    try {
+      const token = await getIdToken();
+      const response = await fetch(`/api/predictions?${params.toString()}`, {
+        headers: token ? { authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as FeedResponse;
+      setItems((prev) => [...prev, ...payload.items]);
+      setNextCursor(payload.nextCursor);
+    } finally {
+      setLoadingMore(false);
+    }
   }
 
   const isPreview = viewerAccess === "preview";
@@ -191,9 +198,10 @@ export function PredictionsFeed() {
             <button
               type="button"
               onClick={() => void loadMore()}
+              disabled={loadingMore}
               className="w-full rounded-full border border-cyan-400/35 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-500/15 sm:w-auto"
             >
-              Load more
+              {loadingMore ? "Loading..." : "Load more"}
             </button>
           </div>
         ) : null}

@@ -38,13 +38,14 @@ export async function GET(request: NextRequest) {
 
   const includePrivate = includePrivateParam === "true";
   const decoded = await getDecodedUserFromRequest(request);
-  const isAnonymousPublicFeed = !decoded && !userId && !includePrivate;
-  const effectiveLimit = isAnonymousPublicFeed ? Math.min(limit, PUBLIC_FEED_PREVIEW_LIMIT) : limit;
   let includePrivateForQuery = false;
 
   if (includePrivate) {
     includePrivateForQuery = Boolean(decoded && userId && decoded.uid === userId);
   }
+
+  const isAnonymousPublicFeed = !decoded && !userId && !includePrivateForQuery;
+  const effectiveLimit = isAnonymousPublicFeed ? Math.min(limit, PUBLIC_FEED_PREVIEW_LIMIT) : limit;
 
   try {
     const result = await listPredictions({

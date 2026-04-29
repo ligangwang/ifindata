@@ -13,6 +13,7 @@ import {
 export const MAX_WATCHLISTS_PER_USER = 5;
 export const MAX_WATCHLIST_NAME_LENGTH = 80;
 export const MAX_WATCHLIST_DESCRIPTION_LENGTH = 500;
+export const WATCHLIST_PREVIEW_LIMIT = 3;
 
 const LIVE_STATUSES = new Set(["CREATED", "OPEN", "CLOSING"]);
 const SETTLED_STATUSES = new Set(["SETTLED"]);
@@ -37,8 +38,11 @@ export type Watchlist = {
 export type WatchlistMetrics = {
   liveReturn: number | null;
   settledReturn: number | null;
+  totalReturn: number | null;
+  totalPredictionCount: number;
   livePredictionCount: number;
   settledPredictionCount: number;
+  winRate: number | null;
 };
 
 export type WatchlistSummary = Watchlist & {
@@ -60,6 +64,20 @@ export type WatchlistPrediction = Prediction & {
 };
 
 export type WatchlistDetail = WatchlistSummary & {
+  viewerAccess: "preview" | "full";
+  owner: {
+    id: string;
+    displayName: string | null;
+    nickname: string | null;
+    photoURL: string | null;
+    stats: {
+      totalScore: number;
+      level: number;
+      followersCount: number;
+      settledCalls: number;
+      winRate: number | null;
+    };
+  };
   livePredictions: WatchlistPrediction[];
   settledPredictions: WatchlistPrediction[];
 };
@@ -133,20 +151,56 @@ function average(values: number[]): number | null {
 function metricsForPredictions(predictions: WatchlistPrediction[]): WatchlistMetrics {
   const livePredictions = predictions.filter((prediction) => LIVE_STATUSES.has(prediction.status));
   const settledPredictions = predictions.filter((prediction) => SETTLED_STATUSES.has(prediction.status));
+  const liveReturns = livePredictions
+    .map((prediction) => prediction.markReturnValue)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const settledReturns = settledPredictions
+    .map((prediction) => prediction.result?.returnValue)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const settledOutcomes = settledPredictions
+    .map((prediction) => prediction.result?.outcome)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const wins = settledOutcomes.filter((outcome) => outcome > 0).length;
 
   return {
-    liveReturn: average(
-      livePredictions
-        .map((prediction) => prediction.markReturnValue)
-        .filter((value): value is number => typeof value === "number" && Number.isFinite(value)),
-    ),
-    settledReturn: average(
-      settledPredictions
-        .map((prediction) => prediction.result?.returnValue)
-        .filter((value): value is number => typeof value === "number" && Number.isFinite(value)),
-    ),
+    liveReturn: average(liveReturns),
+    settledReturn: average(settledReturns),
+    totalReturn: average([...liveReturns, ...settledReturns]),
+    totalPredictionCount: livePredictions.length + settledPredictions.length,
     livePredictionCount: livePredictions.length,
     settledPredictionCount: settledPredictions.length,
+    winRate: settledOutcomes.length > 0 ? wins / settledOutcomes.length : null,
+  };
+}
+
+function numberFromStats(stats: Record<string, unknown>, key: string): number {
+  const value = stats[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function nullableNumberFromStats(stats: Record<string, unknown>, key: string): number | null {
+  const value = stats[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function mapWatchlistOwner(
+  userId: string,
+  data: Record<string, unknown> | undefined,
+): WatchlistDetail["owner"] {
+  const stats = data?.stats && typeof data.stats === "object" ? data.stats as Record<string, unknown> : {};
+
+  return {
+    id: userId,
+    displayName: typeof data?.displayName === "string" ? data.displayName : null,
+    nickname: typeof data?.nickname === "string" ? data.nickname : null,
+    photoURL: typeof data?.photoURL === "string" ? data.photoURL : null,
+    stats: {
+      totalScore: numberFromStats(stats, "totalScore"),
+      level: Math.max(1, numberFromStats(stats, "level") || 1),
+      followersCount: numberFromStats(stats, "followersCount"),
+      settledCalls: numberFromStats(stats, "settledCalls") || numberFromStats(stats, "closedPredictions"),
+      winRate: nullableNumberFromStats(stats, "winRate"),
+    },
   };
 }
 
@@ -338,7 +392,7 @@ export async function listPublicWatchlists(limit = 24): Promise<PublicWatchlistS
         ...watchlist,
         metrics: metricsForPredictions(predictions),
         owner,
-        previewPredictions: predictions.slice(0, 4),
+        previewPredictions: predictions.slice(0, WATCHLIST_PREVIEW_LIMIT),
       };
     }),
   );
@@ -712,7 +766,8 @@ export async function getWatchlistDetail(
   watchlistId: string,
   options: { viewerUserId?: string | null } = {},
 ): Promise<WatchlistDetail | null> {
-  const snapshot = await getAdminFirestore().collection("watchlists").doc(watchlistId).get();
+  const db = getAdminFirestore();
+  const snapshot = await db.collection("watchlists").doc(watchlistId).get();
   if (!snapshot.exists) {
     return null;
   }
@@ -727,13 +782,21 @@ export async function getWatchlistDetail(
     return null;
   }
 
+  const ownerSnapshot = await db.collection("users").doc(watchlist.userId).get();
+  const owner = mapWatchlistOwner(watchlist.userId, ownerSnapshot.data() as Record<string, unknown> | undefined);
   const predictions = await listWatchlistPredictions(watchlist.id, { includePrivate: isOwner });
   const metrics = metricsForPredictions(predictions);
+  const viewerAccess = options.viewerUserId || !watchlist.isPublic ? "full" : "preview";
+  const visiblePredictions = viewerAccess === "preview"
+    ? predictions.slice(0, WATCHLIST_PREVIEW_LIMIT)
+    : predictions;
 
   return {
     ...watchlist,
     metrics,
-    livePredictions: predictions.filter((prediction) => LIVE_STATUSES.has(prediction.status)),
-    settledPredictions: predictions.filter((prediction) => SETTLED_STATUSES.has(prediction.status)),
+    viewerAccess,
+    owner,
+    livePredictions: visiblePredictions.filter((prediction) => LIVE_STATUSES.has(prediction.status)),
+    settledPredictions: visiblePredictions.filter((prediction) => SETTLED_STATUSES.has(prediction.status)),
   };
 }

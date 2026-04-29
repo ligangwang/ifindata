@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
+import { useAuth } from "@/components/providers/auth-provider";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type Prediction = {
@@ -36,29 +37,48 @@ type Prediction = {
 type FeedResponse = {
   items: Prediction[];
   nextCursor: string | null;
+  viewerAccess?: "preview" | "full";
+  previewLimit?: number | null;
 };
 
 const FEED_QUERY = "limit=20&sort=performance";
 
 export function PredictionsFeed() {
+  const { loading: authLoading, getIdToken } = useAuth();
   const [items, setItems] = useState<Prediction[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [viewerAccess, setViewerAccess] = useState<"preview" | "full">("full");
+  const [previewLimit, setPreviewLimit] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
     let cancelled = false;
 
-    void fetch(`/api/predictions?${FEED_QUERY}`)
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error("Unable to load predictions.");
-        }
+    async function loadFeed() {
+      const token = await getIdToken();
+      const response = await fetch(`/api/predictions?${FEED_QUERY}`, {
+        headers: token ? { authorization: `Bearer ${token}` } : undefined,
+      });
 
-        const payload = (await response.json()) as FeedResponse;
+      if (!response.ok) {
+        throw new Error("Unable to load predictions.");
+      }
+
+      return (await response.json()) as FeedResponse;
+    }
+
+    void loadFeed()
+      .then(async (response) => {
         if (!cancelled) {
-          setItems(payload.items);
-          setNextCursor(payload.nextCursor);
+          setItems(response.items);
+          setNextCursor(response.nextCursor);
+          setViewerAccess(response.viewerAccess === "preview" ? "preview" : "full");
+          setPreviewLimit(response.previewLimit ?? null);
         }
       })
       .catch((nextError) => {
@@ -66,6 +86,8 @@ export function PredictionsFeed() {
           setError(nextError instanceof Error ? nextError.message : "Unable to load feed.");
           setItems([]);
           setNextCursor(null);
+          setViewerAccess("full");
+          setPreviewLimit(null);
         }
       })
       .finally(() => {
@@ -77,7 +99,7 @@ export function PredictionsFeed() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authLoading, getIdToken]);
 
   async function loadMore() {
     if (!nextCursor) {
@@ -87,7 +109,10 @@ export function PredictionsFeed() {
     const params = new URLSearchParams(FEED_QUERY);
     params.set("cursorCreatedAt", nextCursor);
 
-    const response = await fetch(`/api/predictions?${params.toString()}`);
+    const token = await getIdToken();
+    const response = await fetch(`/api/predictions?${params.toString()}`, {
+      headers: token ? { authorization: `Bearer ${token}` } : undefined,
+    });
     if (!response.ok) {
       return;
     }
@@ -97,6 +122,8 @@ export function PredictionsFeed() {
     setNextCursor(payload.nextCursor);
   }
 
+  const isPreview = viewerAccess === "preview";
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-5">
       <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-4 shadow-[0_8px_40px_rgba(8,47,73,0.45)]">
@@ -105,7 +132,7 @@ export function PredictionsFeed() {
           <p className="mt-1 text-sm text-slate-300">Create watchlists, publish stock calls, and let performance speak for itself.</p>
         </div>
 
-        {loading ? <p className="text-sm text-slate-300">Loading feed...</p> : null}
+        {loading || authLoading ? <p className="text-sm text-slate-300">Loading feed...</p> : null}
         {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 
         <div className="grid gap-3">
@@ -135,6 +162,29 @@ export function PredictionsFeed() {
             </p>
           ) : null}
         </div>
+
+        {!loading && !error && isPreview ? (
+          <section className="mt-4 rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-5">
+            <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">See more public calls</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+              Create a free account to unlock more than the top {previewLimit ?? 10} public calls and follow the ideas you care about.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link
+                href="/auth"
+                className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+              >
+                Create free account to see more public calls
+              </Link>
+              <Link
+                href="/predictions/new"
+                className="rounded-lg border border-cyan-400/35 px-4 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-500/15"
+              >
+                Make your own call
+              </Link>
+            </div>
+          </section>
+        ) : null}
 
         {nextCursor ? (
           <div className="mt-4">

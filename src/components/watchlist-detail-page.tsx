@@ -211,13 +211,6 @@ export function WatchlistDetailPage({
     };
   }, [authLoading, getIdToken, watchlistId]);
 
-  function openShareIntent(): void {
-    if (!watchlist) {
-      return;
-    }
-    window.open(watchlistShareIntentUrl(watchlist), "_blank", "noopener,noreferrer");
-  }
-
   if (loading || authLoading) {
     return <main className="mx-auto w-full max-w-5xl px-4 py-8 text-sm text-slate-300">Loading watchlist...</main>;
   }
@@ -249,13 +242,14 @@ export function WatchlistDetailPage({
                   Analyst profile
                 </Link>
               )}
-              <button
-                type="button"
-                onClick={openShareIntent}
+              <a
+                href={watchlistShareIntentUrl(watchlist)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-lg bg-cyan-500 px-3 py-1.5 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
               >
                 Share to X
-              </button>
+              </a>
             </div>
           ) : null}
         </div>

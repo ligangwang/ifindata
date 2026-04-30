@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Core, ElementDefinition, StylesheetJsonBlock } from "cytoscape";
 import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
 import { useAuth } from "@/components/providers/auth-provider";
 import { type PredictionStatus } from "@/lib/predictions/types";
@@ -42,9 +43,9 @@ type GraphNode = {
   id: string;
   label: string;
   sublabel: string;
-  x: number;
-  y: number;
-  tone: "cyan" | "emerald" | "slate";
+  kind: "company" | "theme" | "peer" | "chain" | "calls" | "record";
+  width: number;
+  height: number;
 };
 
 function relationNodes(displayTicker: string, predictions: Prediction[]): GraphNode[] {
@@ -59,61 +60,102 @@ function relationNodes(displayTicker: string, predictions: Prediction[]): GraphN
       id: "theme",
       label: "Market themes",
       sublabel: "AI, margins, demand, macro",
-      x: 50,
-      y: 18,
-      tone: "cyan",
+      kind: "theme",
+      width: 136,
+      height: 54,
     },
     {
       id: "peers",
       label: "Peer set",
       sublabel: "Competitors and substitutes",
-      x: 78,
-      y: 45,
-      tone: "slate",
+      kind: "peer",
+      width: 128,
+      height: 52,
     },
     {
       id: "supply",
       label: "Value chain",
       sublabel: "Suppliers, customers, channels",
-      x: 50,
-      y: 76,
-      tone: "slate",
+      kind: "chain",
+      width: 132,
+      height: 52,
     },
     {
       id: "calls",
       label: "Public calls",
       sublabel: `${bullishCount} bullish - ${bearishCount} bearish`,
-      x: 22,
-      y: 45,
-      tone: "emerald",
+      kind: "calls",
+      width: 128,
+      height: 52,
     },
     {
       id: "activity",
       label: "Track record",
       sublabel: `${liveCount} live - ${settledCount} settled - ${uniqueAnalystCount} analysts`,
-      x: 22,
-      y: 72,
-      tone: "cyan",
+      kind: "record",
+      width: 128,
+      height: 52,
     },
     {
       id: "company",
       label: displayTicker,
       sublabel: "Company node",
-      x: 50,
-      y: 45,
-      tone: "emerald",
+      kind: "company",
+      width: 112,
+      height: 76,
     },
   ];
 }
 
-function toneClass(tone: GraphNode["tone"]): string {
-  if (tone === "emerald") {
-    return "border-emerald-300/50 bg-emerald-400/10 text-emerald-100";
+function relationEdges(nodes: GraphNode[]): ElementDefinition[] {
+  return nodes
+    .filter((node) => node.id !== "company")
+    .map((node) => ({
+      data: {
+        id: `company-${node.id}`,
+        source: "company",
+        target: node.id,
+        label: node.kind === "calls" ? "tracked by" : "related to",
+      },
+    }));
+}
+
+function graphPosition(id: string, locked: boolean): { x: number; y: number } {
+  if (locked) {
+    if (id === "theme") {
+      return { x: 230, y: 140 };
+    }
+    if (id === "activity") {
+      return { x: 530, y: 260 };
+    }
+    return { x: 380, y: 200 };
   }
-  if (tone === "cyan") {
-    return "border-cyan-300/50 bg-cyan-400/10 text-cyan-100";
-  }
-  return "border-white/15 bg-slate-900 text-slate-200";
+
+  const positions: Record<string, { x: number; y: number }> = {
+    activity: { x: 150, y: 300 },
+    calls: { x: 150, y: 150 },
+    company: { x: 380, y: 210 },
+    peers: { x: 620, y: 180 },
+    supply: { x: 390, y: 335 },
+    theme: { x: 380, y: 70 },
+  };
+
+  return positions[id] ?? positions.company;
+}
+
+function graphElements(nodes: GraphNode[], locked: boolean): ElementDefinition[] {
+  return [
+    ...nodes.map((node) => ({
+      data: {
+        ...node,
+        label: node.label,
+        detail: node.sublabel,
+      },
+      position: graphPosition(node.id, locked),
+      classes: node.kind,
+    })),
+    ...relationEdges(nodes),
+  ];
 }
 
 function KnowledgeGraph({
@@ -125,53 +167,180 @@ function KnowledgeGraph({
   predictions: Prediction[];
   locked: boolean;
 }) {
-  const nodes = relationNodes(displayTicker, predictions);
-  const center = nodes.find((node) => node.id === "company") ?? nodes[nodes.length - 1];
-  const visibleNodes = locked ? nodes.filter((node) => node.id === "company" || node.id === "theme" || node.id === "activity") : nodes;
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const cytoscapeRef = useRef<Core | null>(null);
+  const nodes = useMemo(() => {
+    const allNodes = relationNodes(displayTicker, predictions);
+    return locked
+      ? allNodes.filter((node) => node.id === "company" || node.id === "theme" || node.id === "activity")
+      : allNodes;
+  }, [displayTicker, locked, predictions]);
+  const [selectedNodeId, setSelectedNodeId] = useState("company");
+  const selectedNodeIdRef = useRef("company");
+  const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? nodes.find((node) => node.id === "company") ?? nodes[0];
+
+  useEffect(() => {
+    selectedNodeIdRef.current = selectedNodeId;
+  }, [selectedNodeId]);
+
+  useEffect(() => {
+    if (!nodes.some((node) => node.id === selectedNodeId)) {
+      setSelectedNodeId("company");
+    }
+  }, [nodes, selectedNodeId]);
+
+  useEffect(() => {
+    if (!containerRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+    let cy: Core | null = null;
+
+    const stylesheet: StylesheetJsonBlock[] = [
+      {
+        selector: "node",
+        style: {
+          "background-color": "#0f172a",
+          "border-color": "#334155",
+          "border-width": 2,
+          color: "#e0f2fe",
+          "font-family": "Inter, sans-serif",
+          "font-size": 12,
+          "font-weight": 700,
+          height: "data(height)",
+          label: "data(label)",
+          "min-zoomed-font-size": 8,
+          shape: "round-rectangle",
+          "text-halign": "center",
+          "text-max-width": "112px",
+          "text-outline-color": "#020617",
+          "text-outline-width": "3px",
+          "text-valign": "center",
+          "text-wrap": "wrap",
+          width: "data(width)",
+        },
+      },
+      {
+        selector: "node.company",
+        style: {
+          "background-color": "#064e3b",
+          "border-color": "#5eead4",
+          color: "#ecfeff",
+        },
+      },
+      {
+        selector: "node.theme, node.record",
+        style: {
+          "background-color": "#083344",
+          "border-color": "#22d3ee",
+        },
+      },
+      {
+        selector: "node.calls",
+        style: {
+          "background-color": "#052e2b",
+          "border-color": "#34d399",
+        },
+      },
+      {
+        selector: "edge",
+        style: {
+          "curve-style": "bezier",
+          "line-color": "#155e75",
+          "line-opacity": 0.72,
+          width: 2,
+        },
+      },
+      {
+        selector: "node:selected",
+        style: {
+          "border-color": "#a7f3d0",
+          "border-width": 4,
+        },
+      },
+    ];
+
+    void import("cytoscape").then((module) => {
+      if (cancelled || !containerRef.current) {
+        return;
+      }
+
+      const cytoscape = module.default;
+      cy = cytoscape({
+        autoungrabify: locked,
+        boxSelectionEnabled: false,
+        container: containerRef.current,
+        elements: graphElements(nodes, locked),
+        layout: {
+          name: "preset",
+          animate: false,
+          fit: true,
+          padding: 55,
+        },
+        maxZoom: 2.2,
+        minZoom: 0.65,
+        style: stylesheet,
+        wheelSensitivity: 0.18,
+      });
+
+      cytoscapeRef.current = cy;
+      const initialSelectedNodeId = nodes.some((node) => node.id === selectedNodeIdRef.current)
+        ? selectedNodeIdRef.current
+        : "company";
+      cy.getElementById(initialSelectedNodeId).select();
+      cy.on("tap", "node", (event) => {
+        const id = event.target.id();
+        setSelectedNodeId(id);
+        cy?.nodes().unselect();
+        event.target.select();
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      cytoscapeRef.current = null;
+      cy?.destroy();
+    };
+  }, [locked, nodes]);
 
   return (
-    <div className="relative min-h-[360px] overflow-hidden rounded-2xl border border-white/10 bg-slate-950/65">
-      <svg className="absolute inset-0 h-full w-full" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
-        {visibleNodes
-          .filter((node) => node.id !== "company")
-          .map((node) => (
-            <line
-              key={`${center.id}-${node.id}`}
-              x1={center.x}
-              y1={center.y}
-              x2={node.x}
-              y2={node.y}
-              stroke="rgba(103, 232, 249, 0.28)"
-              strokeWidth="0.45"
-            />
-          ))}
-      </svg>
-      <div className={locked ? "absolute inset-0 blur-[1px]" : "absolute inset-0"}>
-        {visibleNodes.map((node) => (
+    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70">
+      <div className="grid min-h-[420px] gap-0 lg:grid-cols-[1fr_300px]">
+        <div className="relative h-[420px] min-h-[360px]">
           <div
-            key={node.id}
-            className={`absolute w-[min(44vw,220px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border px-4 py-3 shadow-[0_12px_35px_rgba(2,6,23,0.45)] ${toneClass(node.tone)}`}
-            style={{ left: `${node.x}%`, top: `${node.y}%` }}
-          >
-            <p className="font-[var(--font-sora)] text-sm font-semibold">{node.label}</p>
-            <p className="mt-1 text-xs leading-5 text-slate-300">{node.sublabel}</p>
-          </div>
-        ))}
-      </div>
-      {locked ? (
-        <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-cyan-400/30 bg-slate-950/90 p-4 shadow-[0_12px_40px_rgba(2,6,23,0.7)]">
-          <h3 className="font-[var(--font-sora)] text-lg font-semibold text-cyan-100">Company graph preview</h3>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-            Sign in to explore the full company graph, related calls, watchlists, and relationship context.
-          </p>
-          <Link
-            href="/auth"
-            className="mt-4 inline-flex rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
-          >
-            Sign in to explore more
-          </Link>
+            ref={containerRef}
+            className="absolute inset-0 h-full w-full"
+            aria-label={`${displayTicker} company knowledge graph`}
+          />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,145,178,0.18),transparent_48%)]" />
         </div>
-      ) : null}
+        <aside className="border-t border-white/10 bg-slate-950/80 p-5 lg:border-l lg:border-t-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Selected node</p>
+          <h3 className="mt-3 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">{selectedNode.label}</h3>
+          <p className="mt-3 text-sm leading-6 text-slate-300">{selectedNode.sublabel}</p>
+          <div className="mt-5 rounded-xl border border-white/10 bg-slate-900/70 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Graph type</p>
+            <p className="mt-2 text-sm text-slate-200">
+              Company relationships, market themes, and public YouAnalyst activity.
+            </p>
+          </div>
+          {locked ? (
+            <div className="mt-4 rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-4">
+              <h3 className="font-[var(--font-sora)] text-base font-semibold text-cyan-100">Company graph preview</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Sign in to explore the full company graph, related calls, watchlists, and relationship context.
+              </p>
+              <Link
+                href="/auth"
+                className="mt-4 inline-flex rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+              >
+                Sign in to explore more
+              </Link>
+            </div>
+          ) : null}
+        </aside>
+      </div>
     </div>
   );
 }

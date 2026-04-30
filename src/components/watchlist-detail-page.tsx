@@ -89,8 +89,16 @@ function ownerLabel(owner: WatchlistDetail["owner"]): string {
   return owner.nickname ? `@${owner.nickname}` : owner.displayName ?? "Anonymous analyst";
 }
 
+function shareOrigin(): string {
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+
+  return process.env.NEXT_PUBLIC_SITE_URL ?? "https://youanalyst.com";
+}
+
 function watchlistShareUrl(watchlist: Pick<WatchlistDetail, "id" | "createdAt" | "updatedAt">): string {
-  const url = new URL(watchlistCanonicalPath(watchlist.id), window.location.origin);
+  const url = new URL(watchlistCanonicalPath(watchlist.id), shareOrigin());
   url.searchParams.set("utm_source", "x");
   url.searchParams.set("utm_medium", "social");
   url.searchParams.set("utm_campaign", "watchlist_share");

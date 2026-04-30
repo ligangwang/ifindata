@@ -11,10 +11,11 @@ export const metadata: Metadata = {
 export default async function NewPredictionRoutePage({
   searchParams,
 }: {
-  searchParams: Promise<{ watchlistId?: string | string[] }>;
+  searchParams: Promise<{ ticker?: string | string[]; watchlistId?: string | string[] }>;
 }) {
-  const { watchlistId } = await searchParams;
+  const { ticker, watchlistId } = await searchParams;
+  const requestedTicker = Array.isArray(ticker) ? ticker[0] : ticker;
   const requestedWatchlistId = Array.isArray(watchlistId) ? watchlistId[0] : watchlistId;
 
-  return <CreatePredictionPage requestedWatchlistId={requestedWatchlistId ?? ""} />;
+  return <CreatePredictionPage requestedTicker={requestedTicker ?? ""} requestedWatchlistId={requestedWatchlistId ?? ""} />;
 }

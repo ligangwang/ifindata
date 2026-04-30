@@ -563,15 +563,13 @@ export function PredictionDetailPage({ predictionId }: { predictionId: string })
               <span>{formatTickerSymbol(prediction.ticker)}</span>
             </Link>
           </h1>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="rounded-lg border border-cyan-400/30 px-2.5 py-1 text-xs font-medium text-cyan-100">
               {statusLabel}
             </span>
             {canShareToX ? (
               <a
                 href={xShareUrl}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
               >
                 Share to X

@@ -14,6 +14,7 @@ import {
   type PredictionTimeHorizonUnit,
   type PredictionVisibility,
 } from "@/lib/predictions/types";
+import { xPostIntentUrl } from "@/lib/x-share";
 
 type PredictionDetail = {
   id: string;
@@ -167,12 +168,10 @@ function predictionShareText(prediction: PredictionDetail, returnText: string): 
 }
 
 function predictionShareUrl(prediction: PredictionDetail, returnText: string): string {
-  const params = new URLSearchParams({
+  return xPostIntentUrl({
     text: predictionShareText(prediction, returnText),
     url: predictionUrl(prediction),
   });
-
-  return `https://twitter.com/intent/tweet?${params.toString()}`;
 }
 
 export function PredictionDetailPage({ predictionId }: { predictionId: string }) {

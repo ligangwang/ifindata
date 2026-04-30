@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatTickerSymbol } from "@/components/prediction-ui";
 import { useAuth } from "@/components/providers/auth-provider";
 import { dailyCanonicalPath, dailyShareVersion } from "@/lib/daily-scores/public-share";
+import { xPostIntentUrl } from "@/lib/x-share";
 
 type DailyCallHighlight = {
   predictionId: string;
@@ -138,11 +139,10 @@ function shareText(payload: DailyScoresResponse): string {
 
 function xShareUrl(payload: DailyScoresResponse): string {
   const url = absoluteUrl(dailySharePath(payload.date));
-  const params = new URLSearchParams({
+  return xPostIntentUrl({
     text: shareText(payload),
     url,
   });
-  return `https://twitter.com/intent/tweet?${params.toString()}`;
 }
 
 function callDescription(call: DailyCallHighlight): string {

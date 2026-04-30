@@ -6,6 +6,7 @@ import { formatTickerSymbol, PredictionReturnSummary } from "@/components/predic
 import { useAuth } from "@/components/providers/auth-provider";
 import { type PredictionStatus } from "@/lib/predictions/types";
 import { watchlistCanonicalPath, watchlistShareVersion } from "@/lib/watchlists/public-share";
+import { xPostIntentUrl } from "@/lib/x-share";
 
 type WatchlistPrediction = {
   id: string;
@@ -127,12 +128,10 @@ function watchlistShareText(watchlist: WatchlistDetail): string {
 }
 
 function watchlistShareIntentUrl(watchlist: WatchlistDetail): string {
-  const params = new URLSearchParams({
+  return xPostIntentUrl({
     text: watchlistShareText(watchlist),
     url: watchlistShareUrl(watchlist),
   });
-
-  return `https://twitter.com/intent/tweet?${params.toString()}`;
 }
 
 function PredictionRow({ prediction }: { prediction: WatchlistPrediction }) {

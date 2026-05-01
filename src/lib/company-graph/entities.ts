@@ -63,31 +63,41 @@ function acronymKey(tokens: string[]): string | null {
   return acronym.length >= 3 ? acronym : null;
 }
 
-function entityKeys(value: string): Set<string> {
+function isAcronymLike(value: string): boolean {
+  return /^[A-Z0-9]{3,8}$/.test(cleanName(value));
+}
+
+function entityKeys(value: string): { acronym: string | null; names: Set<string> } {
   const tokens = normalizedTokens(value);
   const strippedTokens = stripLegalSuffixes(tokens);
   const acronymTokens = tokens.filter((token) => token !== "limited" && token !== "ltd");
-  const keys = new Set<string>();
+  const names = new Set<string>();
   const strippedKey = strippedTokens.join(" ");
   const acronym = acronymKey(acronymTokens);
 
   if (strippedKey) {
-    keys.add(strippedKey);
-  }
-  if (acronym) {
-    keys.add(acronym);
+    names.add(strippedKey);
   }
 
-  return keys;
+  return {
+    acronym: isAcronymLike(value) ? strippedKey : acronym,
+    names,
+  };
 }
 
-function hasSharedKey(left: Set<string>, right: Set<string>): boolean {
-  for (const key of left) {
-    if (right.has(key)) {
+function hasSharedKey(
+  left: { acronym: string | null; names: Set<string> },
+  right: { acronym: string | null; names: Set<string> },
+): boolean {
+  for (const key of left.names) {
+    if (right.names.has(key)) {
       return true;
     }
   }
-  return false;
+  return Boolean(
+    left.acronym && right.names.has(left.acronym) ||
+    right.acronym && left.names.has(right.acronym),
+  );
 }
 
 function displayName(value: string): string {
@@ -128,7 +138,12 @@ function shortestDisplayName(...values: string[]): string {
 }
 
 export function collapseCompanyGraphEntityEdges<T extends EdgeLike>(edges: T[]): T[] {
-  const groups: Array<{ direction: string; keys: Set<string>; relationshipType: string; edge: T }> = [];
+  const groups: Array<{
+    direction: string;
+    keys: { acronym: string | null; names: Set<string> };
+    relationshipType: string;
+    edge: T;
+  }> = [];
 
   for (const edge of edges) {
     const keys = entityKeys(edge.targetName);
@@ -153,8 +168,11 @@ export function collapseCompanyGraphEntityEdges<T extends EdgeLike>(edges: T[]):
       continue;
     }
 
-    for (const key of keys) {
-      existing.keys.add(key);
+    for (const key of keys.names) {
+      existing.keys.names.add(key);
+    }
+    if (keys.acronym) {
+      existing.keys.acronym = keys.acronym;
     }
 
     const displayTargetName = shortestDisplayName(existing.edge.targetName, targetName);

@@ -1,5 +1,6 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import type { CompanyGraphEdge } from "@/lib/company-graph/types";
+import { FieldPath } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
 const MAX_EDGES = 40;
@@ -52,6 +53,10 @@ function sortEdges(left: CompanyGraphEdge, right: CompanyGraphEdge): number {
   return left.targetName.localeCompare(right.targetName);
 }
 
+function edgeDocIdPrefix(ticker: string, accessionNumber: string): string {
+  return `${ticker}_${accessionNumber.replace(/-/g, "")}_`;
+}
+
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ ticker: string }> },
@@ -65,23 +70,33 @@ export async function GET(
 
   try {
     const db = getAdminFirestore();
-    const [runSnapshot, edgesSnapshot] = await Promise.all([
-      db.collection("company_graph_runs").doc(`${ticker}_latest_10k`).get(),
-      db.collection("company_graph_edges").where("sourceTicker", "==", ticker).limit(100).get(),
-    ]);
+    const runSnapshot = await db.collection("company_graph_runs").doc(`${ticker}_latest_10k`).get();
     const runData = runSnapshot.data() as CompanyGraphRunDocument | undefined;
     const runResult = readRunResult(runData?.result);
-    const edges = edgesSnapshot.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }) as CompanyGraphEdge)
-      .sort(sortEdges)
-      .slice(0, MAX_EDGES);
+    const latestAccessionNumber = readString(runData?.accessionNumber) ?? runResult?.filing?.accessionNumber ?? null;
+    const edgePrefix = latestAccessionNumber ? edgeDocIdPrefix(ticker, latestAccessionNumber) : null;
+    const edgesSnapshot = edgePrefix
+      ? await db
+          .collection("company_graph_edges")
+          .where(FieldPath.documentId(), ">=", edgePrefix)
+          .where(FieldPath.documentId(), "<", `${edgePrefix}\uf8ff`)
+          .orderBy(FieldPath.documentId())
+          .limit(100)
+          .get()
+      : null;
+    const edges = edgesSnapshot
+      ? edgesSnapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }) as CompanyGraphEdge)
+          .sort(sortEdges)
+          .slice(0, MAX_EDGES)
+      : [];
 
     return NextResponse.json({
       ticker,
       available: edges.length > 0,
       companyName: readString(runData?.companyName),
       cik: readString(runData?.cik),
-      accessionNumber: readString(runData?.accessionNumber),
+      accessionNumber: latestAccessionNumber,
       updatedAt: readString(runData?.updatedAt),
       runId: runResult?.runId ?? null,
       filing: runResult?.filing ?? null,

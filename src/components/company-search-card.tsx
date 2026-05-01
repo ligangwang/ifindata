@@ -78,16 +78,16 @@ export function CompanySearchCard() {
       onSubmit={submitSearch}
       className="mt-4 rounded-2xl border border-white/15 bg-slate-950/55 p-5"
     >
-      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <TickerSearchInput value={ticker} onChange={(value) => {
           setTicker(value);
           setError(null);
           setMessage(null);
-        }} error={error} />
+        }} error={error} showHelperText={false} />
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-lg bg-cyan-500 px-5 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+          className="h-10 rounded-lg bg-cyan-500 px-5 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? "Checking..." : "Open or request graph"}
         </button>

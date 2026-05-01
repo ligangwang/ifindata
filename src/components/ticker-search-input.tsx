@@ -17,6 +17,7 @@ type TickerSearchInputProps = {
   value: string;
   onChange: (value: string) => void;
   error?: string | null;
+  showHelperText?: boolean;
 };
 
 type SearchResponse = {
@@ -32,7 +33,7 @@ function suggestionMeta(item: TickerSuggestion): string {
   return [item.exchange, item.type].filter(Boolean).join(" · ");
 }
 
-export function TickerSearchInput({ value, onChange, error }: TickerSearchInputProps) {
+export function TickerSearchInput({ value, onChange, error, showHelperText = true }: TickerSearchInputProps) {
   const listboxId = useId();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [suggestions, setSuggestions] = useState<TickerSuggestion[]>([]);
@@ -182,7 +183,9 @@ export function TickerSearchInput({ value, onChange, error }: TickerSearchInputP
           error ? "border-rose-400/50" : "border-white/15"
         }`}
       />
-      <p className={`text-xs ${searchError ? "text-rose-300" : "text-slate-400"}`}>{helperText}</p>
+      {showHelperText || searchError || loading ? (
+        <p className={`text-xs ${searchError ? "text-rose-300" : "text-slate-400"}`}>{helperText}</p>
+      ) : null}
       {error ? <p className="text-xs text-rose-300">{error}</p> : null}
 
       {showPanel ? (

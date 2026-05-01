@@ -7,6 +7,7 @@ import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } 
 import { useAuth } from "@/components/providers/auth-provider";
 import type { CompanyGraphEdge, CompanyGraphRelationshipType, CompanyGraphTargetType } from "@/lib/company-graph/types";
 import { type PredictionStatus } from "@/lib/predictions/types";
+import { xPostIntentUrl } from "@/lib/x-share";
 
 type Prediction = {
   id: string;
@@ -50,6 +51,7 @@ type CompanyGraphResponse = {
     reportDate: string | null;
     filingUrl: string | null;
   } | null;
+  runId?: string | null;
   edges: CompanyGraphEdge[];
 };
 
@@ -61,6 +63,7 @@ type GraphNode = {
   width: number;
   height: number;
   relationshipType?: CompanyGraphRelationshipType;
+  direction?: CompanyGraphEdge["direction"];
   targetType?: CompanyGraphTargetType;
   evidenceText?: string;
   confidence?: number;
@@ -72,8 +75,46 @@ function relationLabel(type: CompanyGraphRelationshipType): string {
   return type.replace(/_/g, " ");
 }
 
+function relationshipTone(type: CompanyGraphRelationshipType | undefined): {
+  line: string;
+  nodeBg: string;
+  nodeBorder: string;
+} {
+  if (type === "COMPETES_WITH") {
+    return {
+      line: "#818cf8",
+      nodeBg: "#312e81",
+      nodeBorder: "#a5b4fc",
+    };
+  }
+
+  if (type === "PARTNER_OF" || type === "DISTRIBUTES_FOR") {
+    return {
+      line: "#22d3ee",
+      nodeBg: "#083344",
+      nodeBorder: "#67e8f9",
+    };
+  }
+
+  return {
+    line: "#34d399",
+    nodeBg: "#052e2b",
+    nodeBorder: "#34d399",
+  };
+}
+
 function directionLabel(direction: CompanyGraphEdge["direction"] | undefined): string {
   return direction ? direction.replace(/_/g, " ") : "direction unknown";
+}
+
+function arrowLabel(direction: CompanyGraphEdge["direction"] | undefined, displayTicker: string, targetName: string): string {
+  if (direction === "target_to_source") {
+    return `${targetName} -> ${displayTicker}`;
+  }
+  if (direction === "bidirectional") {
+    return `${displayTicker} <-> ${targetName}`;
+  }
+  return `${displayTicker} -> ${targetName}`;
 }
 
 function graphKindForEdge(edge: CompanyGraphEdge): GraphNode["kind"] {
@@ -97,6 +138,42 @@ function summarizeGraphEdges(edges: CompanyGraphEdge[]): string {
   return summary || "Latest 10-K relationships";
 }
 
+function graphShareVersion(companyGraph: CompanyGraphResponse | null): string {
+  const source = companyGraph?.filing?.accessionNumber ?? companyGraph?.runId ?? companyGraph?.ticker ?? "latest";
+  const compact = source.replace(/[^0-9A-Za-z]/g, "");
+  return `graph-${compact || "latest"}`;
+}
+
+function graphShareUrl(ticker: string, companyGraph: CompanyGraphResponse | null): string {
+  const origin = typeof window === "undefined" ? "https://youanalyst.com" : window.location.origin;
+  const url = new URL(`/ticker/${encodeURIComponent(ticker)}`, origin);
+  url.searchParams.set("utm_source", "x");
+  url.searchParams.set("utm_medium", "social");
+  url.searchParams.set("utm_campaign", "company_graph_share");
+  url.searchParams.set("share", graphShareVersion(companyGraph));
+  return url.toString();
+}
+
+function graphShareText(displayTicker: string, companyGraph: CompanyGraphResponse | null): string {
+  const edges = companyGraph?.edges ?? [];
+  const summary = edges.length > 0 ? summarizeGraphEdges(edges).toLowerCase() : "SEC 10-K relationships";
+  const filingDate = companyGraph?.filing?.filingDate;
+  const suffix = filingDate ? ` Latest 10-K filed ${filingDate}.` : "";
+
+  return `Mapping ${displayTicker}'s company knowledge graph on YouAnalyst: ${summary} with SEC filing evidence.${suffix}`;
+}
+
+function graphShareIntentUrl(input: {
+  ticker: string;
+  displayTicker: string;
+  companyGraph: CompanyGraphResponse | null;
+}): string {
+  return xPostIntentUrl({
+    text: graphShareText(input.displayTicker, input.companyGraph),
+    url: graphShareUrl(input.ticker, input.companyGraph),
+  });
+}
+
 function secGraphNodes(displayTicker: string, graphEdges: CompanyGraphEdge[]): GraphNode[] {
   const selectedEdges = graphEdges.slice(0, 10);
   return [
@@ -116,6 +193,7 @@ function secGraphNodes(displayTicker: string, graphEdges: CompanyGraphEdge[]): G
       width: edge.targetName.length > 18 ? 154 : 132,
       height: 58,
       relationshipType: edge.relationshipType,
+      direction: edge.direction,
       targetType: edge.targetType,
       evidenceText: edge.evidenceText,
       confidence: edge.confidence,
@@ -128,6 +206,19 @@ function secGraphNodes(displayTicker: string, graphEdges: CompanyGraphEdge[]): G
 function relationNodes(displayTicker: string, predictions: Prediction[], graphEdges: CompanyGraphEdge[]): GraphNode[] {
   if (graphEdges.length > 0) {
     return secGraphNodes(displayTicker, graphEdges);
+  }
+
+  if (predictions.length === 0) {
+    return [
+      {
+        id: "company",
+        label: displayTicker,
+        sublabel: "Company node",
+        kind: "company",
+        width: 112,
+        height: 76,
+      },
+    ];
   }
 
   const bullishCount = predictions.filter((prediction) => prediction.direction === "UP").length;
@@ -188,17 +279,31 @@ function relationNodes(displayTicker: string, predictions: Prediction[], graphEd
   ];
 }
 
-function relationEdges(nodes: GraphNode[]): ElementDefinition[] {
+function relationEdges(nodes: GraphNode[], displayTicker: string): ElementDefinition[] {
   return nodes
     .filter((node) => node.id !== "company")
-    .map((node) => ({
-      data: {
-        id: `company-${node.id}`,
-        source: "company",
-        target: node.id,
-        label: node.relationshipType ? relationLabel(node.relationshipType) : node.kind === "calls" ? "tracked by" : "related to",
-      },
-    }));
+    .map((node) => {
+      const isTargetToSource = node.direction === "target_to_source";
+      const isBidirectional = node.direction === "bidirectional";
+      const relationshipText = node.relationshipType ? relationLabel(node.relationshipType) : node.kind === "calls" ? "tracked by" : "related to";
+      const tone = relationshipTone(node.relationshipType);
+      return {
+        data: {
+          id: `company-${node.id}`,
+          source: isTargetToSource ? node.id : "company",
+          target: isTargetToSource ? "company" : node.id,
+          label: relationshipText,
+          tooltip: node.relationshipType
+            ? `${relationshipText} - ${arrowLabel(node.direction, displayTicker, node.label)} - ${Math.round((node.confidence ?? 0) * 100)}% confidence`
+            : relationshipText,
+          lineColor: node.relationshipType ? tone.line : "#155e75",
+        },
+        classes: [
+          node.relationshipType ? "relationship" : "context",
+          isBidirectional ? "bidirectional" : "",
+        ].filter(Boolean).join(" "),
+      };
+    });
 }
 
 function graphPosition(id: string, locked: boolean, node?: GraphNode): { x: number; y: number } {
@@ -237,16 +342,21 @@ function graphPosition(id: string, locked: boolean, node?: GraphNode): { x: numb
 
 function graphElements(nodes: GraphNode[], locked: boolean): ElementDefinition[] {
   return [
-    ...nodes.map((node) => ({
-      data: {
-        ...node,
-        label: node.label,
-        detail: node.sublabel,
-      },
-      position: graphPosition(node.id, locked, node),
-      classes: node.kind,
-    })),
-    ...relationEdges(nodes),
+    ...nodes.map((node) => {
+      const tone = relationshipTone(node.relationshipType ?? (node.kind === "peer" ? "COMPETES_WITH" : undefined));
+      return {
+        data: {
+          ...node,
+          label: node.label,
+          detail: node.sublabel,
+          nodeBg: tone.nodeBg,
+          nodeBorder: tone.nodeBorder,
+        },
+        position: graphPosition(node.id, locked, node),
+        classes: node.kind,
+      };
+    }),
+    ...relationEdges(nodes, nodes.find((node) => node.id === "company")?.label ?? "Company"),
   ];
 }
 
@@ -266,7 +376,7 @@ function KnowledgeGraph({
   const nodes = useMemo(() => {
     const allNodes = relationNodes(displayTicker, predictions, locked ? [] : companyGraph?.edges ?? []);
     return locked
-      ? allNodes.filter((node) => node.id === "company" || node.id === "theme" || node.id === "activity")
+      ? allNodes.filter((node) => node.id === "company")
       : allNodes;
   }, [companyGraph?.edges, displayTicker, locked, predictions]);
   const [selectedNodeId, setSelectedNodeId] = useState("company");
@@ -338,26 +448,52 @@ function KnowledgeGraph({
         },
       },
       {
-        selector: "node.chain",
+        selector: "node.chain, node.peer",
         style: {
-          "background-color": "#052e2b",
-          "border-color": "#34d399",
-        },
-      },
-      {
-        selector: "node.peer",
-        style: {
-          "background-color": "#312e81",
-          "border-color": "#a5b4fc",
+          "background-color": "data(nodeBg)",
+          "border-color": "data(nodeBorder)",
         },
       },
       {
         selector: "edge",
         style: {
           "curve-style": "bezier",
-          "line-color": "#155e75",
+          "line-color": "data(lineColor)",
           "line-opacity": 0.72,
+          "target-arrow-color": "data(lineColor)",
+          "source-arrow-color": "data(lineColor)",
           width: 2,
+        },
+      },
+      {
+        selector: "edge.relationship",
+        style: {
+          "target-arrow-shape": "triangle",
+        },
+      },
+      {
+        selector: "edge.bidirectional",
+        style: {
+          "source-arrow-shape": "triangle",
+        },
+      },
+      {
+        selector: "edge.edge-hover",
+        style: {
+          color: "#e0f2fe",
+          "font-size": 11,
+          "font-weight": 700,
+          label: "data(tooltip)",
+          "line-opacity": 1,
+          "text-background-color": "#020617",
+          "text-background-opacity": 0.86,
+          "text-background-padding": "4px",
+          "text-border-color": "#164e63",
+          "text-border-opacity": 0.85,
+          "text-border-width": 1,
+          "text-rotation": "autorotate",
+          "text-wrap": "wrap",
+          width: 3,
         },
       },
       {
@@ -403,6 +539,19 @@ function KnowledgeGraph({
         cy?.nodes().unselect();
         event.target.select();
       });
+      cy.on("tap", "edge", (event) => {
+        const targetNode = event.target.target().id() === "company" ? event.target.source() : event.target.target();
+        const id = targetNode.id();
+        setSelectedNodeId(id);
+        cy?.nodes().unselect();
+        targetNode.select();
+      });
+      cy.on("mouseover", "edge", (event) => {
+        event.target.addClass("edge-hover");
+      });
+      cy.on("mouseout", "edge", (event) => {
+        event.target.removeClass("edge-hover");
+      });
     });
 
     return () => {
@@ -422,6 +571,27 @@ function KnowledgeGraph({
             aria-label={`${displayTicker} company knowledge graph`}
           />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,145,178,0.18),transparent_48%)]" />
+          <div className="pointer-events-none absolute left-4 top-4 rounded-xl border border-white/10 bg-slate-950/80 p-3 text-xs text-slate-300 shadow-xl">
+            <p className="mb-2 font-semibold uppercase tracking-wide text-slate-500">Color key</p>
+            <div className="grid gap-1.5">
+              <span className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-sm border border-cyan-200 bg-emerald-900" />
+                Filing company
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-sm border border-emerald-300 bg-emerald-950" />
+                Supply chain
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-sm border border-cyan-200 bg-cyan-950" />
+                Partner/channel
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-sm border border-indigo-300 bg-indigo-950" />
+                Competitor
+              </span>
+            </div>
+          </div>
         </div>
         <aside className="border-t border-white/10 bg-slate-950/80 p-5 lg:border-l lg:border-t-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Selected node</p>
@@ -432,7 +602,7 @@ function KnowledgeGraph({
             <p className="mt-2 text-sm text-slate-200">
               {companyGraph?.available && !locked
                 ? "SEC latest 10-K relationships with filing evidence."
-                : "Company relationships, market themes, and public YouAnalyst activity."}
+                : "Sign in to explore SEC relationship context for this company."}
             </p>
           </div>
           {selectedNode.evidenceText ? (
@@ -444,22 +614,26 @@ function KnowledgeGraph({
               ) : null}
             </div>
           ) : null}
-          {locked ? (
-            <div className="mt-4 rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-4">
-              <h3 className="font-[var(--font-sora)] text-base font-semibold text-cyan-100">Company graph preview</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                Sign in to explore the full company graph, related calls, watchlists, and relationship context.
-              </p>
-              <Link
-                href="/auth"
-                className="mt-4 inline-flex rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
-              >
-                Sign in to explore more
-              </Link>
-            </div>
-          ) : null}
         </aside>
       </div>
+      {locked ? (
+        <div className="border-t border-white/10 bg-slate-950/75 p-5">
+          <div className="mx-auto flex max-w-3xl flex-col gap-3 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+            <div>
+              <h3 className="font-[var(--font-sora)] text-base font-semibold text-cyan-100">Company graph preview</h3>
+              <p className="mt-1 text-sm leading-6 text-slate-300">
+                Sign in to explore the full SEC company graph, relationship evidence, related calls, and watchlists.
+              </p>
+            </div>
+            <Link
+              href="/auth"
+              className="shrink-0 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+            >
+              Sign in to explore more
+            </Link>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -689,14 +863,30 @@ export function TickerPage({ ticker }: { ticker: string }) {
             </p>
           </div>
           {canExtractGraph ? (
-            <button
-              type="button"
-              onClick={refreshCompanyGraph}
-              disabled={extractingGraph}
-              className="w-full rounded-lg border border-cyan-400/40 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-            >
-              {extractingGraph ? "Generating..." : companyGraph?.available ? "Check latest 10-K" : "Generate SEC graph"}
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {companyGraph?.available ? (
+                <a
+                  href={graphShareIntentUrl({
+                    ticker: payload.ticker,
+                    displayTicker,
+                    companyGraph,
+                  })}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full rounded-lg bg-cyan-500 px-4 py-2 text-center text-sm font-semibold text-slate-950 hover:bg-cyan-400 sm:w-auto"
+                >
+                  Share graph on X
+                </a>
+              ) : null}
+              <button
+                type="button"
+                onClick={refreshCompanyGraph}
+                disabled={extractingGraph}
+                className="w-full rounded-lg border border-cyan-400/40 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              >
+                {extractingGraph ? "Generating..." : companyGraph?.available ? "Check latest 10-K" : "Generate SEC graph"}
+              </button>
+            </div>
           ) : null}
         </div>
         {graphActionMessage ? <p className="mb-3 text-sm text-emerald-200">{graphActionMessage}</p> : null}

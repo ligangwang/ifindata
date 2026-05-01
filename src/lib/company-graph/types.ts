@@ -1,27 +1,15 @@
+export const COMPANY_GRAPH_EXTRACTION_VERSION = "supply-chain-competitors-v1";
+
 export const COMPANY_GRAPH_RELATIONSHIP_TYPES = [
   "vendor",
   "supplier",
   "customer",
   "competitor",
   "partner",
-  "executive",
-  "director",
-  "subsidiary",
-  "product",
-  "market",
-  "geography",
-  "risk",
 ] as const;
 
 export const COMPANY_GRAPH_TARGET_TYPES = [
   "company",
-  "person",
-  "fund",
-  "product",
-  "market",
-  "geography",
-  "risk",
-  "subsidiary",
 ] as const;
 
 export type CompanyGraphRelationshipType = (typeof COMPANY_GRAPH_RELATIONSHIP_TYPES)[number];
@@ -50,6 +38,7 @@ export type CompanyGraphEdge = {
 
 export type CompanyGraphExtractionResult = {
   runId: string;
+  extractionVersion: typeof COMPANY_GRAPH_EXTRACTION_VERSION;
   ticker: string;
   companyName: string;
   cik: string;

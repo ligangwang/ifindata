@@ -57,7 +57,7 @@ type GraphNode = {
   id: string;
   label: string;
   sublabel: string;
-  kind: "company" | "theme" | "peer" | "chain" | "calls" | "record" | "person" | "risk";
+  kind: "company" | "theme" | "peer" | "chain" | "calls" | "record";
   width: number;
   height: number;
   relationshipType?: CompanyGraphRelationshipType;
@@ -76,16 +76,7 @@ function graphKindForEdge(edge: CompanyGraphEdge): GraphNode["kind"] {
   if (edge.relationshipType === "competitor") {
     return "peer";
   }
-  if (edge.targetType === "person" || edge.relationshipType === "executive" || edge.relationshipType === "director") {
-    return "person";
-  }
-  if (edge.relationshipType === "risk" || edge.targetType === "risk") {
-    return "risk";
-  }
-  if (edge.relationshipType === "vendor" || edge.relationshipType === "supplier" || edge.relationshipType === "customer" || edge.relationshipType === "partner") {
-    return "chain";
-  }
-  return "theme";
+  return "chain";
 }
 
 function summarizeGraphEdges(edges: CompanyGraphEdge[]): string {
@@ -103,7 +94,7 @@ function summarizeGraphEdges(edges: CompanyGraphEdge[]): string {
 }
 
 function secGraphNodes(displayTicker: string, graphEdges: CompanyGraphEdge[]): GraphNode[] {
-  const selectedEdges = graphEdges.slice(0, 14);
+  const selectedEdges = graphEdges.slice(0, 10);
   return [
     {
       id: "company",
@@ -219,7 +210,7 @@ function graphPosition(id: string, locked: boolean, node?: GraphNode): { x: numb
 
   if (id.startsWith("sec-")) {
     const index = node?.positionIndex ?? 0;
-    const angle = (index / Math.max(8, 14)) * Math.PI * 2 - Math.PI / 2;
+    const angle = (index / Math.max(6, 10)) * Math.PI * 2 - Math.PI / 2;
     const radiusX = 265;
     const radiusY = 150;
     return {
@@ -354,20 +345,6 @@ function KnowledgeGraph({
         style: {
           "background-color": "#312e81",
           "border-color": "#a5b4fc",
-        },
-      },
-      {
-        selector: "node.person",
-        style: {
-          "background-color": "#3b1d12",
-          "border-color": "#fdba74",
-        },
-      },
-      {
-        selector: "node.risk",
-        style: {
-          "background-color": "#4c0519",
-          "border-color": "#fb7185",
         },
       },
       {

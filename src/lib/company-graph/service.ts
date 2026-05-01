@@ -7,6 +7,7 @@ import {
   resolveSecCompanyByTicker,
   summarizeStoredSections,
 } from "@/lib/company-graph/sec";
+import { collapseCompanyGraphEntityEdges } from "@/lib/company-graph/entities";
 import { extractCompanyGraphRelationships } from "@/lib/company-graph/openai";
 import {
   COMPANY_GRAPH_EXTRACTION_VERSION,
@@ -162,7 +163,7 @@ export async function runLatest10KCompanyGraphExtraction(
       runId,
     },
   });
-  const edges: CompanyGraphEdge[] = openAiResult.relationships
+  const edges: CompanyGraphEdge[] = collapseCompanyGraphEntityEdges(openAiResult.relationships
     .filter((relationship) => relationship.confidence >= MIN_EDGE_CONFIDENCE)
     .map((relationship) => {
       return {
@@ -192,7 +193,7 @@ export async function runLatest10KCompanyGraphExtraction(
         extractionRunId: runId,
         createdAt: nowIso,
       };
-    });
+    }));
 
   const result: CompanyGraphExtractionResult = {
     runId,

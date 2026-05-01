@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CompanySearchCard } from "@/components/company-search-card";
 import { featuredCompanies } from "@/lib/featured-companies";
 
 export const metadata: Metadata = {
@@ -29,6 +30,8 @@ export default function CompaniesPage() {
           Start from a ticker, then map related market themes, public calls, watchlists, and company context.
         </p>
       </section>
+
+      <CompanySearchCard />
 
       <section className="mt-4 grid gap-3 md:grid-cols-2">
         {featuredCompanies.map((company) => (

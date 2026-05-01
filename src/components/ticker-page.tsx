@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Core, ElementDefinition, StylesheetJsonBlock } from "cytoscape";
 import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
 import { useAuth } from "@/components/providers/auth-provider";
+import type { CompanyGraphEdge, CompanyGraphRelationshipType, CompanyGraphTargetType } from "@/lib/company-graph/types";
 import { type PredictionStatus } from "@/lib/predictions/types";
 
 type Prediction = {
@@ -39,16 +40,101 @@ type TickerResponse = {
   ticker: string;
 };
 
+type CompanyGraphResponse = {
+  available: boolean;
+  ticker: string;
+  companyName: string | null;
+  filing: {
+    accessionNumber: string | null;
+    filingDate: string | null;
+    reportDate: string | null;
+    filingUrl: string | null;
+  } | null;
+  edges: CompanyGraphEdge[];
+};
+
 type GraphNode = {
   id: string;
   label: string;
   sublabel: string;
-  kind: "company" | "theme" | "peer" | "chain" | "calls" | "record";
+  kind: "company" | "theme" | "peer" | "chain" | "calls" | "record" | "person" | "risk";
   width: number;
   height: number;
+  relationshipType?: CompanyGraphRelationshipType;
+  targetType?: CompanyGraphTargetType;
+  evidenceText?: string;
+  confidence?: number;
+  filingDate?: string;
+  positionIndex?: number;
 };
 
-function relationNodes(displayTicker: string, predictions: Prediction[]): GraphNode[] {
+function relationLabel(type: CompanyGraphRelationshipType): string {
+  return type.replace(/_/g, " ");
+}
+
+function graphKindForEdge(edge: CompanyGraphEdge): GraphNode["kind"] {
+  if (edge.relationshipType === "competitor") {
+    return "peer";
+  }
+  if (edge.targetType === "person" || edge.relationshipType === "executive" || edge.relationshipType === "director") {
+    return "person";
+  }
+  if (edge.relationshipType === "risk" || edge.targetType === "risk") {
+    return "risk";
+  }
+  if (edge.relationshipType === "vendor" || edge.relationshipType === "supplier" || edge.relationshipType === "customer" || edge.relationshipType === "partner") {
+    return "chain";
+  }
+  return "theme";
+}
+
+function summarizeGraphEdges(edges: CompanyGraphEdge[]): string {
+  const counts = edges.reduce<Record<string, number>>((accumulator, edge) => {
+    accumulator[edge.relationshipType] = (accumulator[edge.relationshipType] ?? 0) + 1;
+    return accumulator;
+  }, {});
+  const summary = Object.entries(counts)
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 3)
+    .map(([type, count]) => `${count} ${relationLabel(type as CompanyGraphRelationshipType)}`)
+    .join(" - ");
+
+  return summary || "Latest 10-K relationships";
+}
+
+function secGraphNodes(displayTicker: string, graphEdges: CompanyGraphEdge[]): GraphNode[] {
+  const selectedEdges = graphEdges.slice(0, 14);
+  return [
+    {
+      id: "company",
+      label: displayTicker,
+      sublabel: summarizeGraphEdges(graphEdges),
+      kind: "company",
+      width: 122,
+      height: 78,
+    },
+    ...selectedEdges.map((edge, index) => ({
+      id: `sec-${edge.id}`,
+      label: edge.targetName,
+      sublabel: `${relationLabel(edge.relationshipType)} - ${Math.round(edge.confidence * 100)}% confidence`,
+      kind: graphKindForEdge(edge),
+      width: edge.targetName.length > 18 ? 154 : 132,
+      height: 58,
+      relationshipType: edge.relationshipType,
+      targetType: edge.targetType,
+      evidenceText: edge.evidenceText,
+      confidence: edge.confidence,
+      filingDate: edge.filingDate,
+      positionIndex: index,
+    })),
+  ];
+}
+
+function relationNodes(displayTicker: string, predictions: Prediction[], graphEdges: CompanyGraphEdge[]): GraphNode[] {
+  if (graphEdges.length > 0) {
+    return secGraphNodes(displayTicker, graphEdges);
+  }
+
   const bullishCount = predictions.filter((prediction) => prediction.direction === "UP").length;
   const bearishCount = predictions.filter((prediction) => prediction.direction === "DOWN").length;
   const liveCount = predictions.filter((prediction) => ["CREATED", "OPEN", "CLOSING"].includes(prediction.status)).length;
@@ -115,12 +201,12 @@ function relationEdges(nodes: GraphNode[]): ElementDefinition[] {
         id: `company-${node.id}`,
         source: "company",
         target: node.id,
-        label: node.kind === "calls" ? "tracked by" : "related to",
+        label: node.relationshipType ? relationLabel(node.relationshipType) : node.kind === "calls" ? "tracked by" : "related to",
       },
     }));
 }
 
-function graphPosition(id: string, locked: boolean): { x: number; y: number } {
+function graphPosition(id: string, locked: boolean, node?: GraphNode): { x: number; y: number } {
   if (locked) {
     if (id === "theme") {
       return { x: 230, y: 140 };
@@ -129,6 +215,17 @@ function graphPosition(id: string, locked: boolean): { x: number; y: number } {
       return { x: 530, y: 260 };
     }
     return { x: 380, y: 200 };
+  }
+
+  if (id.startsWith("sec-")) {
+    const index = node?.positionIndex ?? 0;
+    const angle = (index / Math.max(8, 14)) * Math.PI * 2 - Math.PI / 2;
+    const radiusX = 265;
+    const radiusY = 150;
+    return {
+      x: 380 + Math.cos(angle) * radiusX,
+      y: 210 + Math.sin(angle) * radiusY,
+    };
   }
 
   const positions: Record<string, { x: number; y: number }> = {
@@ -151,7 +248,7 @@ function graphElements(nodes: GraphNode[], locked: boolean): ElementDefinition[]
         label: node.label,
         detail: node.sublabel,
       },
-      position: graphPosition(node.id, locked),
+      position: graphPosition(node.id, locked, node),
       classes: node.kind,
     })),
     ...relationEdges(nodes),
@@ -161,20 +258,22 @@ function graphElements(nodes: GraphNode[], locked: boolean): ElementDefinition[]
 function KnowledgeGraph({
   displayTicker,
   predictions,
+  companyGraph,
   locked,
 }: {
   displayTicker: string;
   predictions: Prediction[];
+  companyGraph: CompanyGraphResponse | null;
   locked: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cytoscapeRef = useRef<Core | null>(null);
   const nodes = useMemo(() => {
-    const allNodes = relationNodes(displayTicker, predictions);
+    const allNodes = relationNodes(displayTicker, predictions, locked ? [] : companyGraph?.edges ?? []);
     return locked
       ? allNodes.filter((node) => node.id === "company" || node.id === "theme" || node.id === "activity")
       : allNodes;
-  }, [displayTicker, locked, predictions]);
+  }, [companyGraph?.edges, displayTicker, locked, predictions]);
   const [selectedNodeId, setSelectedNodeId] = useState("company");
   const selectedNodeIdRef = useRef("company");
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? nodes.find((node) => node.id === "company") ?? nodes[0];
@@ -241,6 +340,34 @@ function KnowledgeGraph({
         style: {
           "background-color": "#052e2b",
           "border-color": "#34d399",
+        },
+      },
+      {
+        selector: "node.chain",
+        style: {
+          "background-color": "#052e2b",
+          "border-color": "#34d399",
+        },
+      },
+      {
+        selector: "node.peer",
+        style: {
+          "background-color": "#312e81",
+          "border-color": "#a5b4fc",
+        },
+      },
+      {
+        selector: "node.person",
+        style: {
+          "background-color": "#3b1d12",
+          "border-color": "#fdba74",
+        },
+      },
+      {
+        selector: "node.risk",
+        style: {
+          "background-color": "#4c0519",
+          "border-color": "#fb7185",
         },
       },
       {
@@ -322,9 +449,20 @@ function KnowledgeGraph({
           <div className="mt-5 rounded-xl border border-white/10 bg-slate-900/70 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Graph type</p>
             <p className="mt-2 text-sm text-slate-200">
-              Company relationships, market themes, and public YouAnalyst activity.
+              {companyGraph?.available && !locked
+                ? "SEC latest 10-K relationships with filing evidence."
+                : "Company relationships, market themes, and public YouAnalyst activity."}
             </p>
           </div>
+          {selectedNode.evidenceText ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-slate-900/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Evidence</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">{selectedNode.evidenceText}</p>
+              {selectedNode.filingDate ? (
+                <p className="mt-3 text-xs text-slate-500">10-K filed {selectedNode.filingDate}</p>
+              ) : null}
+            </div>
+          ) : null}
           {locked ? (
             <div className="mt-4 rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-4">
               <h3 className="font-[var(--font-sora)] text-base font-semibold text-cyan-100">Company graph preview</h3>
@@ -346,18 +484,26 @@ function KnowledgeGraph({
 }
 
 export function TickerPage({ ticker }: { ticker: string }) {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, getIdToken } = useAuth();
   const [payload, setPayload] = useState<TickerResponse | null>(null);
+  const [companyGraph, setCompanyGraph] = useState<CompanyGraphResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [graphError, setGraphError] = useState<string | null>(null);
+  const [adminStatus, setAdminStatus] = useState<{ userId: string; isAdmin: boolean } | null>(null);
+  const [extractingGraph, setExtractingGraph] = useState(false);
+  const [graphActionMessage, setGraphActionMessage] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const displayTicker = formatTickerSymbol(payload?.ticker ?? ticker);
   const graphLocked = authLoading || !user;
+  const canExtractGraph = Boolean(user && adminStatus?.userId === user.uid && adminStatus.isAdmin);
 
   useEffect(() => {
     let cancelled = false;
 
     setPayload(null);
+    setCompanyGraph(null);
     setError(null);
+    setGraphError(null);
     setLoadingMore(false);
 
     void fetch(`/api/ticker/${ticker}?limit=25`)
@@ -366,7 +512,9 @@ export function TickerPage({ ticker }: { ticker: string }) {
           throw new Error("Unable to load ticker predictions.");
         }
 
-        const nextPayload = (await response.json()) as TickerResponse;
+        return (await response.json()) as TickerResponse;
+      })
+      .then((nextPayload) => {
         if (!cancelled) {
           setPayload(nextPayload);
         }
@@ -377,10 +525,116 @@ export function TickerPage({ ticker }: { ticker: string }) {
         }
       });
 
+    void fetch(`/api/company-graph/${ticker}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Unable to load company graph.");
+        }
+
+        return (await response.json()) as CompanyGraphResponse;
+      })
+      .then((nextGraph) => {
+        if (!cancelled) {
+          setCompanyGraph(nextGraph);
+        }
+      })
+      .catch((nextError) => {
+        if (!cancelled) {
+          setGraphError(nextError instanceof Error ? nextError.message : "Unable to load company graph.");
+        }
+      });
+
     return () => {
       cancelled = true;
     };
   }, [ticker]);
+
+  useEffect(() => {
+    if (authLoading || !user) {
+      setAdminStatus(null);
+      return;
+    }
+
+    let cancelled = false;
+    const userId = user.uid;
+
+    async function loadAdminStatus() {
+      try {
+        const token = await getIdToken(true);
+        if (!token) {
+          if (!cancelled) {
+            setAdminStatus({ userId, isAdmin: false });
+          }
+          return;
+        }
+
+        const response = await fetch("/api/admin/me", {
+          headers: {
+            authorization: `Bearer ${token}`,
+          },
+        });
+        const payload = (await response.json().catch(() => ({}))) as { isAdmin?: boolean };
+
+        if (!cancelled) {
+          setAdminStatus({ userId, isAdmin: response.ok && payload.isAdmin === true });
+        }
+      } catch {
+        if (!cancelled) {
+          setAdminStatus({ userId, isAdmin: false });
+        }
+      }
+    }
+
+    void loadAdminStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, getIdToken, user]);
+
+  async function refreshCompanyGraph() {
+    if (extractingGraph) {
+      return;
+    }
+
+    setExtractingGraph(true);
+    setGraphActionMessage(null);
+    setGraphError(null);
+
+    try {
+      const token = await getIdToken(true);
+      if (!token) {
+        throw new Error("Sign in with an admin account to generate SEC graph data.");
+      }
+
+      const response = await fetch("/api/admin/company-graph/extract", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ticker: payload?.ticker ?? ticker,
+          force: false,
+        }),
+      });
+      const body = (await response.json().catch(() => ({}))) as { error?: string; edges?: CompanyGraphEdge[]; cached?: boolean };
+
+      if (!response.ok) {
+        throw new Error(body.error ?? "Unable to generate SEC graph.");
+      }
+
+      const graphResponse = await fetch(`/api/company-graph/${encodeURIComponent(payload?.ticker ?? ticker)}`);
+      if (graphResponse.ok) {
+        setCompanyGraph((await graphResponse.json()) as CompanyGraphResponse);
+      }
+      setGraphActionMessage(body.cached ? "SEC graph is already current." : `SEC graph generated with ${body.edges?.length ?? 0} edges.`);
+    } catch (nextError) {
+      setGraphError(nextError instanceof Error ? nextError.message : "Unable to generate SEC graph.");
+    } finally {
+      setExtractingGraph(false);
+    }
+  }
 
   async function loadMorePredictions() {
     if (!payload?.nextCursor || loadingMore) {
@@ -444,13 +698,34 @@ export function TickerPage({ ticker }: { ticker: string }) {
       </section>
 
       <section className="mt-4 rounded-2xl border border-white/15 bg-slate-950/55 p-5">
-        <div className="mb-4 flex flex-col gap-1">
-          <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Knowledge graph</h2>
-          <p className="text-sm text-slate-400">
-            Map company relationships, market themes, and YouAnalyst activity around {displayTicker}.
-          </p>
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-1">
+            <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Knowledge graph</h2>
+            <p className="text-sm text-slate-400">
+              {companyGraph?.available && !graphLocked
+                ? `Latest 10-K relationships around ${displayTicker}.`
+                : `Map company relationships, market themes, and YouAnalyst activity around ${displayTicker}.`}
+            </p>
+          </div>
+          {canExtractGraph ? (
+            <button
+              type="button"
+              onClick={refreshCompanyGraph}
+              disabled={extractingGraph}
+              className="w-full rounded-lg border border-cyan-400/40 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            >
+              {extractingGraph ? "Generating..." : companyGraph?.available ? "Check latest 10-K" : "Generate SEC graph"}
+            </button>
+          ) : null}
         </div>
-        <KnowledgeGraph displayTicker={displayTicker} predictions={payload.items} locked={graphLocked} />
+        {graphActionMessage ? <p className="mb-3 text-sm text-emerald-200">{graphActionMessage}</p> : null}
+        {graphError ? <p className="mb-3 text-sm text-amber-200">{graphError}</p> : null}
+        <KnowledgeGraph
+          displayTicker={displayTicker}
+          predictions={payload.items}
+          companyGraph={companyGraph}
+          locked={graphLocked}
+        />
       </section>
 
       <section className="mt-4 rounded-2xl border border-white/15 bg-slate-950/55 p-5">

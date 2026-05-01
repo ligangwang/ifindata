@@ -1,0 +1,318 @@
+export type SecCompanyIdentity = {
+  cik: string;
+  name: string;
+  ticker: string;
+  exchange: string | null;
+};
+
+export type SecLatest10K = {
+  accessionNumber: string;
+  filingDate: string;
+  reportDate: string | null;
+  primaryDocument: string;
+  filingUrl: string;
+};
+
+export type SecFilingSection = {
+  id: "item1" | "item1a";
+  title: string;
+  text: string;
+};
+
+type SecCompanyTickersResponse = {
+  fields?: unknown;
+  data?: unknown;
+};
+
+type SecSubmissionsResponse = {
+  filings?: {
+    recent?: Record<string, unknown>;
+  };
+};
+
+const SEC_BASE_URL = "https://www.sec.gov";
+const SEC_DATA_BASE_URL = "https://data.sec.gov";
+const SECTION_STORE_CHAR_LIMIT = 300_000;
+const ITEM_1_EXTRACTION_CHAR_LIMIT = 36_000;
+const ITEM_1A_EXTRACTION_CHAR_LIMIT = 16_000;
+
+function getSecUserAgent(): string {
+  const userAgent = process.env.SEC_USER_AGENT?.trim();
+  if (userAgent) {
+    return userAgent;
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://youanalyst.com";
+  return `YouAnalyst company graph ${appUrl}`;
+}
+
+async function fetchSecJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: {
+      accept: "application/json",
+      "user-agent": getSecUserAgent(),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`SEC request failed (${response.status}): ${url}`);
+  }
+
+  return (await response.json()) as T;
+}
+
+async function fetchSecText(url: string): Promise<string> {
+  const response = await fetch(url, {
+    headers: {
+      accept: "text/html,application/xhtml+xml,text/plain",
+      "user-agent": getSecUserAgent(),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`SEC filing download failed (${response.status}): ${url}`);
+  }
+
+  return response.text();
+}
+
+function normalizeTicker(value: string): string {
+  return value.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, "");
+}
+
+function padCik(cik: string | number): string {
+  return String(cik).replace(/\D/g, "").padStart(10, "0");
+}
+
+function unpadCik(cik: string): string {
+  return String(Number(cik));
+}
+
+function readRecentColumn(recent: Record<string, unknown>, key: string): string[] {
+  const value = recent[key];
+  return Array.isArray(value) ? value.map((item) => String(item ?? "")) : [];
+}
+
+function filingDocumentUrl(cik: string, accessionNumber: string, primaryDocument: string): string {
+  const accessionPath = accessionNumber.replace(/-/g, "");
+  return `${SEC_BASE_URL}/Archives/edgar/data/${unpadCik(cik)}/${accessionPath}/${primaryDocument}`;
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+}
+
+function htmlToText(html: string): string {
+  return decodeHtmlEntities(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<\/(p|div|section|article|tr|table|h[1-6]|li)>/gi, "\n")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\r/g, "\n")
+      .replace(/[ \t\f\v]+/g, " ")
+      .replace(/\n[ \t]+/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim(),
+  );
+}
+
+function normalizeSectionMarker(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[.\-–—:]/g, "")
+    .trim();
+}
+
+function isLikelyTableOfContentsMarker(text: string, index: number): boolean {
+  const earlyDocumentLimit = Math.min(50_000, Math.floor(text.length * 0.25));
+  if (index > earlyDocumentLimit) {
+    return false;
+  }
+
+  const nearbyText = text.slice(index, index + 1_500);
+  const nearbyItemMarkers = nearbyText.match(/(?:^|\n)\s*item\s+(?:1a?|1b|[2-9]|1[0-6])[\s.\-–—:]+/gi) ?? [];
+
+  return nearbyItemMarkers.length >= 3;
+}
+
+function findSectionStart(text: string, labels: string[], fromIndex = 0): number {
+  const markerPattern = /(?:^|\n)\s*item\s+(?:1a?|1b|2)[\s.\-–—:]+[^\n]{0,120}/gi;
+  markerPattern.lastIndex = fromIndex;
+
+  let match = markerPattern.exec(text);
+  while (match) {
+    const marker = normalizeSectionMarker(match[0]);
+    if (labels.some((label) => marker.startsWith(label)) && !isLikelyTableOfContentsMarker(text, match.index)) {
+      return match.index;
+    }
+    match = markerPattern.exec(text);
+  }
+
+  return -1;
+}
+
+function extractSection(text: string, id: "item1" | "item1a", title: string): SecFilingSection {
+  const item1Start = findSectionStart(text, ["item 1 business"]);
+  const item1AStart = findSectionStart(text, ["item 1a risk factors"], Math.max(0, item1Start + 20));
+  const item1BStart = findSectionStart(text, ["item 1b unresolved"], Math.max(0, item1AStart + 20));
+  const item2Start = findSectionStart(text, ["item 2 properties"], Math.max(0, (item1AStart > 0 ? item1AStart : item1Start) + 20));
+
+  if (id === "item1") {
+    const start = item1Start >= 0 ? item1Start : 0;
+    const endCandidates = [item1AStart, item2Start].filter((index) => index > start);
+    const end = endCandidates.length ? Math.min(...endCandidates) : Math.min(text.length, start + 120_000);
+    return { id, title, text: text.slice(start, end).trim() };
+  }
+
+  if (item1AStart < 0) {
+    return { id, title, text: "" };
+  }
+
+  const endCandidates = [item1BStart, item2Start].filter((index) => index > item1AStart);
+  const end = endCandidates.length ? Math.min(...endCandidates) : Math.min(text.length, item1AStart + 120_000);
+  return { id, title, text: text.slice(item1AStart, end).trim() };
+}
+
+function keywordSnippets(text: string, charLimit: number): string {
+  const keywords = [
+    "customer",
+    "supplier",
+    "vendor",
+    "compet",
+    "partner",
+    "depend",
+    "distribution",
+    "manufactur",
+    "contract",
+    "executive",
+    "director",
+    "subsidiar",
+  ];
+  const paragraphs = text.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
+  const selected: string[] = [];
+  let charCount = 0;
+
+  for (const paragraph of paragraphs) {
+    const lower = paragraph.toLowerCase();
+    if (!keywords.some((keyword) => lower.includes(keyword))) {
+      continue;
+    }
+
+    const next = paragraph.slice(0, 2_000);
+    if (charCount + next.length > charLimit) {
+      break;
+    }
+
+    selected.push(next);
+    charCount += next.length;
+  }
+
+  return selected.join("\n\n");
+}
+
+export function buildCompanyGraphExtractionText(sections: SecFilingSection[]): string {
+  const item1 = sections.find((section) => section.id === "item1")?.text ?? "";
+  const item1a = sections.find((section) => section.id === "item1a")?.text ?? "";
+
+  return [
+    "SECTION item1 Business",
+    item1.slice(0, ITEM_1_EXTRACTION_CHAR_LIMIT),
+    "SECTION item1a Risk Factors snippets",
+    keywordSnippets(item1a, ITEM_1A_EXTRACTION_CHAR_LIMIT),
+  ].join("\n\n").trim();
+}
+
+export function summarizeStoredSections(sections: SecFilingSection[]) {
+  return sections.map((section) => {
+    const storedText = section.text.slice(0, SECTION_STORE_CHAR_LIMIT);
+    return {
+      id: section.id,
+      title: section.title,
+      text: storedText,
+      available: section.text.length > 0,
+      charCount: section.text.length,
+      storedCharCount: storedText.length,
+      truncated: section.text.length > storedText.length,
+    };
+  });
+}
+
+export async function resolveSecCompanyByTicker(ticker: string): Promise<SecCompanyIdentity> {
+  const normalizedTicker = normalizeTicker(ticker);
+  if (!normalizedTicker) {
+    throw new Error("Ticker is required.");
+  }
+
+  const payload = await fetchSecJson<SecCompanyTickersResponse>(`${SEC_BASE_URL}/files/company_tickers_exchange.json`);
+  const fields = Array.isArray(payload.fields) ? payload.fields.map(String) : [];
+  const data = Array.isArray(payload.data) ? payload.data : [];
+  const cikIndex = fields.indexOf("cik");
+  const nameIndex = fields.indexOf("name");
+  const tickerIndex = fields.indexOf("ticker");
+  const exchangeIndex = fields.indexOf("exchange");
+
+  const match = data.find((row) => {
+    if (!Array.isArray(row)) {
+      return false;
+    }
+    return String(row[tickerIndex] ?? "").toUpperCase() === normalizedTicker;
+  });
+
+  if (!Array.isArray(match)) {
+    throw new Error(`No SEC CIK mapping found for ${normalizedTicker}.`);
+  }
+
+  return {
+    cik: padCik(match[cikIndex] as string | number),
+    name: String(match[nameIndex] ?? normalizedTicker),
+    ticker: normalizedTicker,
+    exchange: exchangeIndex >= 0 ? String(match[exchangeIndex] ?? "") || null : null,
+  };
+}
+
+export async function fetchLatest10K(cik: string): Promise<SecLatest10K> {
+  const paddedCik = padCik(cik);
+  const payload = await fetchSecJson<SecSubmissionsResponse>(`${SEC_DATA_BASE_URL}/submissions/CIK${paddedCik}.json`);
+  const recent = payload.filings?.recent;
+  if (!recent) {
+    throw new Error(`No SEC submissions found for CIK ${paddedCik}.`);
+  }
+
+  const forms = readRecentColumn(recent, "form");
+  const accessionNumbers = readRecentColumn(recent, "accessionNumber");
+  const filingDates = readRecentColumn(recent, "filingDate");
+  const reportDates = readRecentColumn(recent, "reportDate");
+  const primaryDocuments = readRecentColumn(recent, "primaryDocument");
+  const index = forms.findIndex((form) => form === "10-K");
+
+  if (index < 0 || !accessionNumbers[index] || !primaryDocuments[index]) {
+    throw new Error(`No latest 10-K found for CIK ${paddedCik}.`);
+  }
+
+  return {
+    accessionNumber: accessionNumbers[index],
+    filingDate: filingDates[index] || "",
+    reportDate: reportDates[index] || null,
+    primaryDocument: primaryDocuments[index],
+    filingUrl: filingDocumentUrl(paddedCik, accessionNumbers[index], primaryDocuments[index]),
+  };
+}
+
+export async function fetchLatest10KSections(cik: string, filing: SecLatest10K): Promise<SecFilingSection[]> {
+  const html = await fetchSecText(filing.filingUrl);
+  const text = htmlToText(html);
+
+  return [
+    extractSection(text, "item1", "Item 1. Business"),
+    extractSection(text, "item1a", "Item 1A. Risk Factors"),
+  ];
+}

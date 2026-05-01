@@ -9,12 +9,6 @@ import {
 } from "@/lib/company-graph/sec";
 import { extractCompanyGraphRelationships } from "@/lib/company-graph/openai";
 import {
-  canonicalCompanyName,
-  collapseCompanyGraphEdges,
-  resolveCompanyGraphTargetNames,
-  shortestCompanyDisplayName,
-} from "@/lib/company-graph/entities";
-import {
   COMPANY_GRAPH_EXTRACTION_VERSION,
   type CompanyGraphEdge,
   type CompanyGraphExtractionResult,
@@ -168,31 +162,21 @@ export async function runLatest10KCompanyGraphExtraction(
       runId,
     },
   });
-  const extractedRelationships = openAiResult.relationships
-    .filter((relationship) => relationship.confidence >= MIN_EDGE_CONFIDENCE);
-  const resolvedTargetNames = await resolveCompanyGraphTargetNames(
-    db,
-    extractedRelationships.map((relationship) => relationship.targetName),
-  );
-  const edges: CompanyGraphEdge[] = collapseCompanyGraphEdges(extractedRelationships
+  const edges: CompanyGraphEdge[] = openAiResult.relationships
+    .filter((relationship) => relationship.confidence >= MIN_EDGE_CONFIDENCE)
     .map((relationship) => {
-      const normalizedTargetName = canonicalCompanyName(relationship.targetName);
-      const targetName = shortestCompanyDisplayName(
-        normalizedTargetName,
-        resolvedTargetNames.get(normalizedTargetName) ?? normalizedTargetName,
-      );
       return {
         id: edgeId({
           accessionNumber: filing.accessionNumber,
           sourceTicker: ticker,
           relationshipType: relationship.relationshipType,
-          targetName,
+          targetName: relationship.targetName,
           evidenceText: relationship.evidenceText,
         }),
         sourceName: company.name,
         sourceTicker: ticker,
         sourceCik: company.cik,
-        targetName,
+        targetName: relationship.targetName,
         targetType: relationship.targetType,
         relationshipType: relationship.relationshipType,
         direction: relationship.direction,
@@ -208,7 +192,7 @@ export async function runLatest10KCompanyGraphExtraction(
         extractionRunId: runId,
         createdAt: nowIso,
       };
-    }));
+    });
 
   const result: CompanyGraphExtractionResult = {
     runId,

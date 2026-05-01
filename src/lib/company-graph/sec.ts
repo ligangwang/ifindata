@@ -102,16 +102,28 @@ function filingDocumentUrl(cik: string, accessionNumber: string, primaryDocument
 function decodeHtmlEntities(value: string): string {
   return value
     .replace(/&nbsp;/gi, " ")
+    .replace(/&#160;/gi, " ")
     .replace(/&amp;/gi, "&")
     .replace(/&quot;/gi, "\"")
     .replace(/&#39;|&apos;/gi, "'")
     .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">");
+    .replace(/&gt;/gi, ">")
+    .replace(/&#x([0-9a-f]+);/gi, (_, code: string) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number.parseInt(code, 10)));
+}
+
+function stripSecMetadata(html: string): string {
+  return html
+    .replace(/<ix:header[\s\S]*?<\/ix:header>/gi, " ")
+    .replace(/<ix:hidden[\s\S]*?<\/ix:hidden>/gi, " ")
+    .replace(/<xbrli:context[\s\S]*?<\/xbrli:context>/gi, " ")
+    .replace(/<xbrli:unit[\s\S]*?<\/xbrli:unit>/gi, " ")
+    .replace(/<link:schemaRef\b[^>]*\/?>/gi, " ");
 }
 
 function htmlToText(html: string): string {
   return decodeHtmlEntities(
-    html
+    stripSecMetadata(html)
       .replace(/<script[\s\S]*?<\/script>/gi, " ")
       .replace(/<style[\s\S]*?<\/style>/gi, " ")
       .replace(/<\/(p|div|section|article|tr|table|h[1-6]|li)>/gi, "\n")
@@ -123,6 +135,95 @@ function htmlToText(html: string): string {
       .replace(/\n{3,}/g, "\n\n")
       .trim(),
   );
+}
+
+function normalizeHtmlTextForSearch(html: string): string {
+  return decodeHtmlEntities(
+    stripSecMetadata(html)
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " "),
+  )
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function findElementByIdIndex(html: string, id: string): number {
+  const pattern = new RegExp(`\\bid\\s*=\\s*["']${escapeRegExp(id)}["']`, "i");
+  const match = pattern.exec(html);
+  if (!match) {
+    return -1;
+  }
+
+  const tagStart = html.lastIndexOf("<", match.index);
+  return tagStart >= 0 ? tagStart : match.index;
+}
+
+function findTocAnchorIndex(
+  html: string,
+  titlePattern: RegExp,
+  itemMarkerPattern: RegExp,
+): number {
+  const linkPattern = /<a\b[^>]*\bhref\s*=\s*["']#([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let match = linkPattern.exec(html);
+
+  while (match) {
+    const [, anchorId, linkHtml] = match;
+    const linkText = normalizeHtmlTextForSearch(linkHtml);
+    if (titlePattern.test(linkText)) {
+      const nearbyHtml = html.slice(Math.max(0, match.index - 1_200), match.index + 1_200);
+      const nearbyText = normalizeHtmlTextForSearch(nearbyHtml);
+      if (itemMarkerPattern.test(nearbyText)) {
+        const anchorIndex = findElementByIdIndex(html, anchorId);
+        if (anchorIndex > match.index) {
+          return anchorIndex;
+        }
+      }
+    }
+
+    match = linkPattern.exec(html);
+  }
+
+  return -1;
+}
+
+function extractHtmlSlice(html: string, start: number, endCandidates: number[]): string {
+  if (start < 0) {
+    return "";
+  }
+
+  const end = endCandidates.filter((index) => index > start).sort((a, b) => a - b)[0] ?? Math.min(html.length, start + 300_000);
+  return htmlToText(html.slice(start, end));
+}
+
+function extractAnchoredSections(html: string): SecFilingSection[] | null {
+  const item1Start = findTocAnchorIndex(html, /^business$/, /\bitem\s*1\b(?!\s*[a-z])/);
+  const item1AStart = findTocAnchorIndex(html, /^risk factors?$/, /\bitem\s*1a\b/);
+  const item1BStart = findTocAnchorIndex(html, /^unresolved staff comments?$/, /\bitem\s*1b\b/);
+  const item1CStart = findTocAnchorIndex(html, /^cybersecurity$/, /\bitem\s*1c\b/);
+  const item2Start = findTocAnchorIndex(html, /^properties$/, /\bitem\s*2\b/);
+
+  if (item1Start < 0 && item1AStart < 0) {
+    return null;
+  }
+
+  return [
+    {
+      id: "item1",
+      title: "Item 1. Business",
+      text: extractHtmlSlice(html, item1Start, [item1AStart, item1BStart, item1CStart, item2Start]),
+    },
+    {
+      id: "item1a",
+      title: "Item 1A. Risk Factors",
+      text: extractHtmlSlice(html, item1AStart, [item1BStart, item1CStart, item2Start]),
+    },
+  ];
 }
 
 function normalizeSectionMarker(value: string): string {
@@ -310,10 +411,15 @@ export async function fetchLatest10K(cik: string): Promise<SecLatest10K> {
 
 export async function fetchLatest10KSections(cik: string, filing: SecLatest10K): Promise<SecFilingSection[]> {
   const html = await fetchSecText(filing.filingUrl);
+  const anchoredSections = extractAnchoredSections(html);
   const text = htmlToText(html);
-
-  return [
+  const fallbackSections = [
     extractSection(text, "item1", "Item 1. Business"),
     extractSection(text, "item1a", "Item 1A. Risk Factors"),
+  ];
+
+  return [
+    anchoredSections?.[0]?.text ? anchoredSections[0] : fallbackSections[0],
+    anchoredSections?.[1]?.text ? anchoredSections[1] : fallbackSections[1],
   ];
 }

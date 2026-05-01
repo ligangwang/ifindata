@@ -502,37 +502,41 @@ export function TickerPage({ ticker }: { ticker: string }) {
     setGraphError(null);
     setLoadingMore(false);
 
-    void Promise.allSettled([
-      fetch(`/api/ticker/${ticker}?limit=25`).then(async (response) => {
+    void fetch(`/api/ticker/${ticker}?limit=25`)
+      .then(async (response) => {
         if (!response.ok) {
           throw new Error("Unable to load ticker predictions.");
         }
 
         return (await response.json()) as TickerResponse;
-      }),
-      fetch(`/api/company-graph/${ticker}`).then(async (response) => {
+      })
+      .then((nextPayload) => {
+        if (!cancelled) {
+          setPayload(nextPayload);
+        }
+      })
+      .catch((nextError) => {
+        if (!cancelled) {
+          setError(nextError instanceof Error ? nextError.message : "Unable to load ticker.");
+        }
+      });
+
+    void fetch(`/api/company-graph/${ticker}`)
+      .then(async (response) => {
         if (!response.ok) {
           throw new Error("Unable to load company graph.");
         }
 
         return (await response.json()) as CompanyGraphResponse;
-      }),
-    ])
-      .then(([tickerResult, graphResult]) => {
-        if (cancelled) {
-          return;
+      })
+      .then((nextGraph) => {
+        if (!cancelled) {
+          setCompanyGraph(nextGraph);
         }
-
-        if (tickerResult.status === "fulfilled") {
-          setPayload(tickerResult.value);
-        } else {
-          setError(tickerResult.reason instanceof Error ? tickerResult.reason.message : "Unable to load ticker.");
-        }
-
-        if (graphResult.status === "fulfilled") {
-          setCompanyGraph(graphResult.value);
-        } else {
-          setGraphError(graphResult.reason instanceof Error ? graphResult.reason.message : "Unable to load company graph.");
+      })
+      .catch((nextError) => {
+        if (!cancelled) {
+          setGraphError(nextError instanceof Error ? nextError.message : "Unable to load company graph.");
         }
       });
 

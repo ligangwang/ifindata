@@ -15,7 +15,7 @@ test("homepage renders company graph search", async ({ page }) => {
   // Verify navigation is present
   await expect(page.getByRole("link", { name: "Feed", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Predict", exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Find a company graph" })).toBeVisible();
+  await expect(page.getByText("Company graph", { exact: true })).toBeVisible();
   
   // Verify company graph search is on the page
   await expect(page.getByRole("combobox", { name: "Company or ticker" })).toBeVisible();

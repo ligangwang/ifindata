@@ -25,13 +25,8 @@ export default function CompaniesPage() {
     <main className="mx-auto grid min-h-[calc(100vh-10rem)] w-full max-w-5xl place-items-center px-4 py-8">
       <section className="w-full">
         <div className="mx-auto max-w-3xl text-center">
+          <h1 className="sr-only">Company graph search</h1>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Company graph</p>
-          <h1 className="mt-3 font-[var(--font-sora)] text-4xl font-semibold text-cyan-100 sm:text-5xl">
-            Find a company graph
-          </h1>
-          <p className="mx-auto mt-3 max-w-2xl text-base leading-7 text-slate-300">
-            Search a ticker to open or request SEC relationship context.
-          </p>
         </div>
 
         <CompanySearchCard />

@@ -145,7 +145,7 @@ export async function runLatest10KCompanyGraphExtraction(
   });
   const nowIso = new Date().toISOString();
   const runId = `${ticker}_${filing.accessionNumber.replace(/-/g, "")}_${Date.now()}`;
-  await safeRecordOpenAiUsageEvent({
+  const usageEvent = await safeRecordOpenAiUsageEvent({
     purpose: "company_graph_extraction",
     model: openAiResult.model,
     responseId: openAiResult.responseId,
@@ -220,6 +220,16 @@ export async function runLatest10KCompanyGraphExtraction(
       model: openAiResult.model,
       responseId: openAiResult.responseId,
       usage: openAiResult.usage,
+      usageEvent: usageEvent
+        ? {
+            id: usageEvent.id,
+            estimatedCostUsd: usageEvent.estimatedCostUsd,
+            inputTokens: usageEvent.inputTokens,
+            cachedInputTokens: usageEvent.cachedInputTokens,
+            outputTokens: usageEvent.outputTokens,
+            totalTokens: usageEvent.totalTokens,
+          }
+        : null,
     },
     edges,
   };

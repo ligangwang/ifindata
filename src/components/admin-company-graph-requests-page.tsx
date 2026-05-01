@@ -40,6 +40,19 @@ function formatDate(value: string | null): string {
   }).format(date);
 }
 
+function formatCost(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "unknown cost";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: value < 0.01 ? 4 : 2,
+    maximumFractionDigits: 6,
+  }).format(value);
+}
+
 function statusClassName(status: GraphRequestStatus): string {
   if (status === "COMPLETED") {
     return "border-emerald-400/35 bg-emerald-500/10 text-emerald-100";
@@ -135,6 +148,11 @@ export function AdminCompanyGraphRequestsPage() {
         error?: string;
         edges?: unknown[];
         cached?: boolean;
+        extraction?: {
+          usageEvent?: {
+            estimatedCostUsd?: number | null;
+          } | null;
+        } | null;
       };
 
       if (!response.ok) {
@@ -143,7 +161,7 @@ export function AdminCompanyGraphRequestsPage() {
 
       setMessage(payload.cached
         ? `${ticker} graph is already current.`
-        : `${ticker} graph ${shouldForce ? "regenerated" : "generated"} with ${payload.edges?.length ?? 0} edges.`);
+        : `${ticker} graph ${shouldForce ? "regenerated" : "generated"} with ${payload.edges?.length ?? 0} edges. Estimated OpenAI cost: ${formatCost(payload.extraction?.usageEvent?.estimatedCostUsd)}.`);
       await loadRequests();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to generate company graph.");

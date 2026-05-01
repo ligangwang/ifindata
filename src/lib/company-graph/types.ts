@@ -1,19 +1,27 @@
-export const COMPANY_GRAPH_EXTRACTION_VERSION = "supply-chain-competitors-v1";
+export const COMPANY_GRAPH_EXTRACTION_VERSION = "supply-chain-ontology-v1";
 
 export const COMPANY_GRAPH_RELATIONSHIP_TYPES = [
-  "vendor",
-  "supplier",
-  "customer",
-  "competitor",
-  "partner",
+  "SUPPLIER_OF",
+  "CUSTOMER_OF",
+  "COMPETES_WITH",
+  "PARTNER_OF",
+  "DISTRIBUTES_FOR",
+  "MANUFACTURES_FOR",
 ] as const;
 
 export const COMPANY_GRAPH_TARGET_TYPES = [
   "company",
 ] as const;
 
+export const COMPANY_GRAPH_EDGE_DIRECTIONS = [
+  "source_to_target",
+  "target_to_source",
+  "bidirectional",
+] as const;
+
 export type CompanyGraphRelationshipType = (typeof COMPANY_GRAPH_RELATIONSHIP_TYPES)[number];
 export type CompanyGraphTargetType = (typeof COMPANY_GRAPH_TARGET_TYPES)[number];
+export type CompanyGraphEdgeDirection = (typeof COMPANY_GRAPH_EDGE_DIRECTIONS)[number];
 
 export type CompanyGraphEdge = {
   id: string;
@@ -23,6 +31,7 @@ export type CompanyGraphEdge = {
   targetName: string;
   targetType: CompanyGraphTargetType;
   relationshipType: CompanyGraphRelationshipType;
+  direction: CompanyGraphEdgeDirection;
   evidenceText: string;
   filingType: "10-K";
   accessionNumber: string;

@@ -33,8 +33,9 @@ type SecSubmissionsResponse = {
 const SEC_BASE_URL = "https://www.sec.gov";
 const SEC_DATA_BASE_URL = "https://data.sec.gov";
 const SECTION_STORE_CHAR_LIMIT = 300_000;
-const ITEM_1_EXTRACTION_CHAR_LIMIT = 28_000;
-const ITEM_1_FALLBACK_CHAR_LIMIT = 18_000;
+const ITEM_1_EXTRACTION_CHAR_LIMIT = 24_000;
+const ITEM_1A_EXTRACTION_CHAR_LIMIT = 8_000;
+const ITEM_1_FALLBACK_CHAR_LIMIT = 16_000;
 
 function getSecUserAgent(): string {
   const userAgent = process.env.SEC_USER_AGENT?.trim();
@@ -218,12 +219,16 @@ function relationshipSnippets(text: string, charLimit: number): string {
 
 export function buildCompanyGraphExtractionText(sections: SecFilingSection[]): string {
   const item1 = sections.find((section) => section.id === "item1")?.text ?? "";
+  const item1a = sections.find((section) => section.id === "item1a")?.text ?? "";
   const businessRelationshipText = relationshipSnippets(item1, ITEM_1_EXTRACTION_CHAR_LIMIT) ||
     item1.slice(0, ITEM_1_FALLBACK_CHAR_LIMIT);
+  const riskRelationshipText = relationshipSnippets(item1a, ITEM_1A_EXTRACTION_CHAR_LIMIT);
 
   return [
     "SECTION item1 Business",
     businessRelationshipText,
+    riskRelationshipText ? "SECTION item1a Risk Factors relationship snippets" : "",
+    riskRelationshipText,
   ].join("\n\n").trim();
 }
 

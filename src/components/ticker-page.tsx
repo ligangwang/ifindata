@@ -73,7 +73,7 @@ function relationLabel(type: CompanyGraphRelationshipType): string {
 }
 
 function graphKindForEdge(edge: CompanyGraphEdge): GraphNode["kind"] {
-  if (edge.relationshipType === "competitor") {
+  if (edge.relationshipType === "COMPETES_WITH") {
     return "peer";
   }
   return "chain";
@@ -107,7 +107,7 @@ function secGraphNodes(displayTicker: string, graphEdges: CompanyGraphEdge[]): G
     ...selectedEdges.map((edge, index) => ({
       id: `sec-${edge.id}`,
       label: edge.targetName,
-      sublabel: `${relationLabel(edge.relationshipType)} - ${Math.round(edge.confidence * 100)}% confidence`,
+      sublabel: `${relationLabel(edge.relationshipType)} - ${edge.direction.replace(/_/g, " ")} - ${Math.round(edge.confidence * 100)}% confidence`,
       kind: graphKindForEdge(edge),
       width: edge.targetName.length > 18 ? 154 : 132,
       height: 58,

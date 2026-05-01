@@ -1,7 +1,9 @@
 import { getOpenAiApiKey, getOpenAiModel } from "@/lib/ai-analyst/runtime";
 import {
+  COMPANY_GRAPH_EDGE_DIRECTIONS,
   COMPANY_GRAPH_RELATIONSHIP_TYPES,
   COMPANY_GRAPH_TARGET_TYPES,
+  type CompanyGraphEdgeDirection,
   type CompanyGraphRelationshipType,
   type CompanyGraphTargetType,
 } from "@/lib/company-graph/types";
@@ -11,6 +13,7 @@ export type ExtractedCompanyGraphRelationship = {
   targetName: string;
   targetType: CompanyGraphTargetType;
   relationshipType: CompanyGraphRelationshipType;
+  direction: CompanyGraphEdgeDirection;
   evidenceText: string;
   section: "item1" | "item1a" | "unknown";
   confidence: number;
@@ -42,6 +45,7 @@ const RESPONSE_SCHEMA = {
             "targetName",
             "targetType",
             "relationshipType",
+            "direction",
             "evidenceText",
             "section",
             "confidence",
@@ -56,6 +60,10 @@ const RESPONSE_SCHEMA = {
             relationshipType: {
               type: "string",
               enum: COMPANY_GRAPH_RELATIONSHIP_TYPES,
+            },
+            direction: {
+              type: "string",
+              enum: COMPANY_GRAPH_EDGE_DIRECTIONS,
             },
             evidenceText: { type: "string" },
             section: {
@@ -91,6 +99,12 @@ function asTargetType(value: unknown): CompanyGraphTargetType | null {
 function asRelationshipType(value: unknown): CompanyGraphRelationshipType | null {
   return typeof value === "string" && (COMPANY_GRAPH_RELATIONSHIP_TYPES as readonly string[]).includes(value)
     ? value as CompanyGraphRelationshipType
+    : null;
+}
+
+function asDirection(value: unknown): CompanyGraphEdgeDirection | null {
+  return typeof value === "string" && (COMPANY_GRAPH_EDGE_DIRECTIONS as readonly string[]).includes(value)
+    ? value as CompanyGraphEdgeDirection
     : null;
 }
 
@@ -131,9 +145,10 @@ function normalizeRelationships(raw: unknown): ExtractedCompanyGraphRelationship
     const targetName = asString(source.targetName);
     const targetType = asTargetType(source.targetType);
     const relationshipType = asRelationshipType(source.relationshipType);
+    const direction = asDirection(source.direction);
     const evidenceText = asString(source.evidenceText);
 
-    if (!sourceName || !targetName || !targetType || !relationshipType || !evidenceText) {
+    if (!sourceName || !targetName || !targetType || !relationshipType || !direction || !evidenceText) {
       return [];
     }
 
@@ -142,6 +157,7 @@ function normalizeRelationships(raw: unknown): ExtractedCompanyGraphRelationship
       targetName,
       targetType,
       relationshipType,
+      direction,
       evidenceText,
       section: asSection(source.section),
       confidence: asConfidence(source.confidence),
@@ -174,7 +190,10 @@ export async function extractCompanyGraphRelationships(input: {
               text:
                 "Extract only a focused supply-chain and competitor relationship graph from SEC 10-K text. " +
                 "Return relationships only when the target is a specifically named company or named organization. " +
-                "Allowed relationships are vendor, supplier, customer, competitor, and partner. " +
+                "Allowed ontology relationships are SUPPLIER_OF, CUSTOMER_OF, COMPETES_WITH, PARTNER_OF, DISTRIBUTES_FOR, and MANUFACTURES_FOR. " +
+                "Use source_to_target when sourceName has the relationship to targetName, target_to_source when targetName has the relationship to sourceName, and bidirectional for reciprocal relationships like competitors or partners. " +
+                "Example: if the filing company depends on TSMC as a supplier, return relationshipType=SUPPLIER_OF and direction=target_to_source. " +
+                "Example: if the filing company sells to Walmart as a customer, return relationshipType=CUSTOMER_OF and direction=target_to_source. " +
                 "Do not extract geographies, risks, products, markets, executives, directors, subsidiaries, generic categories, or unnamed groups. " +
                 "Do not infer relationships beyond the evidence text, and keep evidenceText short but verbatim enough to audit the edge.",
             },

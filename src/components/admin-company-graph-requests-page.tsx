@@ -103,7 +103,9 @@ export function AdminCompanyGraphRequestsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user]);
 
-  async function generateGraph(ticker: string) {
+  async function generateGraph(item: GraphRequestItem) {
+    const shouldForce = item.status === "COMPLETED";
+    const ticker = item.ticker;
     setActiveTicker(ticker);
     setError(null);
     setMessage(null);
@@ -126,7 +128,7 @@ export function AdminCompanyGraphRequestsPage() {
         },
         body: JSON.stringify({
           ticker,
-          force: false,
+          force: shouldForce,
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
@@ -141,7 +143,7 @@ export function AdminCompanyGraphRequestsPage() {
 
       setMessage(payload.cached
         ? `${ticker} graph is already current.`
-        : `${ticker} graph generated with ${payload.edges?.length ?? 0} edges.`);
+        : `${ticker} graph ${shouldForce ? "regenerated" : "generated"} with ${payload.edges?.length ?? 0} edges.`);
       await loadRequests();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to generate company graph.");
@@ -203,7 +205,7 @@ export function AdminCompanyGraphRequestsPage() {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => void generateGraph(item.ticker)}
+                  onClick={() => void generateGraph(item)}
                   disabled={activeTicker === item.ticker || item.status === "PROCESSING"}
                   className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >

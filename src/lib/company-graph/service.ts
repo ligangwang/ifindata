@@ -164,33 +164,35 @@ export async function runLatest10KCompanyGraphExtraction(
   });
   const edges: CompanyGraphEdge[] = openAiResult.relationships
     .filter((relationship) => relationship.confidence >= MIN_EDGE_CONFIDENCE)
-    .map((relationship) => ({
-      id: edgeId({
-        accessionNumber: filing.accessionNumber,
+    .map((relationship) => {
+      return {
+        id: edgeId({
+          accessionNumber: filing.accessionNumber,
+          sourceTicker: ticker,
+          relationshipType: relationship.relationshipType,
+          targetName: relationship.targetName,
+          evidenceText: relationship.evidenceText,
+        }),
+        sourceName: company.name,
         sourceTicker: ticker,
-        relationshipType: relationship.relationshipType,
+        sourceCik: company.cik,
         targetName: relationship.targetName,
+        targetType: relationship.targetType,
+        relationshipType: relationship.relationshipType,
+        direction: relationship.direction,
         evidenceText: relationship.evidenceText,
-      }),
-      sourceName: company.name,
-      sourceTicker: ticker,
-      sourceCik: company.cik,
-      targetName: relationship.targetName,
-      targetType: relationship.targetType,
-      relationshipType: relationship.relationshipType,
-      direction: relationship.direction,
-      evidenceText: relationship.evidenceText,
-      filingType: "10-K",
-      accessionNumber: filing.accessionNumber,
-      filingDate: filing.filingDate,
-      reportDate: filing.reportDate,
-      section: relationship.section,
-      confidence: relationship.confidence,
-      extractionProvider: "openai",
-      extractionModel: openAiResult.model,
-      extractionRunId: runId,
-      createdAt: nowIso,
-    }));
+        filingType: "10-K" as const,
+        accessionNumber: filing.accessionNumber,
+        filingDate: filing.filingDate,
+        reportDate: filing.reportDate,
+        section: relationship.section,
+        confidence: relationship.confidence,
+        extractionProvider: "openai" as const,
+        extractionModel: openAiResult.model,
+        extractionRunId: runId,
+        createdAt: nowIso,
+      };
+    });
 
   const result: CompanyGraphExtractionResult = {
     runId,

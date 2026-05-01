@@ -76,20 +76,27 @@ export function CompanySearchCard() {
   return (
     <form
       onSubmit={submitSearch}
-      className="mt-4 rounded-2xl border border-white/15 bg-slate-950/55 p-5"
+      className="mt-6 rounded-2xl border border-cyan-400/20 bg-slate-950/70 p-3 shadow-[0_12px_44px_rgba(8,47,73,0.22)] sm:p-4"
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-        <TickerSearchInput value={ticker} onChange={(value) => {
-          setTicker(value);
-          setError(null);
-          setMessage(null);
-        }} error={error} showHelperText={false} />
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <TickerSearchInput
+          value={ticker}
+          onChange={(value) => {
+            setTicker(value);
+            setError(null);
+            setMessage(null);
+          }}
+          error={error}
+          hideLabel
+          label="Company or ticker"
+          showHelperText={false}
+        />
         <button
           type="submit"
           disabled={submitting}
-          className="h-10 rounded-lg bg-cyan-500 px-5 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+          className="h-11 rounded-xl bg-cyan-500 px-5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? "Checking..." : "Open or request graph"}
+          {submitting ? "Checking..." : "Go"}
         </button>
       </div>
       {message ? <p className="mt-3 text-sm text-emerald-200">{message}</p> : null}

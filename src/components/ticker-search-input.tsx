@@ -17,6 +17,8 @@ type TickerSearchInputProps = {
   value: string;
   onChange: (value: string) => void;
   error?: string | null;
+  hideLabel?: boolean;
+  label?: string;
   showHelperText?: boolean;
 };
 
@@ -33,7 +35,14 @@ function suggestionMeta(item: TickerSuggestion): string {
   return [item.exchange, item.type].filter(Boolean).join(" · ");
 }
 
-export function TickerSearchInput({ value, onChange, error, showHelperText = true }: TickerSearchInputProps) {
+export function TickerSearchInput({
+  value,
+  onChange,
+  error,
+  hideLabel = false,
+  label = "Ticker",
+  showHelperText = true,
+}: TickerSearchInputProps) {
   const listboxId = useId();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [suggestions, setSuggestions] = useState<TickerSuggestion[]>([]);
@@ -148,8 +157,8 @@ export function TickerSearchInput({ value, onChange, error, showHelperText = tru
 
   return (
     <div ref={containerRef} className="relative grid gap-2">
-      <label className="text-sm text-slate-200" htmlFor="ticker-search">
-        Ticker
+      <label className={hideLabel ? "sr-only" : "text-sm text-slate-200"} htmlFor="ticker-search">
+        {label}
       </label>
       <input
         id="ticker-search"

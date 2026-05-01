@@ -5,66 +5,49 @@ import { featuredCompanies } from "@/lib/featured-companies";
 
 export const metadata: Metadata = {
   title: "Company graph | YouAnalyst",
-  description: "Explore company relationship graphs, public calls, watchlists, and market themes on YouAnalyst.",
+  description: "Search a ticker to open or request a company relationship graph on YouAnalyst.",
   alternates: {
     canonical: "/companies",
   },
   openGraph: {
     title: "Company graph | YouAnalyst",
-    description: "Explore company relationship graphs, public calls, watchlists, and market themes on YouAnalyst.",
+    description: "Search a ticker to open or request a company relationship graph on YouAnalyst.",
     url: "/companies",
   },
   twitter: {
     title: "Company graph | YouAnalyst",
-    description: "Explore company relationship graphs, public calls, watchlists, and market themes on YouAnalyst.",
+    description: "Search a ticker to open or request a company relationship graph on YouAnalyst.",
   },
 };
 
 export default function CompaniesPage() {
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8">
-      <section className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Company graph</p>
-        <h1 className="mt-2 font-[var(--font-sora)] text-4xl font-semibold text-cyan-100">Explore companies by relationships</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-          Start from a ticker, then map related market themes, public calls, watchlists, and company context.
-        </p>
-      </section>
+    <main className="mx-auto grid min-h-[calc(100vh-10rem)] w-full max-w-5xl place-items-center px-4 py-8">
+      <section className="w-full">
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Company graph</p>
+          <h1 className="mt-3 font-[var(--font-sora)] text-4xl font-semibold text-cyan-100 sm:text-5xl">
+            Find a company graph
+          </h1>
+          <p className="mx-auto mt-3 max-w-2xl text-base leading-7 text-slate-300">
+            Search a ticker to open or request SEC relationship context.
+          </p>
+        </div>
 
-      <CompanySearchCard />
+        <CompanySearchCard />
 
-      <section className="mt-4 grid gap-3 md:grid-cols-2">
-        {featuredCompanies.map((company) => (
-          <Link
-            key={company.symbol}
-            href={`/ticker/${company.symbol}`}
-            className="rounded-2xl border border-white/10 bg-slate-950/55 p-5 transition hover:border-cyan-300/60 hover:bg-cyan-500/5"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{company.sector}</p>
-                <h2 className="mt-1 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">
-                  ${company.symbol}
-                </h2>
-                <p className="mt-1 text-sm font-semibold text-slate-100">{company.name}</p>
-              </div>
-              <span className="rounded-full border border-cyan-400/35 px-3 py-1 text-xs font-semibold text-cyan-100">
-                View graph
-              </span>
-            </div>
-            <p className="mt-4 text-sm leading-6 text-slate-300">{company.thesis}</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {company.relationships.map((relationship) => (
-                <span
-                  key={relationship}
-                  className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300"
-                >
-                  {relationship}
-                </span>
-              ))}
-            </div>
-          </Link>
-        ))}
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          {featuredCompanies.map((company) => (
+            <Link
+              key={company.symbol}
+              href={`/ticker/${company.symbol}`}
+              className="rounded-full border border-white/10 bg-slate-950/50 px-4 py-2 text-sm font-semibold text-cyan-100 transition hover:border-cyan-300/60 hover:bg-cyan-500/10"
+            >
+              ${company.symbol}
+              <span className="ml-2 font-normal text-slate-400">{company.name}</span>
+            </Link>
+          ))}
+        </div>
       </section>
     </main>
   );

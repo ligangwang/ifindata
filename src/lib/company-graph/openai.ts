@@ -190,6 +190,9 @@ export async function extractCompanyGraphRelationships(input: {
               text:
                 "Extract only a focused supply-chain and competitor relationship graph from SEC 10-K text. " +
                 "Return relationships only when the target is a specifically named company or named organization. " +
+                "Collapse aliases and legal-name variants into one targetName per real-world company. " +
+                "Prefer the shortest recognizable public company name, for example use Intel instead of returning both Intel and Intel Corporation, and use NVIDIA instead of returning both NVIDIA and NVIDIA Corporation. " +
+                "If only a legal name appears in evidence, you may still use the shorter common public name when it is unambiguous. " +
                 "Allowed ontology relationships are SUPPLIER_OF, CUSTOMER_OF, COMPETES_WITH, PARTNER_OF, DISTRIBUTES_FOR, and MANUFACTURES_FOR. " +
                 "Use source_to_target when sourceName has the relationship to targetName, target_to_source when targetName has the relationship to sourceName, and bidirectional for reciprocal relationships like competitors or partners. " +
                 "Example: if the filing company depends on TSMC as a supplier, return relationshipType=SUPPLIER_OF and direction=target_to_source. " +

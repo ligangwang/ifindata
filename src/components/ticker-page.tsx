@@ -208,6 +208,19 @@ function relationNodes(displayTicker: string, predictions: Prediction[], graphEd
     return secGraphNodes(displayTicker, graphEdges);
   }
 
+  if (predictions.length === 0) {
+    return [
+      {
+        id: "company",
+        label: displayTicker,
+        sublabel: "Company node",
+        kind: "company",
+        width: 112,
+        height: 76,
+      },
+    ];
+  }
+
   const bullishCount = predictions.filter((prediction) => prediction.direction === "UP").length;
   const bearishCount = predictions.filter((prediction) => prediction.direction === "DOWN").length;
   const liveCount = predictions.filter((prediction) => ["CREATED", "OPEN", "CLOSING"].includes(prediction.status)).length;
@@ -363,7 +376,7 @@ function KnowledgeGraph({
   const nodes = useMemo(() => {
     const allNodes = relationNodes(displayTicker, predictions, locked ? [] : companyGraph?.edges ?? []);
     return locked
-      ? allNodes.filter((node) => node.id === "company" || node.id === "theme" || node.id === "activity")
+      ? allNodes.filter((node) => node.id === "company")
       : allNodes;
   }, [companyGraph?.edges, displayTicker, locked, predictions]);
   const [selectedNodeId, setSelectedNodeId] = useState("company");
@@ -589,7 +602,7 @@ function KnowledgeGraph({
             <p className="mt-2 text-sm text-slate-200">
               {companyGraph?.available && !locked
                 ? "SEC latest 10-K relationships with filing evidence."
-                : "Company relationships, market themes, and public YouAnalyst activity."}
+                : "Sign in to explore SEC relationship context for this company."}
             </p>
           </div>
           {selectedNode.evidenceText ? (
@@ -601,22 +614,26 @@ function KnowledgeGraph({
               ) : null}
             </div>
           ) : null}
-          {locked ? (
-            <div className="mt-4 rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-4">
-              <h3 className="font-[var(--font-sora)] text-base font-semibold text-cyan-100">Company graph preview</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                Sign in to explore the full company graph, related calls, watchlists, and relationship context.
-              </p>
-              <Link
-                href="/auth"
-                className="mt-4 inline-flex rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
-              >
-                Sign in to explore more
-              </Link>
-            </div>
-          ) : null}
         </aside>
       </div>
+      {locked ? (
+        <div className="border-t border-white/10 bg-slate-950/75 p-5">
+          <div className="mx-auto flex max-w-3xl flex-col gap-3 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+            <div>
+              <h3 className="font-[var(--font-sora)] text-base font-semibold text-cyan-100">Company graph preview</h3>
+              <p className="mt-1 text-sm leading-6 text-slate-300">
+                Sign in to explore the full SEC company graph, relationship evidence, related calls, and watchlists.
+              </p>
+            </div>
+            <Link
+              href="/auth"
+              className="shrink-0 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+            >
+              Sign in to explore more
+            </Link>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

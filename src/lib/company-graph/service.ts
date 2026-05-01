@@ -56,6 +56,13 @@ function readCachedResult(data: Record<string, unknown> | undefined): CompanyGra
   return result as CompanyGraphExtractionResult;
 }
 
+function isCachedResultForFiling(
+  result: CompanyGraphExtractionResult | null,
+  accessionNumber: string,
+): result is CompanyGraphExtractionResult {
+  return result?.filing.accessionNumber === accessionNumber;
+}
+
 async function persistEdges(db: FirebaseFirestore.Firestore, edges: CompanyGraphEdge[]): Promise<number> {
   let written = 0;
 
@@ -86,11 +93,13 @@ export async function runLatest10KCompanyGraphExtraction(
   const force = input.force === true;
   const db = getAdminFirestore();
   const runRef = db.collection("company_graph_runs").doc(runDocId(ticker));
+  const company = await resolveSecCompanyByTicker(ticker);
+  const filing = await fetchLatest10K(company.cik);
 
   if (!force) {
     const runSnapshot = await runRef.get();
     const cachedResult = readCachedResult(runSnapshot.data());
-    if (cachedResult) {
+    if (isCachedResultForFiling(cachedResult, filing.accessionNumber)) {
       return {
         ...cachedResult,
         dryRun,
@@ -99,8 +108,6 @@ export async function runLatest10KCompanyGraphExtraction(
     }
   }
 
-  const company = await resolveSecCompanyByTicker(ticker);
-  const filing = await fetchLatest10K(company.cik);
   const existingFilingSnapshot = await db.collection("sec_filings").doc(filing.accessionNumber).get();
   const existingFilingData = existingFilingSnapshot.data() as Record<string, unknown> | undefined;
 

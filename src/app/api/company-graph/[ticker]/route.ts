@@ -71,8 +71,10 @@ export async function GET(
     ]);
     const runData = runSnapshot.data() as CompanyGraphRunDocument | undefined;
     const runResult = readRunResult(runData?.result);
+    const latestAccessionNumber = readString(runData?.accessionNumber);
     const edges = edgesSnapshot.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }) as CompanyGraphEdge)
+      .filter((edge) => !latestAccessionNumber || edge.accessionNumber === latestAccessionNumber)
       .sort(sortEdges)
       .slice(0, MAX_EDGES);
 
@@ -81,7 +83,7 @@ export async function GET(
       available: edges.length > 0,
       companyName: readString(runData?.companyName),
       cik: readString(runData?.cik),
-      accessionNumber: readString(runData?.accessionNumber),
+      accessionNumber: latestAccessionNumber,
       updatedAt: readString(runData?.updatedAt),
       runId: runResult?.runId ?? null,
       filing: runResult?.filing ?? null,

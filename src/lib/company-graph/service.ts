@@ -13,6 +13,7 @@ import {
   type CompanyGraphEdge,
   type CompanyGraphExtractionResult,
 } from "@/lib/company-graph/types";
+import { safeRecordOpenAiUsageEvent } from "@/lib/openai/usage";
 
 export type CompanyGraphExtractionInput = {
   ticker: string;
@@ -144,6 +145,23 @@ export async function runLatest10KCompanyGraphExtraction(
   });
   const nowIso = new Date().toISOString();
   const runId = `${ticker}_${filing.accessionNumber.replace(/-/g, "")}_${Date.now()}`;
+  await safeRecordOpenAiUsageEvent({
+    purpose: "company_graph_extraction",
+    model: openAiResult.model,
+    responseId: openAiResult.responseId,
+    usage: openAiResult.usage,
+    createdAt: nowIso,
+    metadata: {
+      ticker,
+      companyName: company.name,
+      cik: company.cik,
+      accessionNumber: filing.accessionNumber,
+      filingDate: filing.filingDate,
+      dryRun,
+      force,
+      runId,
+    },
+  });
   const edges: CompanyGraphEdge[] = openAiResult.relationships
     .filter((relationship) => relationship.confidence >= MIN_EDGE_CONFIDENCE)
     .map((relationship) => ({

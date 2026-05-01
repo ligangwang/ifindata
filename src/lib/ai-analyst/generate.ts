@@ -3,6 +3,7 @@ import { buildAiAnalystDailyContext } from "@/lib/ai-analyst/context";
 import { aiChipsAnalystConfig } from "@/lib/ai-analyst/config";
 import { getAiAnalystUserId, getOpenAiApiKey, getOpenAiModel } from "@/lib/ai-analyst/runtime";
 import { generateAiAnalystCalls } from "@/lib/ai-analyst/openai";
+import { safeRecordOpenAiUsageEvent } from "@/lib/openai/usage";
 
 export type AiAnalystGenerateInput = {
   runDate?: string;
@@ -162,6 +163,22 @@ export async function runAiAnalystGenerate(
   };
   const openAiResult = await generateAiAnalystCalls(promptPayload);
   const nowIso = new Date().toISOString();
+  await safeRecordOpenAiUsageEvent({
+    purpose: "ai_analyst_generation",
+    model: openAiResult.model,
+    responseId: openAiResult.responseId,
+    usage: openAiResult.usage,
+    createdAt: nowIso,
+    metadata: {
+      aiAnalystId: aiChipsAnalystConfig.id,
+      analystUserId,
+      runDate,
+      dryRun,
+      force,
+      eligibleTickerCount: dailyContext.eligibleTickers.length,
+      decisionCount: openAiResult.decisions.length,
+    },
+  });
   const drafts: AiAnalystGenerateResult["drafts"] = [];
 
   for (const decision of openAiResult.decisions) {

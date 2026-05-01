@@ -7,6 +7,7 @@ import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } 
 import { useAuth } from "@/components/providers/auth-provider";
 import type { CompanyGraphEdge, CompanyGraphRelationshipType, CompanyGraphTargetType } from "@/lib/company-graph/types";
 import { type PredictionStatus } from "@/lib/predictions/types";
+import { xPostIntentUrl } from "@/lib/x-share";
 
 type Prediction = {
   id: string;
@@ -50,6 +51,7 @@ type CompanyGraphResponse = {
     reportDate: string | null;
     filingUrl: string | null;
   } | null;
+  runId?: string | null;
   edges: CompanyGraphEdge[];
 };
 
@@ -134,6 +136,42 @@ function summarizeGraphEdges(edges: CompanyGraphEdge[]): string {
     .join(" - ");
 
   return summary || "Latest 10-K relationships";
+}
+
+function graphShareVersion(companyGraph: CompanyGraphResponse | null): string {
+  const source = companyGraph?.filing?.accessionNumber ?? companyGraph?.runId ?? companyGraph?.ticker ?? "latest";
+  const compact = source.replace(/[^0-9A-Za-z]/g, "");
+  return `graph-${compact || "latest"}`;
+}
+
+function graphShareUrl(ticker: string, companyGraph: CompanyGraphResponse | null): string {
+  const origin = typeof window === "undefined" ? "https://youanalyst.com" : window.location.origin;
+  const url = new URL(`/ticker/${encodeURIComponent(ticker)}`, origin);
+  url.searchParams.set("utm_source", "x");
+  url.searchParams.set("utm_medium", "social");
+  url.searchParams.set("utm_campaign", "company_graph_share");
+  url.searchParams.set("share", graphShareVersion(companyGraph));
+  return url.toString();
+}
+
+function graphShareText(displayTicker: string, companyGraph: CompanyGraphResponse | null): string {
+  const edges = companyGraph?.edges ?? [];
+  const summary = edges.length > 0 ? summarizeGraphEdges(edges).toLowerCase() : "SEC 10-K relationships";
+  const filingDate = companyGraph?.filing?.filingDate;
+  const suffix = filingDate ? ` Latest 10-K filed ${filingDate}.` : "";
+
+  return `Mapping ${displayTicker}'s company knowledge graph on YouAnalyst: ${summary} with SEC filing evidence.${suffix}`;
+}
+
+function graphShareIntentUrl(input: {
+  ticker: string;
+  displayTicker: string;
+  companyGraph: CompanyGraphResponse | null;
+}): string {
+  return xPostIntentUrl({
+    text: graphShareText(input.displayTicker, input.companyGraph),
+    url: graphShareUrl(input.ticker, input.companyGraph),
+  });
 }
 
 function secGraphNodes(displayTicker: string, graphEdges: CompanyGraphEdge[]): GraphNode[] {
@@ -808,14 +846,30 @@ export function TickerPage({ ticker }: { ticker: string }) {
             </p>
           </div>
           {canExtractGraph ? (
-            <button
-              type="button"
-              onClick={refreshCompanyGraph}
-              disabled={extractingGraph}
-              className="w-full rounded-lg border border-cyan-400/40 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-            >
-              {extractingGraph ? "Generating..." : companyGraph?.available ? "Check latest 10-K" : "Generate SEC graph"}
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {companyGraph?.available ? (
+                <a
+                  href={graphShareIntentUrl({
+                    ticker: payload.ticker,
+                    displayTicker,
+                    companyGraph,
+                  })}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full rounded-lg bg-cyan-500 px-4 py-2 text-center text-sm font-semibold text-slate-950 hover:bg-cyan-400 sm:w-auto"
+                >
+                  Share graph on X
+                </a>
+              ) : null}
+              <button
+                type="button"
+                onClick={refreshCompanyGraph}
+                disabled={extractingGraph}
+                className="w-full rounded-lg border border-cyan-400/40 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              >
+                {extractingGraph ? "Generating..." : companyGraph?.available ? "Check latest 10-K" : "Generate SEC graph"}
+              </button>
+            </div>
           ) : null}
         </div>
         {graphActionMessage ? <p className="mb-3 text-sm text-emerald-200">{graphActionMessage}</p> : null}

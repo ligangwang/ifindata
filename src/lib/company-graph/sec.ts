@@ -286,31 +286,69 @@ function extractSection(text: string, id: "item1" | "item1a", title: string): Se
 
 function relationshipSnippets(text: string, charLimit: number): string {
   const keywords = [
-    "customer",
     "supplier",
     "vendor",
+    "foundr",
+    "wafer",
+    "fabricat",
+    "manufactur",
+    "assembly",
+    "packag",
+    "subcontract",
+    "outsourc",
+    "production",
+    "customer",
     "compet",
     "partner",
     "depend",
     "distribution",
-    "manufactur",
     "contract",
   ];
   const paragraphs = text.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
-  const selected: string[] = [];
+  const candidates: Array<{ text: string; priority: number; sourceIndex: number }> = [];
   let charCount = 0;
 
-  for (const paragraph of paragraphs) {
+  for (const [sourceIndex, paragraph] of paragraphs.entries()) {
     const lower = paragraph.toLowerCase();
-    if (!keywords.some((keyword) => lower.includes(keyword))) {
+    const matchedPriority = keywords.findIndex((keyword) => lower.includes(keyword));
+    if (matchedPriority < 0) {
       continue;
     }
 
-    const next = paragraph.slice(0, 2_000);
-    if (charCount + next.length > charLimit) {
-      break;
+    const matchedKeyword = keywords[matchedPriority];
+    const keywordIndex = lower.indexOf(matchedKeyword);
+    const snippetStart = paragraph.length > 2_000 ? Math.max(0, keywordIndex - 650) : 0;
+    const next = paragraph.slice(snippetStart, snippetStart + 2_000).trim();
+    if (!next) {
+      continue;
     }
 
+    candidates.push({
+      text: next,
+      priority: matchedPriority,
+      sourceIndex,
+    });
+  }
+
+  const selected: string[] = [];
+  const seen = new Set<string>();
+  const sortedCandidates = candidates.sort((left, right) => {
+    const priorityDelta = left.priority - right.priority;
+    return priorityDelta !== 0 ? priorityDelta : left.sourceIndex - right.sourceIndex;
+  });
+
+  for (const candidate of sortedCandidates) {
+    const dedupeKey = candidate.text.toLowerCase().slice(0, 300);
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+
+    const next = candidate.text;
+    if (charCount + next.length > charLimit) {
+      continue;
+    }
+
+    seen.add(dedupeKey);
     selected.push(next);
     charCount += next.length;
   }

@@ -72,6 +72,10 @@ function relationLabel(type: CompanyGraphRelationshipType): string {
   return type.replace(/_/g, " ");
 }
 
+function directionLabel(direction: CompanyGraphEdge["direction"] | undefined): string {
+  return direction ? direction.replace(/_/g, " ") : "direction unknown";
+}
+
 function graphKindForEdge(edge: CompanyGraphEdge): GraphNode["kind"] {
   if (edge.relationshipType === "COMPETES_WITH") {
     return "peer";
@@ -107,7 +111,7 @@ function secGraphNodes(displayTicker: string, graphEdges: CompanyGraphEdge[]): G
     ...selectedEdges.map((edge, index) => ({
       id: `sec-${edge.id}`,
       label: edge.targetName,
-      sublabel: `${relationLabel(edge.relationshipType)} - ${edge.direction.replace(/_/g, " ")} - ${Math.round(edge.confidence * 100)}% confidence`,
+      sublabel: `${relationLabel(edge.relationshipType)} - ${directionLabel(edge.direction)} - ${Math.round(edge.confidence * 100)}% confidence`,
       kind: graphKindForEdge(edge),
       width: edge.targetName.length > 18 ? 154 : 132,
       height: 58,

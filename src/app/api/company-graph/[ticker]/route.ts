@@ -1,6 +1,8 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
+  COMPANY_GRAPH_EDGE_DIRECTIONS,
   COMPANY_GRAPH_EXTRACTION_VERSION,
+  COMPANY_GRAPH_RELATIONSHIP_TYPES,
   type CompanyGraphEdge,
 } from "@/lib/company-graph/types";
 import { FieldPath } from "firebase-admin/firestore";
@@ -61,6 +63,39 @@ function edgeDocIdPrefix(ticker: string, accessionNumber: string): string {
   return `${ticker}_${accessionNumber.replace(/-/g, "")}_`;
 }
 
+function toCurrentCompanyGraphEdge(doc: FirebaseFirestore.QueryDocumentSnapshot): CompanyGraphEdge | null {
+  const data = doc.data() as Record<string, unknown>;
+  const relationshipType = readString(data.relationshipType);
+  const direction = readString(data.direction);
+  const targetName = readString(data.targetName);
+  const evidenceText = readString(data.evidenceText);
+  const confidence = typeof data.confidence === "number" && Number.isFinite(data.confidence)
+    ? data.confidence
+    : null;
+
+  if (
+    !relationshipType ||
+    !(COMPANY_GRAPH_RELATIONSHIP_TYPES as readonly string[]).includes(relationshipType) ||
+    !direction ||
+    !(COMPANY_GRAPH_EDGE_DIRECTIONS as readonly string[]).includes(direction) ||
+    !targetName ||
+    !evidenceText ||
+    confidence === null
+  ) {
+    return null;
+  }
+
+  return {
+    id: doc.id,
+    ...data,
+    relationshipType,
+    direction,
+    targetName,
+    evidenceText,
+    confidence,
+  } as CompanyGraphEdge;
+}
+
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ ticker: string }> },
@@ -94,7 +129,8 @@ export async function GET(
       : null;
     const edges = edgesSnapshot
       ? edgesSnapshot.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }) as CompanyGraphEdge)
+          .map(toCurrentCompanyGraphEdge)
+          .filter((edge): edge is CompanyGraphEdge => Boolean(edge))
           .sort(sortEdges)
           .slice(0, MAX_EDGES)
       : [];

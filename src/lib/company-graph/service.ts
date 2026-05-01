@@ -160,6 +160,7 @@ export async function runLatest10KCompanyGraphExtraction(
       targetName: relationship.targetName,
       targetType: relationship.targetType,
       relationshipType: relationship.relationshipType,
+      direction: relationship.direction,
       evidenceText: relationship.evidenceText,
       filingType: "10-K",
       accessionNumber: filing.accessionNumber,

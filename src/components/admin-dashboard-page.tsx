@@ -226,6 +226,17 @@ export function AdminDashboardPage() {
 
       <section className="grid gap-4 md:grid-cols-2">
         <Link
+          href="/admin/company-graph"
+          className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5 transition hover:border-cyan-300/50 hover:bg-slate-900"
+        >
+          <p className="text-sm font-medium uppercase tracking-wide text-cyan-300">Company Graph</p>
+          <h2 className="mt-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">Generate requested graphs</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-300">
+            Review queued tickers and generate focused SEC supply-chain graphs one at a time.
+          </p>
+        </Link>
+
+        <Link
           href="/admin/ai-analyst"
           className="rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-5 transition hover:border-cyan-300/50 hover:bg-slate-900"
         >

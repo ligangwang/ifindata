@@ -1,5 +1,10 @@
 import { isAdminUser } from "@/lib/firebase/admin-role";
 import { getDecodedUserFromRequest } from "@/lib/firebase/auth";
+import {
+  markCompanyGraphRequestCompleted,
+  markCompanyGraphRequestFailed,
+  markCompanyGraphRequestProcessing,
+} from "@/lib/company-graph/requests";
 import { runLatest10KCompanyGraphExtraction } from "@/lib/company-graph/service";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -35,11 +40,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "ticker is required" }, { status: 400 });
     }
 
-    const result = await runLatest10KCompanyGraphExtraction({
-      ticker,
-      dryRun: false,
-      force: readBoolean(payload.force),
-    });
+    await markCompanyGraphRequestProcessing(ticker);
+
+    let result: Awaited<ReturnType<typeof runLatest10KCompanyGraphExtraction>>;
+    try {
+      result = await runLatest10KCompanyGraphExtraction({
+        ticker,
+        dryRun: false,
+        force: readBoolean(payload.force),
+      });
+      await markCompanyGraphRequestCompleted(result.ticker, result.edges.length);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to extract company graph";
+      await markCompanyGraphRequestFailed(ticker, message);
+      throw error;
+    }
 
     return NextResponse.json({
       ok: true,

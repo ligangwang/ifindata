@@ -17,21 +17,60 @@ export function CompanySearchCard() {
   const [ticker, setTicker] = useState("");
   const normalizedTicker = normalizeTicker(ticker);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  function submitSearch(event: FormEvent<HTMLFormElement>) {
+  async function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!normalizedTicker) {
       setError("Enter a ticker or company name.");
+      setMessage(null);
       return;
     }
 
     if (!isValidTicker(normalizedTicker)) {
       setError("Choose a ticker from search or enter a valid symbol.");
+      setMessage(null);
       return;
     }
 
-    router.push(`/ticker/${encodeURIComponent(normalizedTicker)}`);
+    setSubmitting(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/company-graph/requests", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          ticker: normalizedTicker,
+        }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+        status?: "AVAILABLE" | "QUEUED" | "ALREADY_QUEUED";
+        ticker?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(body.error ?? "Unable to request company graph.");
+      }
+
+      if (body.status === "AVAILABLE") {
+        router.push(`/ticker/${encodeURIComponent(body.ticker ?? normalizedTicker)}`);
+        return;
+      }
+
+      setMessage(body.message ?? `${normalizedTicker} was added to the graph request queue.`);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to request company graph.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -43,14 +82,17 @@ export function CompanySearchCard() {
         <TickerSearchInput value={ticker} onChange={(value) => {
           setTicker(value);
           setError(null);
+          setMessage(null);
         }} error={error} />
         <button
           type="submit"
+          disabled={submitting}
           className="rounded-lg bg-cyan-500 px-5 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
         >
-          Open graph
+          {submitting ? "Checking..." : "Open or request graph"}
         </button>
       </div>
+      {message ? <p className="mt-3 text-sm text-emerald-200">{message}</p> : null}
     </form>
   );
 }

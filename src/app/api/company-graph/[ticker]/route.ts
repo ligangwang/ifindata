@@ -9,6 +9,7 @@ import {
   canonicalCompanyName,
   collapseCompanyGraphEdges,
   resolveCompanyGraphTargetNames,
+  shortestCompanyDisplayName,
 } from "@/lib/company-graph/entities";
 import { FieldPath } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
@@ -150,7 +151,10 @@ export async function GET(
       const normalizedTargetName = canonicalCompanyName(edge.targetName);
       return {
         ...edge,
-        targetName: resolvedTargetNames.get(normalizedTargetName) ?? normalizedTargetName,
+        targetName: shortestCompanyDisplayName(
+          normalizedTargetName,
+          resolvedTargetNames.get(normalizedTargetName) ?? normalizedTargetName,
+        ),
       };
     }))
       .sort(sortEdges)

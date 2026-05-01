@@ -176,16 +176,23 @@ export async function resolveCompanyGraphTargetNames(
   return resolved;
 }
 
+export function shortestCompanyDisplayName(...values: string[]): string {
+  return values
+    .map(canonicalCompanyName)
+    .filter(Boolean)
+    .sort((left, right) => {
+      const lengthDelta = left.length - right.length;
+      if (lengthDelta !== 0) {
+        return lengthDelta;
+      }
+      return left.localeCompare(right);
+    })[0] ?? "";
+}
+
 function betterDisplayName(left: string, right: string): string {
   const leftCanonical = canonicalCompanyName(left);
   const rightCanonical = canonicalCompanyName(right);
-  if (leftCanonical !== left.trim()) {
-    return leftCanonical;
-  }
-  if (rightCanonical !== right.trim()) {
-    return rightCanonical;
-  }
-  return right.length > left.length ? right : left;
+  return shortestCompanyDisplayName(leftCanonical, rightCanonical);
 }
 
 export function collapseCompanyGraphEdges<T extends EdgeLike>(edges: T[]): T[] {

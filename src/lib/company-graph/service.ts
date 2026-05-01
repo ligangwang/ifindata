@@ -12,6 +12,7 @@ import {
   canonicalCompanyName,
   collapseCompanyGraphEdges,
   resolveCompanyGraphTargetNames,
+  shortestCompanyDisplayName,
 } from "@/lib/company-graph/entities";
 import {
   COMPANY_GRAPH_EXTRACTION_VERSION,
@@ -176,7 +177,10 @@ export async function runLatest10KCompanyGraphExtraction(
   const edges: CompanyGraphEdge[] = collapseCompanyGraphEdges(extractedRelationships
     .map((relationship) => {
       const normalizedTargetName = canonicalCompanyName(relationship.targetName);
-      const targetName = resolvedTargetNames.get(normalizedTargetName) ?? normalizedTargetName;
+      const targetName = shortestCompanyDisplayName(
+        normalizedTargetName,
+        resolvedTargetNames.get(normalizedTargetName) ?? normalizedTargetName,
+      );
       return {
         id: edgeId({
           accessionNumber: filing.accessionNumber,

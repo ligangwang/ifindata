@@ -73,6 +73,14 @@ export type CompanyGraphExtractionResult = {
     model: string;
     responseId: string | null;
     usage: Record<string, unknown> | null;
+    usageEvent?: {
+      id: string;
+      estimatedCostUsd: number | null;
+      inputTokens: number;
+      cachedInputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+    } | null;
   } | null;
   edges: CompanyGraphEdge[];
 };

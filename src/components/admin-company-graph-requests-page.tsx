@@ -40,6 +40,19 @@ function formatDate(value: string | null): string {
   }).format(date);
 }
 
+function formatCost(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "unknown cost";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: value < 0.01 ? 4 : 2,
+    maximumFractionDigits: 6,
+  }).format(value);
+}
+
 function statusClassName(status: GraphRequestStatus): string {
   if (status === "COMPLETED") {
     return "border-emerald-400/35 bg-emerald-500/10 text-emerald-100";
@@ -103,7 +116,9 @@ export function AdminCompanyGraphRequestsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user]);
 
-  async function generateGraph(ticker: string) {
+  async function generateGraph(item: GraphRequestItem) {
+    const shouldForce = item.status === "COMPLETED";
+    const ticker = item.ticker;
     setActiveTicker(ticker);
     setError(null);
     setMessage(null);
@@ -126,13 +141,18 @@ export function AdminCompanyGraphRequestsPage() {
         },
         body: JSON.stringify({
           ticker,
-          force: false,
+          force: shouldForce,
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
         error?: string;
         edges?: unknown[];
         cached?: boolean;
+        extraction?: {
+          usageEvent?: {
+            estimatedCostUsd?: number | null;
+          } | null;
+        } | null;
       };
 
       if (!response.ok) {
@@ -141,7 +161,7 @@ export function AdminCompanyGraphRequestsPage() {
 
       setMessage(payload.cached
         ? `${ticker} graph is already current.`
-        : `${ticker} graph generated with ${payload.edges?.length ?? 0} edges.`);
+        : `${ticker} graph ${shouldForce ? "regenerated" : "generated"} with ${payload.edges?.length ?? 0} edges. Estimated OpenAI cost: ${formatCost(payload.extraction?.usageEvent?.estimatedCostUsd)}.`);
       await loadRequests();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to generate company graph.");
@@ -203,7 +223,7 @@ export function AdminCompanyGraphRequestsPage() {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => void generateGraph(item.ticker)}
+                  onClick={() => void generateGraph(item)}
                   disabled={activeTicker === item.ticker || item.status === "PROCESSING"}
                   className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >

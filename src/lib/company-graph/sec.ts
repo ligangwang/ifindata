@@ -132,6 +132,18 @@ function normalizeSectionMarker(value: string): string {
     .trim();
 }
 
+function isLikelyTableOfContentsMarker(text: string, index: number): boolean {
+  const earlyDocumentLimit = Math.min(50_000, Math.floor(text.length * 0.25));
+  if (index > earlyDocumentLimit) {
+    return false;
+  }
+
+  const nearbyText = text.slice(index, index + 1_500);
+  const nearbyItemMarkers = nearbyText.match(/(?:^|\n)\s*item\s+(?:1a?|1b|[2-9]|1[0-6])[\s.\-–—:]+/gi) ?? [];
+
+  return nearbyItemMarkers.length >= 3;
+}
+
 function findSectionStart(text: string, labels: string[], fromIndex = 0): number {
   const markerPattern = /(?:^|\n)\s*item\s+(?:1a?|1b|2)[\s.\-–—:]+[^\n]{0,120}/gi;
   markerPattern.lastIndex = fromIndex;
@@ -139,7 +151,7 @@ function findSectionStart(text: string, labels: string[], fromIndex = 0): number
   let match = markerPattern.exec(text);
   while (match) {
     const marker = normalizeSectionMarker(match[0]);
-    if (labels.some((label) => marker.startsWith(label))) {
+    if (labels.some((label) => marker.startsWith(label)) && !isLikelyTableOfContentsMarker(text, match.index)) {
       return match.index;
     }
     match = markerPattern.exec(text);

@@ -69,6 +69,7 @@ type GraphNode = {
   confidence?: number;
   filingDate?: string;
   positionIndex?: number;
+  positionTotal?: number;
 };
 
 function relationLabel(type: CompanyGraphRelationshipType): string {
@@ -175,7 +176,6 @@ function graphShareIntentUrl(input: {
 }
 
 function secGraphNodes(displayTicker: string, graphEdges: CompanyGraphEdge[]): GraphNode[] {
-  const selectedEdges = graphEdges.slice(0, 10);
   return [
     {
       id: "company",
@@ -185,7 +185,7 @@ function secGraphNodes(displayTicker: string, graphEdges: CompanyGraphEdge[]): G
       width: 122,
       height: 78,
     },
-    ...selectedEdges.map((edge, index) => ({
+    ...graphEdges.map((edge, index) => ({
       id: `sec-${edge.id}`,
       label: edge.targetName,
       sublabel: `${relationLabel(edge.relationshipType)} - ${directionLabel(edge.direction)} - ${Math.round(edge.confidence * 100)}% confidence`,
@@ -199,6 +199,7 @@ function secGraphNodes(displayTicker: string, graphEdges: CompanyGraphEdge[]): G
       confidence: edge.confidence,
       filingDate: edge.filingDate,
       positionIndex: index,
+      positionTotal: graphEdges.length,
     })),
   ];
 }
@@ -319,19 +320,20 @@ function graphPosition(id: string, locked: boolean, node?: GraphNode): { x: numb
 
   if (id.startsWith("sec-")) {
     const index = node?.positionIndex ?? 0;
-    const angle = (index / Math.max(6, 10)) * Math.PI * 2 - Math.PI / 2;
-    const radiusX = 265;
-    const radiusY = 150;
+    const total = Math.max(6, node?.positionTotal ?? 10);
+    const angle = (index / total) * Math.PI * 2 - Math.PI / 2;
+    const radiusX = total > 24 ? 390 : total > 16 ? 330 : 265;
+    const radiusY = total > 24 ? 230 : total > 16 ? 190 : 150;
     return {
-      x: 380 + Math.cos(angle) * radiusX,
-      y: 210 + Math.sin(angle) * radiusY,
+      x: 430 + Math.cos(angle) * radiusX,
+      y: 270 + Math.sin(angle) * radiusY,
     };
   }
 
   const positions: Record<string, { x: number; y: number }> = {
     activity: { x: 150, y: 300 },
     calls: { x: 150, y: 150 },
-    company: { x: 380, y: 210 },
+    company: { x: 430, y: 270 },
     peers: { x: 620, y: 180 },
     supply: { x: 390, y: 335 },
     theme: { x: 380, y: 70 },
@@ -563,8 +565,8 @@ function KnowledgeGraph({
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70">
-      <div className="grid min-h-[420px] gap-0 lg:grid-cols-[1fr_300px]">
-        <div className="relative h-[420px] min-h-[360px]">
+      <div className="grid min-h-[560px] gap-0 lg:grid-cols-[1fr_300px]">
+        <div className="relative h-[560px] min-h-[420px]">
           <div
             ref={containerRef}
             className="absolute inset-0 h-full w-full"

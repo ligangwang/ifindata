@@ -172,9 +172,11 @@ export async function extractCompanyGraphRelationships(input: {
             {
               type: "input_text",
               text:
-                "Extract a company relationship knowledge graph from SEC 10-K text. Return only relationships explicitly supported by the evidence text. " +
-                "Prioritize named vendors, suppliers, customers, competitors, partners, executives, directors, subsidiaries, products, markets, geographies, and risks. " +
-                "Do not infer unnamed entities, do not turn generic categories into companies, and keep evidenceText short but verbatim enough to audit the edge.",
+                "Extract only a focused supply-chain and competitor relationship graph from SEC 10-K text. " +
+                "Return relationships only when the target is a specifically named company or named organization. " +
+                "Allowed relationships are vendor, supplier, customer, competitor, and partner. " +
+                "Do not extract geographies, risks, products, markets, executives, directors, subsidiaries, generic categories, or unnamed groups. " +
+                "Do not infer relationships beyond the evidence text, and keep evidenceText short but verbatim enough to audit the edge.",
             },
           ],
         },

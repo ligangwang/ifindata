@@ -8,7 +8,11 @@ import {
   summarizeStoredSections,
 } from "@/lib/company-graph/sec";
 import { extractCompanyGraphRelationships } from "@/lib/company-graph/openai";
-import type { CompanyGraphEdge, CompanyGraphExtractionResult } from "@/lib/company-graph/types";
+import {
+  COMPANY_GRAPH_EXTRACTION_VERSION,
+  type CompanyGraphEdge,
+  type CompanyGraphExtractionResult,
+} from "@/lib/company-graph/types";
 
 export type CompanyGraphExtractionInput = {
   ticker: string;
@@ -60,7 +64,8 @@ function isCachedResultForFiling(
   result: CompanyGraphExtractionResult | null,
   accessionNumber: string,
 ): result is CompanyGraphExtractionResult {
-  return result?.filing.accessionNumber === accessionNumber;
+  return result?.filing.accessionNumber === accessionNumber &&
+    result.extractionVersion === COMPANY_GRAPH_EXTRACTION_VERSION;
 }
 
 async function persistEdges(db: FirebaseFirestore.Firestore, edges: CompanyGraphEdge[]): Promise<number> {
@@ -113,7 +118,7 @@ export async function runLatest10KCompanyGraphExtraction(
 
   if (!force) {
     const existingResult = readCachedResult(existingFilingData?.companyGraphLatestResult as Record<string, unknown> | undefined);
-    if (existingResult) {
+    if (isCachedResultForFiling(existingResult, filing.accessionNumber)) {
       return {
         ...existingResult,
         dryRun,
@@ -170,6 +175,7 @@ export async function runLatest10KCompanyGraphExtraction(
 
   const result: CompanyGraphExtractionResult = {
     runId,
+    extractionVersion: COMPANY_GRAPH_EXTRACTION_VERSION,
     ticker,
     companyName: company.name,
     cik: company.cik,
@@ -240,6 +246,7 @@ export async function runLatest10KCompanyGraphExtraction(
     companyName: company.name,
     accessionNumber: filing.accessionNumber,
     status: "COMPLETED",
+    extractionVersion: COMPANY_GRAPH_EXTRACTION_VERSION,
     edgeCount: edges.length,
     updatedAt: nowIso,
     result,

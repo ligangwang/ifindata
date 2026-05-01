@@ -1,5 +1,8 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
-import type { CompanyGraphEdge } from "@/lib/company-graph/types";
+import {
+  COMPANY_GRAPH_EXTRACTION_VERSION,
+  type CompanyGraphEdge,
+} from "@/lib/company-graph/types";
 import { FieldPath } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -10,6 +13,7 @@ type CompanyGraphRunDocument = {
   cik?: unknown;
   accessionNumber?: unknown;
   result?: unknown;
+  extractionVersion?: unknown;
   updatedAt?: unknown;
 };
 
@@ -73,8 +77,12 @@ export async function GET(
     const runSnapshot = await db.collection("company_graph_runs").doc(`${ticker}_latest_10k`).get();
     const runData = runSnapshot.data() as CompanyGraphRunDocument | undefined;
     const runResult = readRunResult(runData?.result);
+    const extractionVersion = readString(runData?.extractionVersion);
+    const isCurrentExtractionVersion = extractionVersion === COMPANY_GRAPH_EXTRACTION_VERSION;
     const latestAccessionNumber = readString(runData?.accessionNumber) ?? runResult?.filing?.accessionNumber ?? null;
-    const edgePrefix = latestAccessionNumber ? edgeDocIdPrefix(ticker, latestAccessionNumber) : null;
+    const edgePrefix = isCurrentExtractionVersion && latestAccessionNumber
+      ? edgeDocIdPrefix(ticker, latestAccessionNumber)
+      : null;
     const edgesSnapshot = edgePrefix
       ? await db
           .collection("company_graph_edges")
@@ -94,6 +102,7 @@ export async function GET(
     return NextResponse.json({
       ticker,
       available: edges.length > 0,
+      extractionVersion,
       companyName: readString(runData?.companyName),
       cik: readString(runData?.cik),
       accessionNumber: latestAccessionNumber,

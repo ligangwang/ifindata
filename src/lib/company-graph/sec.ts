@@ -193,9 +193,6 @@ function keywordSnippets(text: string, charLimit: number): string {
     "distribution",
     "manufactur",
     "contract",
-    "executive",
-    "director",
-    "subsidiar",
   ];
   const paragraphs = text.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
   const selected: string[] = [];

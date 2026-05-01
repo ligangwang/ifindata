@@ -9,6 +9,11 @@ import {
 } from "@/lib/company-graph/sec";
 import { extractCompanyGraphRelationships } from "@/lib/company-graph/openai";
 import {
+  canonicalCompanyName,
+  collapseCompanyGraphEdges,
+  resolveCompanyGraphTargetNames,
+} from "@/lib/company-graph/entities";
+import {
   COMPANY_GRAPH_EXTRACTION_VERSION,
   type CompanyGraphEdge,
   type CompanyGraphExtractionResult,
@@ -162,34 +167,43 @@ export async function runLatest10KCompanyGraphExtraction(
       runId,
     },
   });
-  const edges: CompanyGraphEdge[] = openAiResult.relationships
-    .filter((relationship) => relationship.confidence >= MIN_EDGE_CONFIDENCE)
-    .map((relationship) => ({
-      id: edgeId({
-        accessionNumber: filing.accessionNumber,
+  const extractedRelationships = openAiResult.relationships
+    .filter((relationship) => relationship.confidence >= MIN_EDGE_CONFIDENCE);
+  const resolvedTargetNames = await resolveCompanyGraphTargetNames(
+    db,
+    extractedRelationships.map((relationship) => relationship.targetName),
+  );
+  const edges: CompanyGraphEdge[] = collapseCompanyGraphEdges(extractedRelationships
+    .map((relationship) => {
+      const normalizedTargetName = canonicalCompanyName(relationship.targetName);
+      const targetName = resolvedTargetNames.get(normalizedTargetName) ?? normalizedTargetName;
+      return {
+        id: edgeId({
+          accessionNumber: filing.accessionNumber,
+          sourceTicker: ticker,
+          relationshipType: relationship.relationshipType,
+          targetName,
+          evidenceText: relationship.evidenceText,
+        }),
+        sourceName: company.name,
         sourceTicker: ticker,
+        sourceCik: company.cik,
+        targetName,
+        targetType: relationship.targetType,
         relationshipType: relationship.relationshipType,
-        targetName: relationship.targetName,
+        direction: relationship.direction,
         evidenceText: relationship.evidenceText,
-      }),
-      sourceName: company.name,
-      sourceTicker: ticker,
-      sourceCik: company.cik,
-      targetName: relationship.targetName,
-      targetType: relationship.targetType,
-      relationshipType: relationship.relationshipType,
-      direction: relationship.direction,
-      evidenceText: relationship.evidenceText,
-      filingType: "10-K",
-      accessionNumber: filing.accessionNumber,
-      filingDate: filing.filingDate,
-      reportDate: filing.reportDate,
-      section: relationship.section,
-      confidence: relationship.confidence,
-      extractionProvider: "openai",
-      extractionModel: openAiResult.model,
-      extractionRunId: runId,
-      createdAt: nowIso,
+        filingType: "10-K" as const,
+        accessionNumber: filing.accessionNumber,
+        filingDate: filing.filingDate,
+        reportDate: filing.reportDate,
+        section: relationship.section,
+        confidence: relationship.confidence,
+        extractionProvider: "openai" as const,
+        extractionModel: openAiResult.model,
+        extractionRunId: runId,
+        createdAt: nowIso,
+      };
     }));
 
   const result: CompanyGraphExtractionResult = {

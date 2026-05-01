@@ -5,6 +5,11 @@ import {
   COMPANY_GRAPH_RELATIONSHIP_TYPES,
   type CompanyGraphEdge,
 } from "@/lib/company-graph/types";
+import {
+  canonicalCompanyName,
+  collapseCompanyGraphEdges,
+  resolveCompanyGraphTargetNames,
+} from "@/lib/company-graph/entities";
 import { FieldPath } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -90,7 +95,7 @@ function toCurrentCompanyGraphEdge(doc: FirebaseFirestore.QueryDocumentSnapshot)
     ...data,
     relationshipType,
     direction,
-    targetName,
+    targetName: canonicalCompanyName(targetName),
     evidenceText,
     confidence,
   } as CompanyGraphEdge;
@@ -131,13 +136,29 @@ export async function GET(
       ? edgesSnapshot.docs
           .map(toCurrentCompanyGraphEdge)
           .filter((edge): edge is CompanyGraphEdge => Boolean(edge))
+          .map((edge) => ({
+            ...edge,
+            targetName: canonicalCompanyName(edge.targetName),
+          }))
           .sort(sortEdges)
-          .slice(0, MAX_EDGES)
       : [];
+    const resolvedTargetNames = await resolveCompanyGraphTargetNames(
+      db,
+      edges.map((edge) => edge.targetName),
+    );
+    const currentEdges = collapseCompanyGraphEdges(edges.map((edge) => {
+      const normalizedTargetName = canonicalCompanyName(edge.targetName);
+      return {
+        ...edge,
+        targetName: resolvedTargetNames.get(normalizedTargetName) ?? normalizedTargetName,
+      };
+    }))
+      .sort(sortEdges)
+      .slice(0, MAX_EDGES);
 
     return NextResponse.json({
       ticker,
-      available: edges.length > 0,
+      available: currentEdges.length > 0,
       extractionVersion,
       companyName: readString(runData?.companyName),
       cik: readString(runData?.cik),
@@ -145,7 +166,7 @@ export async function GET(
       updatedAt: readString(runData?.updatedAt),
       runId: runResult?.runId ?? null,
       filing: runResult?.filing ?? null,
-      edges,
+      edges: currentEdges,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch company graph";

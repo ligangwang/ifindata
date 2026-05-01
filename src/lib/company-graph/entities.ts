@@ -18,6 +18,8 @@ const COMPANY_SUFFIX_TOKENS = new Set([
 
 type EdgeLike = {
   targetName: string;
+  relationshipType: string;
+  direction: string;
   confidence: number;
 };
 
@@ -126,11 +128,15 @@ function shortestDisplayName(...values: string[]): string {
 }
 
 export function collapseCompanyGraphEntityEdges<T extends EdgeLike>(edges: T[]): T[] {
-  const groups: Array<{ keys: Set<string>; edge: T }> = [];
+  const groups: Array<{ direction: string; keys: Set<string>; relationshipType: string; edge: T }> = [];
 
   for (const edge of edges) {
     const keys = entityKeys(edge.targetName);
-    const existing = groups.find((group) => hasSharedKey(group.keys, keys));
+    const existing = groups.find((group) =>
+      group.relationshipType === edge.relationshipType &&
+      group.direction === edge.direction &&
+      hasSharedKey(group.keys, keys)
+    );
     const targetName = displayName(edge.targetName);
     const nextEdge = {
       ...edge,
@@ -139,7 +145,9 @@ export function collapseCompanyGraphEntityEdges<T extends EdgeLike>(edges: T[]):
 
     if (!existing) {
       groups.push({
+        direction: edge.direction,
         keys,
+        relationshipType: edge.relationshipType,
         edge: nextEdge,
       });
       continue;

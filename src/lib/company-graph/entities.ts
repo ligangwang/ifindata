@@ -64,6 +64,21 @@ export function canonicalCompanyName(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }
 
+function companyDisplayName(value: string): string {
+  const normalized = canonicalCompanyName(normalizeSuffixForms(value));
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+
+  while (tokens.length > 1) {
+    const last = tokens[tokens.length - 1]?.toLowerCase().replace(/\./g, "");
+    if (!last || !COMPANY_SUFFIX_TOKENS.has(last)) {
+      break;
+    }
+    tokens.pop();
+  }
+
+  return tokens.join(" ") || normalized;
+}
+
 function candidateSearchTerms(value: string): string[] {
   const key = companyEntityKey(value);
   const tokens = key
@@ -178,7 +193,7 @@ export async function resolveCompanyGraphTargetNames(
 
 export function shortestCompanyDisplayName(...values: string[]): string {
   return values
-    .map(canonicalCompanyName)
+    .map(companyDisplayName)
     .filter(Boolean)
     .sort((left, right) => {
       const lengthDelta = left.length - right.length;
@@ -206,7 +221,7 @@ export function collapseCompanyGraphEdges<T extends EdgeLike>(edges: T[]): T[] {
 
     const nextEdge = {
       ...edge,
-      targetName: canonicalCompanyName(edge.targetName),
+      targetName: companyDisplayName(edge.targetName),
     };
     const groupKey = targetKey;
     const current = grouped.get(groupKey);

@@ -3,18 +3,18 @@ import CompaniesPage from "@/app/companies/page";
 
 export const metadata: Metadata = {
   title: "Company graph | YouAnalyst",
-  description: "Explore company relationship graphs, public calls, watchlists, and market themes on YouAnalyst.",
+  description: "Search a ticker to open or request a company relationship graph on YouAnalyst.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     title: "Company graph | YouAnalyst",
-    description: "Explore company relationship graphs, public calls, watchlists, and market themes on YouAnalyst.",
+    description: "Search a ticker to open or request a company relationship graph on YouAnalyst.",
     url: "/",
   },
   twitter: {
     title: "Company graph | YouAnalyst",
-    description: "Explore company relationship graphs, public calls, watchlists, and market themes on YouAnalyst.",
+    description: "Search a ticker to open or request a company relationship graph on YouAnalyst.",
   },
 };
 

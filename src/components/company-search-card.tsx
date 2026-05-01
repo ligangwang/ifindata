@@ -96,7 +96,7 @@ export function CompanySearchCard() {
           disabled={submitting}
           className="h-11 rounded-xl bg-cyan-500 px-5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? "Checking..." : "Open graph"}
+          {submitting ? "Checking..." : "Go"}
         </button>
       </div>
       {message ? <p className="mt-3 text-sm text-emerald-200">{message}</p> : null}

@@ -19,7 +19,7 @@ test("homepage renders company graph search", async ({ page }) => {
   
   // Verify company graph search is on the page
   await expect(page.getByRole("combobox", { name: "Company or ticker" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Open graph" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Go" })).toBeVisible();
   await expect(page.getByRole("link", { name: /MSFT/i }).first()).toBeVisible();
 });
 

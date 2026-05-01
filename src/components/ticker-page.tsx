@@ -61,6 +61,7 @@ type GraphNode = {
   width: number;
   height: number;
   relationshipType?: CompanyGraphRelationshipType;
+  direction?: CompanyGraphEdge["direction"];
   targetType?: CompanyGraphTargetType;
   evidenceText?: string;
   confidence?: number;
@@ -72,8 +73,46 @@ function relationLabel(type: CompanyGraphRelationshipType): string {
   return type.replace(/_/g, " ");
 }
 
+function relationshipTone(type: CompanyGraphRelationshipType | undefined): {
+  line: string;
+  nodeBg: string;
+  nodeBorder: string;
+} {
+  if (type === "COMPETES_WITH") {
+    return {
+      line: "#818cf8",
+      nodeBg: "#312e81",
+      nodeBorder: "#a5b4fc",
+    };
+  }
+
+  if (type === "PARTNER_OF" || type === "DISTRIBUTES_FOR") {
+    return {
+      line: "#22d3ee",
+      nodeBg: "#083344",
+      nodeBorder: "#67e8f9",
+    };
+  }
+
+  return {
+    line: "#34d399",
+    nodeBg: "#052e2b",
+    nodeBorder: "#34d399",
+  };
+}
+
 function directionLabel(direction: CompanyGraphEdge["direction"] | undefined): string {
   return direction ? direction.replace(/_/g, " ") : "direction unknown";
+}
+
+function arrowLabel(direction: CompanyGraphEdge["direction"] | undefined, displayTicker: string, targetName: string): string {
+  if (direction === "target_to_source") {
+    return `${targetName} -> ${displayTicker}`;
+  }
+  if (direction === "bidirectional") {
+    return `${displayTicker} <-> ${targetName}`;
+  }
+  return `${displayTicker} -> ${targetName}`;
 }
 
 function graphKindForEdge(edge: CompanyGraphEdge): GraphNode["kind"] {
@@ -116,6 +155,7 @@ function secGraphNodes(displayTicker: string, graphEdges: CompanyGraphEdge[]): G
       width: edge.targetName.length > 18 ? 154 : 132,
       height: 58,
       relationshipType: edge.relationshipType,
+      direction: edge.direction,
       targetType: edge.targetType,
       evidenceText: edge.evidenceText,
       confidence: edge.confidence,
@@ -188,17 +228,31 @@ function relationNodes(displayTicker: string, predictions: Prediction[], graphEd
   ];
 }
 
-function relationEdges(nodes: GraphNode[]): ElementDefinition[] {
+function relationEdges(nodes: GraphNode[], displayTicker: string): ElementDefinition[] {
   return nodes
     .filter((node) => node.id !== "company")
-    .map((node) => ({
-      data: {
-        id: `company-${node.id}`,
-        source: "company",
-        target: node.id,
-        label: node.relationshipType ? relationLabel(node.relationshipType) : node.kind === "calls" ? "tracked by" : "related to",
-      },
-    }));
+    .map((node) => {
+      const isTargetToSource = node.direction === "target_to_source";
+      const isBidirectional = node.direction === "bidirectional";
+      const relationshipText = node.relationshipType ? relationLabel(node.relationshipType) : node.kind === "calls" ? "tracked by" : "related to";
+      const tone = relationshipTone(node.relationshipType);
+      return {
+        data: {
+          id: `company-${node.id}`,
+          source: isTargetToSource ? node.id : "company",
+          target: isTargetToSource ? "company" : node.id,
+          label: relationshipText,
+          tooltip: node.relationshipType
+            ? `${relationshipText} - ${arrowLabel(node.direction, displayTicker, node.label)} - ${Math.round((node.confidence ?? 0) * 100)}% confidence`
+            : relationshipText,
+          lineColor: node.relationshipType ? tone.line : "#155e75",
+        },
+        classes: [
+          node.relationshipType ? "relationship" : "context",
+          isBidirectional ? "bidirectional" : "",
+        ].filter(Boolean).join(" "),
+      };
+    });
 }
 
 function graphPosition(id: string, locked: boolean, node?: GraphNode): { x: number; y: number } {
@@ -237,16 +291,21 @@ function graphPosition(id: string, locked: boolean, node?: GraphNode): { x: numb
 
 function graphElements(nodes: GraphNode[], locked: boolean): ElementDefinition[] {
   return [
-    ...nodes.map((node) => ({
-      data: {
-        ...node,
-        label: node.label,
-        detail: node.sublabel,
-      },
-      position: graphPosition(node.id, locked, node),
-      classes: node.kind,
-    })),
-    ...relationEdges(nodes),
+    ...nodes.map((node) => {
+      const tone = relationshipTone(node.relationshipType ?? (node.kind === "peer" ? "COMPETES_WITH" : undefined));
+      return {
+        data: {
+          ...node,
+          label: node.label,
+          detail: node.sublabel,
+          nodeBg: tone.nodeBg,
+          nodeBorder: tone.nodeBorder,
+        },
+        position: graphPosition(node.id, locked, node),
+        classes: node.kind,
+      };
+    }),
+    ...relationEdges(nodes, nodes.find((node) => node.id === "company")?.label ?? "Company"),
   ];
 }
 
@@ -338,26 +397,52 @@ function KnowledgeGraph({
         },
       },
       {
-        selector: "node.chain",
+        selector: "node.chain, node.peer",
         style: {
-          "background-color": "#052e2b",
-          "border-color": "#34d399",
-        },
-      },
-      {
-        selector: "node.peer",
-        style: {
-          "background-color": "#312e81",
-          "border-color": "#a5b4fc",
+          "background-color": "data(nodeBg)",
+          "border-color": "data(nodeBorder)",
         },
       },
       {
         selector: "edge",
         style: {
           "curve-style": "bezier",
-          "line-color": "#155e75",
+          "line-color": "data(lineColor)",
           "line-opacity": 0.72,
+          "target-arrow-color": "data(lineColor)",
+          "source-arrow-color": "data(lineColor)",
           width: 2,
+        },
+      },
+      {
+        selector: "edge.relationship",
+        style: {
+          "target-arrow-shape": "triangle",
+        },
+      },
+      {
+        selector: "edge.bidirectional",
+        style: {
+          "source-arrow-shape": "triangle",
+        },
+      },
+      {
+        selector: "edge.edge-hover",
+        style: {
+          color: "#e0f2fe",
+          "font-size": 11,
+          "font-weight": 700,
+          label: "data(tooltip)",
+          "line-opacity": 1,
+          "text-background-color": "#020617",
+          "text-background-opacity": 0.86,
+          "text-background-padding": "4px",
+          "text-border-color": "#164e63",
+          "text-border-opacity": 0.85,
+          "text-border-width": 1,
+          "text-rotation": "autorotate",
+          "text-wrap": "wrap",
+          width: 3,
         },
       },
       {
@@ -403,6 +488,19 @@ function KnowledgeGraph({
         cy?.nodes().unselect();
         event.target.select();
       });
+      cy.on("tap", "edge", (event) => {
+        const targetNode = event.target.target().id() === "company" ? event.target.source() : event.target.target();
+        const id = targetNode.id();
+        setSelectedNodeId(id);
+        cy?.nodes().unselect();
+        targetNode.select();
+      });
+      cy.on("mouseover", "edge", (event) => {
+        event.target.addClass("edge-hover");
+      });
+      cy.on("mouseout", "edge", (event) => {
+        event.target.removeClass("edge-hover");
+      });
     });
 
     return () => {
@@ -422,6 +520,27 @@ function KnowledgeGraph({
             aria-label={`${displayTicker} company knowledge graph`}
           />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,145,178,0.18),transparent_48%)]" />
+          <div className="pointer-events-none absolute left-4 top-4 rounded-xl border border-white/10 bg-slate-950/80 p-3 text-xs text-slate-300 shadow-xl">
+            <p className="mb-2 font-semibold uppercase tracking-wide text-slate-500">Color key</p>
+            <div className="grid gap-1.5">
+              <span className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-sm border border-cyan-200 bg-emerald-900" />
+                Filing company
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-sm border border-emerald-300 bg-emerald-950" />
+                Supply chain
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-sm border border-cyan-200 bg-cyan-950" />
+                Partner/channel
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-sm border border-indigo-300 bg-indigo-950" />
+                Competitor
+              </span>
+            </div>
+          </div>
         </div>
         <aside className="border-t border-white/10 bg-slate-950/80 p-5 lg:border-l lg:border-t-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Selected node</p>

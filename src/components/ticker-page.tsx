@@ -602,7 +602,7 @@ function KnowledgeGraph({
             <p className="mt-2 text-sm text-slate-200">
               {companyGraph?.available && !locked
                 ? "SEC latest 10-K relationships with filing evidence."
-                : "Sign in to explore SEC relationship context for this company."}
+                : "Sign in to explore more relationships."}
             </p>
           </div>
           {selectedNode.evidenceText ? (
@@ -622,7 +622,7 @@ function KnowledgeGraph({
             <div>
               <h3 className="font-[var(--font-sora)] text-base font-semibold text-cyan-100">Company graph preview</h3>
               <p className="mt-1 text-sm leading-6 text-slate-300">
-                Sign in to explore the full SEC company graph, relationship evidence, related calls, and watchlists.
+                Sign in to explore more relationships around this company.
               </p>
             </div>
             <Link

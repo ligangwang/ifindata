@@ -15,6 +15,10 @@ export type CompanyGraphRequestDocument = {
   failedAt: string | null;
   error: string | null;
   extractionVersion: typeof COMPANY_GRAPH_EXTRACTION_VERSION;
+  edgeCount?: number;
+  processingStartedAt?: string | null;
+  processingRunId?: string | null;
+  attemptCount?: number;
 };
 
 export type CompanyGraphRequestQueueResult = {
@@ -126,6 +130,10 @@ export async function listCompanyGraphRequests(): Promise<CompanyGraphRequestLis
         failedAt: stringFromValue(data.failedAt),
         error: stringFromValue(data.error),
         extractionVersion: COMPANY_GRAPH_EXTRACTION_VERSION,
+        edgeCount: numberFromValue(data.edgeCount),
+        processingStartedAt: stringFromValue(data.processingStartedAt),
+        processingRunId: stringFromValue(data.processingRunId),
+        attemptCount: numberFromValue(data.attemptCount),
       };
       return item;
     })
@@ -142,6 +150,89 @@ export async function listCompanyGraphRequests(): Promise<CompanyGraphRequestLis
       }
       return (right.lastRequestedAt || right.updatedAt).localeCompare(left.lastRequestedAt || left.updatedAt);
     });
+}
+
+export async function listQueuedCompanyGraphRequests(limit: number): Promise<CompanyGraphRequestListItem[]> {
+  const snapshot = await getAdminFirestore()
+    .collection("company_graph_requests")
+    .where("status", "==", "QUEUED")
+    .orderBy("firstRequestedAt", "asc")
+    .limit(Math.max(1, Math.min(25, Math.trunc(limit))))
+    .get();
+
+  return snapshot.docs.map((doc) => {
+    const data = doc.data() as Record<string, unknown>;
+    return {
+      id: doc.id,
+      ticker: stringFromValue(data.ticker) ?? doc.id,
+      status: readStatus(data.status),
+      requestedCount: Math.max(1, numberFromValue(data.requestedCount)),
+      firstRequestedAt: stringFromValue(data.firstRequestedAt) ?? "",
+      lastRequestedAt: stringFromValue(data.lastRequestedAt) ?? "",
+      updatedAt: stringFromValue(data.updatedAt) ?? "",
+      completedAt: stringFromValue(data.completedAt),
+      failedAt: stringFromValue(data.failedAt),
+      error: stringFromValue(data.error),
+      extractionVersion: COMPANY_GRAPH_EXTRACTION_VERSION,
+      edgeCount: numberFromValue(data.edgeCount),
+      processingStartedAt: stringFromValue(data.processingStartedAt),
+      processingRunId: stringFromValue(data.processingRunId),
+      attemptCount: numberFromValue(data.attemptCount),
+    };
+  });
+}
+
+export async function claimCompanyGraphRequest(
+  ticker: string,
+  processingRunId: string,
+): Promise<CompanyGraphRequestListItem | null> {
+  const normalizedTicker = normalizeTicker(ticker);
+  if (!normalizedTicker) {
+    return null;
+  }
+
+  const db = getAdminFirestore();
+  const requestRef = db.collection("company_graph_requests").doc(normalizedTicker);
+  const nowIso = new Date().toISOString();
+
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(requestRef);
+    const data = snapshot.data() as Record<string, unknown> | undefined;
+    const status = readStatus(data?.status);
+
+    if (!snapshot.exists || status !== "QUEUED") {
+      return null;
+    }
+
+    transaction.set(requestRef, {
+      ticker: normalizedTicker,
+      status: "PROCESSING",
+      processingRunId,
+      processingStartedAt: nowIso,
+      updatedAt: nowIso,
+      error: null,
+      attemptCount: FieldValue.increment(1),
+      extractionVersion: COMPANY_GRAPH_EXTRACTION_VERSION,
+    }, { merge: true });
+
+    return {
+      id: snapshot.id,
+      ticker: normalizedTicker,
+      status: "PROCESSING",
+      requestedCount: Math.max(1, numberFromValue(data?.requestedCount)),
+      firstRequestedAt: stringFromValue(data?.firstRequestedAt) ?? "",
+      lastRequestedAt: stringFromValue(data?.lastRequestedAt) ?? "",
+      updatedAt: nowIso,
+      completedAt: stringFromValue(data?.completedAt),
+      failedAt: stringFromValue(data?.failedAt),
+      error: null,
+      extractionVersion: COMPANY_GRAPH_EXTRACTION_VERSION,
+      edgeCount: numberFromValue(data?.edgeCount),
+      processingStartedAt: nowIso,
+      processingRunId,
+      attemptCount: numberFromValue(data?.attemptCount) + 1,
+    };
+  });
 }
 
 export async function markCompanyGraphRequestProcessing(ticker: string): Promise<void> {

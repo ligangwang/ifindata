@@ -484,14 +484,18 @@ function KnowledgeGraph({
 }
 
 export function TickerPage({ ticker }: { ticker: string }) {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, getIdToken } = useAuth();
   const [payload, setPayload] = useState<TickerResponse | null>(null);
   const [companyGraph, setCompanyGraph] = useState<CompanyGraphResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [graphError, setGraphError] = useState<string | null>(null);
+  const [adminStatus, setAdminStatus] = useState<{ userId: string; isAdmin: boolean } | null>(null);
+  const [extractingGraph, setExtractingGraph] = useState(false);
+  const [graphActionMessage, setGraphActionMessage] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const displayTicker = formatTickerSymbol(payload?.ticker ?? ticker);
   const graphLocked = authLoading || !user;
+  const canExtractGraph = Boolean(user && adminStatus?.userId === user.uid && adminStatus.isAdmin);
 
   useEffect(() => {
     let cancelled = false;
@@ -544,6 +548,93 @@ export function TickerPage({ ticker }: { ticker: string }) {
       cancelled = true;
     };
   }, [ticker]);
+
+  useEffect(() => {
+    if (authLoading || !user) {
+      setAdminStatus(null);
+      return;
+    }
+
+    let cancelled = false;
+    const userId = user.uid;
+
+    async function loadAdminStatus() {
+      try {
+        const token = await getIdToken(true);
+        if (!token) {
+          if (!cancelled) {
+            setAdminStatus({ userId, isAdmin: false });
+          }
+          return;
+        }
+
+        const response = await fetch("/api/admin/me", {
+          headers: {
+            authorization: `Bearer ${token}`,
+          },
+        });
+        const payload = (await response.json().catch(() => ({}))) as { isAdmin?: boolean };
+
+        if (!cancelled) {
+          setAdminStatus({ userId, isAdmin: response.ok && payload.isAdmin === true });
+        }
+      } catch {
+        if (!cancelled) {
+          setAdminStatus({ userId, isAdmin: false });
+        }
+      }
+    }
+
+    void loadAdminStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, getIdToken, user]);
+
+  async function refreshCompanyGraph() {
+    if (extractingGraph) {
+      return;
+    }
+
+    setExtractingGraph(true);
+    setGraphActionMessage(null);
+    setGraphError(null);
+
+    try {
+      const token = await getIdToken(true);
+      if (!token) {
+        throw new Error("Sign in with an admin account to generate SEC graph data.");
+      }
+
+      const response = await fetch("/api/admin/company-graph/extract", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ticker: payload?.ticker ?? ticker,
+          force: false,
+        }),
+      });
+      const body = (await response.json().catch(() => ({}))) as { error?: string; edges?: CompanyGraphEdge[]; cached?: boolean };
+
+      if (!response.ok) {
+        throw new Error(body.error ?? "Unable to generate SEC graph.");
+      }
+
+      const graphResponse = await fetch(`/api/company-graph/${encodeURIComponent(payload?.ticker ?? ticker)}`);
+      if (graphResponse.ok) {
+        setCompanyGraph((await graphResponse.json()) as CompanyGraphResponse);
+      }
+      setGraphActionMessage(body.cached ? "SEC graph is already current." : `SEC graph generated with ${body.edges?.length ?? 0} edges.`);
+    } catch (nextError) {
+      setGraphError(nextError instanceof Error ? nextError.message : "Unable to generate SEC graph.");
+    } finally {
+      setExtractingGraph(false);
+    }
+  }
 
   async function loadMorePredictions() {
     if (!payload?.nextCursor || loadingMore) {
@@ -607,14 +698,27 @@ export function TickerPage({ ticker }: { ticker: string }) {
       </section>
 
       <section className="mt-4 rounded-2xl border border-white/15 bg-slate-950/55 p-5">
-        <div className="mb-4 flex flex-col gap-1">
-          <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Knowledge graph</h2>
-          <p className="text-sm text-slate-400">
-            {companyGraph?.available && !graphLocked
-              ? `Latest 10-K relationships around ${displayTicker}.`
-              : `Map company relationships, market themes, and YouAnalyst activity around ${displayTicker}.`}
-          </p>
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-1">
+            <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Knowledge graph</h2>
+            <p className="text-sm text-slate-400">
+              {companyGraph?.available && !graphLocked
+                ? `Latest 10-K relationships around ${displayTicker}.`
+                : `Map company relationships, market themes, and YouAnalyst activity around ${displayTicker}.`}
+            </p>
+          </div>
+          {canExtractGraph ? (
+            <button
+              type="button"
+              onClick={refreshCompanyGraph}
+              disabled={extractingGraph}
+              className="w-full rounded-lg border border-cyan-400/40 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            >
+              {extractingGraph ? "Generating..." : companyGraph?.available ? "Check latest 10-K" : "Generate SEC graph"}
+            </button>
+          ) : null}
         </div>
+        {graphActionMessage ? <p className="mb-3 text-sm text-emerald-200">{graphActionMessage}</p> : null}
         {graphError ? <p className="mb-3 text-sm text-amber-200">{graphError}</p> : null}
         <KnowledgeGraph
           displayTicker={displayTicker}

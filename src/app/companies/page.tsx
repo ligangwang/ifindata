@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 
 export default function CompaniesPage() {
   return (
-    <main className="mx-auto grid min-h-[calc(100vh-10rem)] w-full max-w-5xl place-items-center px-4 py-8">
+    <main className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-5xl flex-col px-4 pt-24 pb-8 sm:pt-28 lg:pt-32">
       <section className="w-full">
         <div className="mx-auto max-w-3xl text-center">
           <h1 className="sr-only">Company graph search</h1>

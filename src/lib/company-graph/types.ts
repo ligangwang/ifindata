@@ -1,4 +1,4 @@
-export const COMPANY_GRAPH_EXTRACTION_VERSION = "supply-chain-ontology-v1";
+export const COMPANY_GRAPH_EXTRACTION_VERSION = "supply-chain-ontology-v2";
 
 export const COMPANY_GRAPH_RELATIONSHIP_TYPES = [
   "SUPPLIER_OF",

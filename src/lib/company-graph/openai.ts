@@ -192,8 +192,9 @@ export async function extractCompanyGraphRelationships(input: {
                 "Extract only a focused supply-chain and competitor relationship graph from SEC 10-K text. " +
                 "Return relationships when the target is a specifically named company, named organization, or an explicit generic relationship category used in the filing. " +
                 "Do not derive or invent specific company names from a generic category unless the filing text names them. " +
-                "Use targetType=company for named companies or organizations and targetType=category for generic groups such as hyperscalers, e-commerce retailers, suppliers, vendors, publishers, logistics providers, or security solution vendors. " +
-                "Return no more than 50 relationships, ordered from most material to least material by likely business impact to the filing company. " +
+                "Use targetType=company for named companies or organizations. Use targetType=category only for concise, strategic categories with clear business impact, such as hyperscalers, e-commerce retailers, suppliers, vendors, publishers, logistics providers, or security solution vendors. " +
+                "Do not return long enumerated phrases as category names; compress category targetName to at most four words while preserving the filing meaning. " +
+                "Return no more than 50 relationships and no more than 8 category targets, ordered from most material to least material by likely business impact to the filing company. " +
                 "Allowed ontology relationships are SUPPLIER_OF, CUSTOMER_OF, COMPETES_WITH, PARTNER_OF, DISTRIBUTES_FOR, and MANUFACTURES_FOR. " +
                 "Use source_to_target when sourceName has the relationship to targetName, target_to_source when targetName has the relationship to sourceName, and bidirectional for reciprocal relationships like competitors or partners. " +
                 "Example: if the filing company depends on TSMC as a supplier, return relationshipType=SUPPLIER_OF and direction=target_to_source. " +

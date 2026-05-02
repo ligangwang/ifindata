@@ -16,8 +16,6 @@ import {
 
 const EOD_PRICE_SOURCE = "twelve-data-time-series";
 const DEFAULT_MARKET = "US";
-const DEFAULT_LIMIT = 500;
-const MAX_LIMIT = 1000;
 const POSITION_SCAN_PAGE_SIZE = 500;
 const ROLL_FORWARD_PRICE_SCAN_PAGE_SIZE = 1000;
 const TWELVE_DATA_CHUNK_SIZE = 8;
@@ -142,6 +140,8 @@ type EodPredictionScanResult = {
   hasMoreCandidatePredictions: boolean;
 };
 
+type PredictionScanLimit = number | null;
+
 function getTwelveDataConfig(): { apiKey: string; apiUrl: string } {
   const apiKey = process.env.TWELVE_DATA_API_KEY?.trim() ?? "";
   if (!apiKey) {
@@ -154,12 +154,12 @@ function getTwelveDataConfig(): { apiKey: string; apiUrl: string } {
   };
 }
 
-function clampLimit(value: unknown): number {
+function readPredictionScanLimit(value: unknown): PredictionScanLimit {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
-    return DEFAULT_LIMIT;
+    return null;
   }
-  return Math.max(1, Math.min(Math.floor(parsed), MAX_LIMIT));
+  return Math.max(1, Math.floor(parsed));
 }
 
 function isIsoDate(value: string): boolean {
@@ -902,7 +902,7 @@ function isDailySnapshotCandidate(prediction: EodPredictionRecord, runDate: stri
 async function scanEodPredictions(
   db: FirebaseFirestore.Firestore,
   runDate: string,
-  limit: number,
+  limit: PredictionScanLimit,
   manualTickers: string[],
 ): Promise<EodPredictionScanResult> {
   const candidatePredictions: EodPredictionRecord[] = [];
@@ -912,7 +912,8 @@ async function scanEodPredictions(
   let scannedCandidatePredictions = 0;
   let hasMoreCandidatePredictions = false;
 
-  while (predictionsToProcess.length < limit) {
+  while (limit === null || predictionsToProcess.length < limit) {
+    let stoppedByLimit = false;
     let query = db
       .collection("predictions")
       .where("status", "in", ["CREATED", "OPEN", "SETTLED", "OPENING", "CLOSING", "CLOSED"])
@@ -948,16 +949,17 @@ async function scanEodPredictions(
 
       if (isActionable || needsDailySnapshot) {
         predictionsToProcess.push(prediction);
-        if (predictionsToProcess.length >= limit) {
+        if (limit !== null && predictionsToProcess.length >= limit) {
+          stoppedByLimit = true;
           break;
         }
       }
     }
 
     lastDoc = snapshot.docs[snapshot.docs.length - 1] ?? null;
-    hasMoreCandidatePredictions = snapshot.size === POSITION_SCAN_PAGE_SIZE;
+    hasMoreCandidatePredictions = stoppedByLimit || snapshot.size === POSITION_SCAN_PAGE_SIZE;
 
-    if (!hasMoreCandidatePredictions) {
+    if (stoppedByLimit || !hasMoreCandidatePredictions) {
       break;
     }
   }
@@ -980,7 +982,7 @@ export async function runDailyEodMaintenance(
   const loadPrices = input.loadPrices !== false;
   const markPredictions = input.markPredictions !== false;
   const runDate = resolveRunDate(input.runDate);
-  const limit = clampLimit(input.limit);
+  const limit = readPredictionScanLimit(input.limit);
   const nowIso = new Date().toISOString();
   const manualTickers = input.tickers?.length ? uniqueTickers(input.tickers) : [];
 

@@ -64,8 +64,7 @@ function edgeDocIdPrefix(ticker: string, accessionNumber: string): string {
   return `${ticker}_${accessionNumber.replace(/-/g, "")}_`;
 }
 
-function toCurrentCompanyGraphEdge(doc: FirebaseFirestore.QueryDocumentSnapshot): CompanyGraphEdge | null {
-  const data = doc.data() as Record<string, unknown>;
+function toCompanyGraphEdge(id: string, data: Record<string, unknown>): CompanyGraphEdge | null {
   const relationshipType = readString(data.relationshipType);
   const direction = readString(data.direction);
   const targetName = readString(data.targetName);
@@ -87,7 +86,7 @@ function toCurrentCompanyGraphEdge(doc: FirebaseFirestore.QueryDocumentSnapshot)
   }
 
   return {
-    id: doc.id,
+    id,
     ...data,
     relationshipType,
     direction,
@@ -95,6 +94,32 @@ function toCurrentCompanyGraphEdge(doc: FirebaseFirestore.QueryDocumentSnapshot)
     evidenceText,
     confidence,
   } as CompanyGraphEdge;
+}
+
+function toCurrentCompanyGraphEdge(doc: FirebaseFirestore.QueryDocumentSnapshot): CompanyGraphEdge | null {
+  return toCompanyGraphEdge(doc.id, doc.data() as Record<string, unknown>);
+}
+
+function readRunResultEdges(value: unknown): CompanyGraphEdge[] | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const edges = (value as Record<string, unknown>).edges;
+  if (!Array.isArray(edges)) {
+    return null;
+  }
+
+  return edges.flatMap((edge) => {
+    if (!edge || typeof edge !== "object") {
+      return [];
+    }
+
+    const data = edge as Record<string, unknown>;
+    const id = readString(data.id);
+    const graphEdge = id ? toCompanyGraphEdge(id, data) : null;
+    return graphEdge ? [graphEdge] : [];
+  });
 }
 
 export async function GET(
@@ -119,7 +144,8 @@ export async function GET(
     const edgePrefix = isCurrentExtractionVersion && latestAccessionNumber
       ? edgeDocIdPrefix(ticker, latestAccessionNumber)
       : null;
-    const edgesSnapshot = edgePrefix
+    const resultEdges = isCurrentExtractionVersion ? readRunResultEdges(runData?.result) : null;
+    const edgesSnapshot = resultEdges === null && edgePrefix
       ? await db
           .collection("company_graph_edges")
           .where(FieldPath.documentId(), ">=", edgePrefix)
@@ -128,11 +154,11 @@ export async function GET(
           .limit(100)
           .get()
       : null;
-    const edges = edgesSnapshot
+    const edges = resultEdges ?? (edgesSnapshot
       ? edgesSnapshot.docs
           .map(toCurrentCompanyGraphEdge)
           .filter((edge): edge is CompanyGraphEdge => Boolean(edge))
-      : [];
+      : []);
     const currentEdges = collapseCompanyGraphEntityEdges(edges)
       .sort(sortEdges)
       .slice(0, MAX_EDGES);

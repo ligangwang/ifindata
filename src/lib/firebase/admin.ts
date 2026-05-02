@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import { getStorage } from "firebase-admin/storage";
 
 declare global {
   var __adminApp: admin.app.App | undefined;
@@ -37,4 +38,13 @@ export async function verifyIdToken(token: string): Promise<admin.auth.DecodedId
 
 export function getAdminFirestore(): admin.firestore.Firestore {
   return getAdminApp().firestore();
+}
+
+export function getAdminStorageBucket(bucketName?: string) {
+  const resolvedBucketName = bucketName?.trim() || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim();
+  if (!resolvedBucketName) {
+    throw new Error("A Firebase/Google Cloud Storage bucket is not configured.");
+  }
+
+  return getStorage(getAdminApp()).bucket(resolvedBucketName);
 }

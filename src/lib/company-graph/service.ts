@@ -24,6 +24,7 @@ export type CompanyGraphExtractionInput = {
 
 const MIN_EDGE_CONFIDENCE = 0.45;
 const EDGE_BATCH_SIZE = 450;
+const MAX_CATEGORY_EDGES = 8;
 
 function normalizeTicker(value: string): string {
   return value.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, "");
@@ -86,6 +87,29 @@ async function persistEdges(db: FirebaseFirestore.Firestore, edges: CompanyGraph
   }
 
   return written;
+}
+
+function limitCategoryEdges(edges: CompanyGraphEdge[]): CompanyGraphEdge[] {
+  const categoryEdgesById = new Set(edges
+    .filter((edge) => edge.targetType === "category")
+    .sort((left, right) => {
+      const confidenceDelta = right.confidence - left.confidence;
+      if (confidenceDelta !== 0) {
+        return confidenceDelta;
+      }
+
+      return left.targetName.localeCompare(right.targetName);
+    })
+    .slice(0, MAX_CATEGORY_EDGES)
+    .map((edge) => edge.id));
+
+  return edges.filter((edge) => {
+    if (edge.targetType !== "category") {
+      return true;
+    }
+
+    return categoryEdgesById.has(edge.id);
+  });
 }
 
 export async function runLatest10KCompanyGraphExtraction(
@@ -163,7 +187,7 @@ export async function runLatest10KCompanyGraphExtraction(
       runId,
     },
   });
-  const edges: CompanyGraphEdge[] = collapseCompanyGraphEntityEdges(openAiResult.relationships
+  const edges: CompanyGraphEdge[] = limitCategoryEdges(collapseCompanyGraphEntityEdges(openAiResult.relationships
     .filter((relationship) => relationship.confidence >= MIN_EDGE_CONFIDENCE)
     .map((relationship) => {
       return {
@@ -193,7 +217,7 @@ export async function runLatest10KCompanyGraphExtraction(
         extractionRunId: runId,
         createdAt: nowIso,
       };
-    }));
+    })));
 
   const result: CompanyGraphExtractionResult = {
     runId,

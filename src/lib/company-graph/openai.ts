@@ -190,9 +190,10 @@ export async function extractCompanyGraphRelationships(input: {
               type: "input_text",
               text:
                 "Extract only a focused supply-chain and competitor relationship graph from SEC 10-K text. " +
-                "Return relationships when the target is a specifically named company, named organization, or an explicit generic relationship category used in the filing. " +
+                "Prefer relationships where the target is a specifically named company or named organization. " +
                 "Do not derive or invent specific company names from a generic category unless the filing text names them. " +
-                "Use targetType=company for named companies or organizations. Use targetType=category only for concise, strategic categories with clear business impact, such as hyperscalers, e-commerce retailers, suppliers, vendors, publishers, logistics providers, or security solution vendors. " +
+                "Use targetType=company for named companies or organizations. Use targetType=category only for specific, material supply-chain or customer groups with a meaningful modifier, such as China-based sellers, content licensors, logistics providers, or semiconductor suppliers. " +
+                "Do not return broad generic category names such as vendors, suppliers, providers, companies, services, platforms, solutions, open source, or cloud services. " +
                 "Do not return long enumerated phrases as category names; compress category targetName to at most four words while preserving the filing meaning. " +
                 "Return no more than 50 relationships and no more than 8 category targets, ordered from most material to least material by likely business impact to the filing company. " +
                 "Allowed ontology relationships are SUPPLIER_OF, CUSTOMER_OF, COMPETES_WITH, PARTNER_OF, DISTRIBUTES_FOR, and MANUFACTURES_FOR. " +

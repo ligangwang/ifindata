@@ -13,6 +13,7 @@ import {
   COMPANY_GRAPH_EXTRACTION_VERSION,
   type CompanyGraphEdge,
   type CompanyGraphExtractionResult,
+  type CompanyGraphTargetType,
 } from "@/lib/company-graph/types";
 import { safeRecordOpenAiUsageEvent } from "@/lib/openai/usage";
 
@@ -25,6 +26,49 @@ export type CompanyGraphExtractionInput = {
 const MIN_EDGE_CONFIDENCE = 0.45;
 const EDGE_BATCH_SIZE = 450;
 const MAX_CATEGORY_EDGES = 8;
+const GENERIC_TARGET_PATTERNS = [
+  /\b(vendors?|suppliers?|providers?|retailers?|publishers?|manufacturers?|producers?|distributors?|developers?|licensors?)\b/i,
+  /\bcompanies\b/i,
+  /\b(businesses|firms|organizations|groups)\s+(that|who|which|with|providing|provide|offering|offer|manufacture|sell|distribute)\b/i,
+  /\b(cloud(?:-based)? services?|cloud service providers?|endpoint security|hyperscalers?|identity vendors?|job boards?|online gaming|open source|search engines?|security solutions?|social networks?|virtual assistants?|web portals?)\b/i,
+  /\b(OEMs?|VARs?|CSPs?|ISVs?|SIs?)\b/,
+];
+const CATEGORY_RELATIONSHIP_WEIGHTS: Record<CompanyGraphEdge["relationshipType"], number> = {
+  SUPPLIER_OF: 60,
+  CUSTOMER_OF: 55,
+  MANUFACTURES_FOR: 50,
+  DISTRIBUTES_FOR: 45,
+  COMPETES_WITH: 35,
+  PARTNER_OF: 25,
+};
+const LOW_INFORMATION_CATEGORY_NAMES = new Set([
+  "businesses",
+  "cloud service",
+  "cloud services",
+  "companies",
+  "developers",
+  "distributors",
+  "firms",
+  "groups",
+  "manufacturers",
+  "organizations",
+  "producers",
+  "providers",
+  "publishers",
+  "retailers",
+  "suppliers",
+  "vendors",
+]);
+const LOW_INFORMATION_CATEGORY_PATTERNS = [
+  /\b(and other|among others|including|products we offer|products and services)\b/i,
+  /\b(companies|businesses|firms|organizations|groups)\s+(that|who|which|with)\b/i,
+  /\b(services?|platforms?|solutions?|products?)\b/i,
+];
+const MATERIAL_CATEGORY_PATTERNS = [
+  /\b(advertising|china-based|cloud infrastructure|component|components|content|contract|data center|e-commerce|foreign|fulfillment|hardware|infrastructure|licensors?|logistics|marketplace|semiconductor|third-party|technology)\b/i,
+  /\b(qualified|strategic)\s+(vendors?|suppliers?|providers?|partners?)\b/i,
+  /\b(vendors?|suppliers?|providers?)\s+for\s+[a-z0-9 -]+\b/i,
+];
 
 function normalizeTicker(value: string): string {
   return value.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, "");
@@ -63,6 +107,54 @@ function readCachedResult(data: Record<string, unknown> | undefined): CompanyGra
   return result as CompanyGraphExtractionResult;
 }
 
+function normalizeGraphTargetType(targetName: string, targetType: CompanyGraphTargetType): CompanyGraphTargetType {
+  const normalizedName = targetName.trim();
+  if (!normalizedName) {
+    return targetType;
+  }
+
+  if (GENERIC_TARGET_PATTERNS.some((pattern) => pattern.test(normalizedName))) {
+    return "category";
+  }
+
+  return targetType;
+}
+
+function categoryEdgeScore(edge: CompanyGraphEdge): number {
+  const normalizedName = edge.targetName.trim().toLowerCase();
+  const wordCount = normalizedName.split(/\s+/).filter(Boolean).length;
+  const specificityScore = Math.min(wordCount, 6) * 4;
+  const lowInformationPenalty = LOW_INFORMATION_CATEGORY_NAMES.has(normalizedName) ? 25 : 0;
+
+  return CATEGORY_RELATIONSHIP_WEIGHTS[edge.relationshipType] +
+    edge.confidence * 100 +
+    specificityScore -
+    lowInformationPenalty;
+}
+
+function isLowInformationCategory(edge: CompanyGraphEdge): boolean {
+  const normalizedName = edge.targetName.trim().toLowerCase();
+  const words = normalizedName.split(/\s+/).filter(Boolean);
+
+  if (LOW_INFORMATION_CATEGORY_NAMES.has(normalizedName)) {
+    return true;
+  }
+
+  if (edge.relationshipType === "COMPETES_WITH") {
+    return true;
+  }
+
+  if (!MATERIAL_CATEGORY_PATTERNS.some((pattern) => pattern.test(normalizedName))) {
+    return true;
+  }
+
+  if (words.length <= 2 && LOW_INFORMATION_CATEGORY_PATTERNS.some((pattern) => pattern.test(normalizedName))) {
+    return true;
+  }
+
+  return words.length > 6 || LOW_INFORMATION_CATEGORY_PATTERNS.slice(0, 2).some((pattern) => pattern.test(normalizedName));
+}
+
 function isCachedResultForFiling(
   result: CompanyGraphExtractionResult | null,
   accessionNumber: string,
@@ -90,12 +182,13 @@ async function persistEdges(db: FirebaseFirestore.Firestore, edges: CompanyGraph
 }
 
 function limitCategoryEdges(edges: CompanyGraphEdge[]): CompanyGraphEdge[] {
-  const categoryEdgesById = new Set(edges
+  const filteredEdges = edges.filter((edge) => edge.targetType !== "category" || !isLowInformationCategory(edge));
+  const categoryEdgesById = new Set(filteredEdges
     .filter((edge) => edge.targetType === "category")
     .sort((left, right) => {
-      const confidenceDelta = right.confidence - left.confidence;
-      if (confidenceDelta !== 0) {
-        return confidenceDelta;
+      const scoreDelta = categoryEdgeScore(right) - categoryEdgeScore(left);
+      if (scoreDelta !== 0) {
+        return scoreDelta;
       }
 
       return left.targetName.localeCompare(right.targetName);
@@ -103,7 +196,7 @@ function limitCategoryEdges(edges: CompanyGraphEdge[]): CompanyGraphEdge[] {
     .slice(0, MAX_CATEGORY_EDGES)
     .map((edge) => edge.id));
 
-  return edges.filter((edge) => {
+  return filteredEdges.filter((edge) => {
     if (edge.targetType !== "category") {
       return true;
     }
@@ -190,6 +283,8 @@ export async function runLatest10KCompanyGraphExtraction(
   const edges: CompanyGraphEdge[] = limitCategoryEdges(collapseCompanyGraphEntityEdges(openAiResult.relationships
     .filter((relationship) => relationship.confidence >= MIN_EDGE_CONFIDENCE)
     .map((relationship) => {
+      const targetType = normalizeGraphTargetType(relationship.targetName, relationship.targetType);
+
       return {
         id: edgeId({
           accessionNumber: filing.accessionNumber,
@@ -202,7 +297,7 @@ export async function runLatest10KCompanyGraphExtraction(
         sourceTicker: ticker,
         sourceCik: company.cik,
         targetName: relationship.targetName,
-        targetType: relationship.targetType,
+        targetType,
         relationshipType: relationship.relationshipType,
         direction: relationship.direction,
         evidenceText: relationship.evidenceText,

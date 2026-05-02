@@ -51,6 +51,19 @@ function stringFromValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function requestTimestampFromData(data: Record<string, unknown>): string {
+  return stringFromValue(data.lastRequestedAt) ??
+    stringFromValue(data.firstRequestedAt) ??
+    stringFromValue(data.processingStartedAt) ??
+    stringFromValue(data.completedAt) ??
+    stringFromValue(data.updatedAt) ??
+    "";
+}
+
+function firstRequestTimestampFromData(data: Record<string, unknown>): string {
+  return stringFromValue(data.firstRequestedAt) ?? requestTimestampFromData(data);
+}
+
 export async function hasCurrentCompanyGraph(ticker: string): Promise<boolean> {
   const normalizedTicker = normalizeTicker(ticker);
   if (!normalizedTicker) {
@@ -123,8 +136,8 @@ export async function listCompanyGraphRequests(): Promise<CompanyGraphRequestLis
         ticker: stringFromValue(data.ticker) ?? doc.id,
         status: readStatus(data.status),
         requestedCount: Math.max(1, numberFromValue(data.requestedCount)),
-        firstRequestedAt: stringFromValue(data.firstRequestedAt) ?? "",
-        lastRequestedAt: stringFromValue(data.lastRequestedAt) ?? "",
+        firstRequestedAt: firstRequestTimestampFromData(data),
+        lastRequestedAt: requestTimestampFromData(data),
         updatedAt: stringFromValue(data.updatedAt) ?? "",
         completedAt: stringFromValue(data.completedAt),
         failedAt: stringFromValue(data.failedAt),
@@ -167,8 +180,8 @@ export async function listQueuedCompanyGraphRequests(limit: number): Promise<Com
       ticker: stringFromValue(data.ticker) ?? doc.id,
       status: readStatus(data.status),
       requestedCount: Math.max(1, numberFromValue(data.requestedCount)),
-      firstRequestedAt: stringFromValue(data.firstRequestedAt) ?? "",
-      lastRequestedAt: stringFromValue(data.lastRequestedAt) ?? "",
+      firstRequestedAt: firstRequestTimestampFromData(data),
+      lastRequestedAt: requestTimestampFromData(data),
       updatedAt: stringFromValue(data.updatedAt) ?? "",
       completedAt: stringFromValue(data.completedAt),
       failedAt: stringFromValue(data.failedAt),
@@ -241,14 +254,26 @@ export async function markCompanyGraphRequestProcessing(ticker: string): Promise
     return;
   }
 
+  const db = getAdminFirestore();
+  const requestRef = db.collection("company_graph_requests").doc(normalizedTicker);
   const nowIso = new Date().toISOString();
-  await getAdminFirestore().collection("company_graph_requests").doc(normalizedTicker).set({
-    ticker: normalizedTicker,
-    status: "PROCESSING",
-    updatedAt: nowIso,
-    error: null,
-    extractionVersion: COMPANY_GRAPH_EXTRACTION_VERSION,
-  }, { merge: true });
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(requestRef);
+    const data = snapshot.data() as Record<string, unknown> | undefined;
+    const requestedCount = numberFromValue(data?.requestedCount);
+
+    transaction.set(requestRef, {
+      ticker: normalizedTicker,
+      status: "PROCESSING",
+      requestedCount: requestedCount + 1,
+      firstRequestedAt: stringFromValue(data?.firstRequestedAt) ?? nowIso,
+      lastRequestedAt: nowIso,
+      updatedAt: nowIso,
+      error: null,
+      extractionVersion: COMPANY_GRAPH_EXTRACTION_VERSION,
+    }, { merge: true });
+  });
 }
 
 export async function markCompanyGraphRequestCompleted(ticker: string, edgeCount: number): Promise<void> {

@@ -1,4 +1,4 @@
-import { getAdminFirestore } from "@/lib/firebase/admin";
+import { getAdminFirestore, getAdminStorageBucket } from "@/lib/firebase/admin";
 import {
   computePredictionOutcome,
   computePredictionReturn,
@@ -15,13 +15,13 @@ import {
 } from "@/lib/predictions/types";
 
 const EOD_PRICE_SOURCE = "twelve-data-time-series";
+const EODHD_BULK_EOD_PRICE_SOURCE = "eodhd-bulk-eod";
 const DEFAULT_MARKET = "US";
-const DEFAULT_LIMIT = 500;
-const MAX_LIMIT = 1000;
 const POSITION_SCAN_PAGE_SIZE = 500;
 const ROLL_FORWARD_PRICE_SCAN_PAGE_SIZE = 1000;
 const TWELVE_DATA_CHUNK_SIZE = 8;
 const PREVIOUS_EOD_PRICE_LOOKBACK_DAYS = 30;
+const EODHD_BULK_GCS_PREFIX = "eodhd-bulk-eod";
 
 export type DailyEodMaintenanceInput = {
   runDate?: string;
@@ -66,6 +66,9 @@ export type DailyEodMaintenanceResult = {
   scannedCandidatePredictions: number;
   hasMoreCandidatePredictions: boolean;
   priceLoad: {
+    provider: string | null;
+    rawGcsPath: string | null;
+    rawCacheHit: boolean;
     requestedTickers: number;
     cacheHits: number;
     loaded: number;
@@ -117,6 +120,26 @@ type TwelveDataSymbolResponse = {
 
 type TwelveDataBatchResponse = Record<string, TwelveDataSymbolResponse>;
 
+type EodhdBulkEodRow = {
+  code?: string;
+  exchange_short_name?: string;
+  date?: string;
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
+  adjusted_close?: number;
+  volume?: number;
+};
+
+type EodPriceFetchResult = {
+  provider: string;
+  prices: EodPrice[];
+  failures: Array<{ ticker: string; reason: string }>;
+  rawGcsPath: string | null;
+  rawCacheHit: boolean;
+};
+
 type EodPredictionRecord = {
   ref: FirebaseFirestore.DocumentReference;
   id: string;
@@ -142,6 +165,8 @@ type EodPredictionScanResult = {
   hasMoreCandidatePredictions: boolean;
 };
 
+type PredictionScanLimit = number | null;
+
 function getTwelveDataConfig(): { apiKey: string; apiUrl: string } {
   const apiKey = process.env.TWELVE_DATA_API_KEY?.trim() ?? "";
   if (!apiKey) {
@@ -154,12 +179,30 @@ function getTwelveDataConfig(): { apiKey: string; apiUrl: string } {
   };
 }
 
-function clampLimit(value: unknown): number {
+function getEodhdConfig(): { apiToken: string; apiUrl: string; bucketName: string } | null {
+  const apiToken = process.env.EODHD_API_TOKEN?.trim() ?? "";
+  if (!apiToken) {
+    return null;
+  }
+
+  const bucketName = process.env.EODHD_BULK_EOD_BUCKET?.trim() || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim() || "";
+  if (!bucketName) {
+    throw new Error("EODHD_BULK_EOD_BUCKET or NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET must be configured to cache EODHD bulk files.");
+  }
+
+  return {
+    apiToken,
+    apiUrl: (process.env.EODHD_API_URL?.trim() || "https://eodhd.com").replace(/\/$/, ""),
+    bucketName,
+  };
+}
+
+function readPredictionScanLimit(value: unknown): PredictionScanLimit {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
-    return DEFAULT_LIMIT;
+    return null;
   }
-  return Math.max(1, Math.min(Math.floor(parsed), MAX_LIMIT));
+  return Math.max(1, Math.floor(parsed));
 }
 
 function isIsoDate(value: string): boolean {
@@ -346,6 +389,139 @@ function parseTwelveDataPrice(
   };
 }
 
+function eodhdBulkGcsPath(market: string, requestedDate: string): string {
+  return `${EODHD_BULK_GCS_PREFIX}/${market}/${requestedDate}.json`;
+}
+
+function parseEodhdBulkRows(rawJson: string): EodhdBulkEodRow[] {
+  const payload = JSON.parse(rawJson) as unknown;
+  if (!Array.isArray(payload)) {
+    const message = typeof payload === "object" && payload !== null && "message" in payload
+      ? String((payload as { message?: unknown }).message)
+      : "unexpected_non_array_response";
+    throw new Error(`EODHD bulk EOD response was not an array: ${message}`);
+  }
+
+  return payload as EodhdBulkEodRow[];
+}
+
+async function readTextFromGcs(bucketName: string, path: string): Promise<string | null> {
+  const file = getAdminStorageBucket(bucketName).file(path);
+  const [exists] = await file.exists();
+  if (!exists) {
+    return null;
+  }
+
+  const [contents] = await file.download();
+  return contents.toString("utf8");
+}
+
+async function writeTextToGcs(bucketName: string, path: string, contents: string): Promise<void> {
+  const file = getAdminStorageBucket(bucketName).file(path);
+  await file.save(contents, {
+    contentType: "application/json",
+    resumable: false,
+    metadata: {
+      cacheControl: "private, max-age=31536000, immutable",
+    },
+  });
+}
+
+async function readEodhdBulkRows(
+  requestedDate: string,
+): Promise<{ rows: EodhdBulkEodRow[]; rawGcsPath: string; rawCacheHit: boolean } | null> {
+  const config = getEodhdConfig();
+  if (!config) {
+    return null;
+  }
+
+  const rawGcsPath = eodhdBulkGcsPath(DEFAULT_MARKET, requestedDate);
+  const cachedJson = await readTextFromGcs(config.bucketName, rawGcsPath);
+  if (cachedJson) {
+    return {
+      rows: parseEodhdBulkRows(cachedJson),
+      rawGcsPath,
+      rawCacheHit: true,
+    };
+  }
+
+  const url = new URL(`${config.apiUrl}/api/eod-bulk-last-day/${DEFAULT_MARKET}`);
+  url.searchParams.set("api_token", config.apiToken);
+  url.searchParams.set("date", requestedDate);
+  url.searchParams.set("fmt", "json");
+
+  const response = await fetch(url, { cache: "no-store" });
+  const rawJson = await response.text();
+  if (!response.ok) {
+    throw new Error(`EODHD bulk EOD request failed with HTTP ${response.status}: ${rawJson.slice(0, 500)}`);
+  }
+
+  const rows = parseEodhdBulkRows(rawJson);
+  await writeTextToGcs(config.bucketName, rawGcsPath, rawJson);
+
+  return {
+    rows,
+    rawGcsPath,
+    rawCacheHit: false,
+  };
+}
+
+function parseEodhdBulkPrice(
+  ticker: string,
+  requestedDate: string,
+  loadedAt: string,
+  row: EodhdBulkEodRow | undefined,
+): EodPrice | { ticker: string; reason: string } {
+  if (!row) {
+    return { ticker, reason: "missing_eodhd_bulk_row" };
+  }
+
+  const tradingDate = typeof row.date === "string" ? row.date : "";
+  if (!isIsoDate(tradingDate)) {
+    return { ticker, reason: "missing_trading_date" };
+  }
+
+  if (tradingDate !== requestedDate) {
+    return { ticker, reason: `trading_date_mismatch_${tradingDate}` };
+  }
+
+  const open = toFiniteNumber(row.open);
+  const high = toFiniteNumber(row.high);
+  const low = toFiniteNumber(row.low);
+  const close = toFiniteNumber(row.adjusted_close) ?? toFiniteNumber(row.close);
+
+  if (open === null || high === null || low === null || close === null || close <= 0) {
+    return { ticker, reason: "invalid_ohlc" };
+  }
+
+  const providerCode = typeof row.code === "string" && row.code.trim() ? row.code.trim() : ticker;
+  const exchange = typeof row.exchange_short_name === "string" && row.exchange_short_name.trim()
+    ? row.exchange_short_name.trim()
+    : DEFAULT_MARKET;
+
+  return {
+    market: DEFAULT_MARKET,
+    ticker,
+    requestedDate,
+    tradingDate,
+    open,
+    high,
+    low,
+    close,
+    volume: toFiniteNumber(row.volume),
+    source: EODHD_BULK_EOD_PRICE_SOURCE,
+    providerSymbol: `${providerCode}.${exchange}`,
+    exchange,
+    exchangeTimezone: null,
+    micCode: null,
+    loadedAt,
+    isFinal: true,
+    previousClose: null,
+    previousTradingDate: null,
+    dailyReturn: null,
+  };
+}
+
 async function readPreviousEodPrice(
   db: FirebaseFirestore.Firestore,
   price: Pick<EodPrice, "market" | "ticker" | "tradingDate">,
@@ -402,9 +578,15 @@ async function fetchTwelveDataEodPrices(
   tickers: string[],
   requestedDate: string,
   loadedAt: string,
-): Promise<{ prices: EodPrice[]; failures: Array<{ ticker: string; reason: string }> }> {
+): Promise<EodPriceFetchResult> {
   if (tickers.length === 0) {
-    return { prices: [], failures: [] };
+    return {
+      provider: EOD_PRICE_SOURCE,
+      prices: [],
+      failures: [],
+      rawGcsPath: null,
+      rawCacheHit: false,
+    };
   }
 
   const config = getTwelveDataConfig();
@@ -440,7 +622,83 @@ async function fetchTwelveDataEodPrices(
     });
   }
 
-  return { prices, failures };
+  return {
+    provider: EOD_PRICE_SOURCE,
+    prices,
+    failures,
+    rawGcsPath: null,
+    rawCacheHit: false,
+  };
+}
+
+async function fetchEodhdBulkEodPrices(
+  tickers: string[],
+  requestedDate: string,
+  loadedAt: string,
+): Promise<EodPriceFetchResult | null> {
+  if (tickers.length === 0) {
+    return {
+      provider: EODHD_BULK_EOD_PRICE_SOURCE,
+      prices: [],
+      failures: [],
+      rawGcsPath: null,
+      rawCacheHit: false,
+    };
+  }
+
+  const bulk = await readEodhdBulkRows(requestedDate);
+  if (!bulk) {
+    return null;
+  }
+
+  const rowsByTicker = new Map<string, EodhdBulkEodRow>();
+  bulk.rows.forEach((row) => {
+    if (typeof row.code === "string") {
+      const ticker = normalizeTicker(row.code);
+      if (ticker) {
+        rowsByTicker.set(ticker, row);
+      }
+    }
+  });
+
+  const prices: EodPrice[] = [];
+  const failures: Array<{ ticker: string; reason: string }> = [];
+  tickers.forEach((ticker) => {
+    const parsed = parseEodhdBulkPrice(ticker, requestedDate, loadedAt, rowsByTicker.get(ticker));
+    if ("reason" in parsed) {
+      failures.push(parsed);
+    } else {
+      prices.push(parsed);
+    }
+  });
+
+  return {
+    provider: EODHD_BULK_EOD_PRICE_SOURCE,
+    prices,
+    failures,
+    rawGcsPath: bulk.rawGcsPath,
+    rawCacheHit: bulk.rawCacheHit,
+  };
+}
+
+async function fetchEodPrices(
+  tickers: string[],
+  requestedDate: string,
+  loadedAt: string,
+): Promise<EodPriceFetchResult> {
+  try {
+    const eodhd = await fetchEodhdBulkEodPrices(tickers, requestedDate, loadedAt);
+    if (eodhd) {
+      return eodhd;
+    }
+  } catch (error) {
+    console.warn("[daily-eod-maintenance] EODHD bulk EOD load failed; falling back to Twelve Data", {
+      requestedDate,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return fetchTwelveDataEodPrices(tickers, requestedDate, loadedAt);
 }
 
 async function readRollForwardDates(db: FirebaseFirestore.Firestore, startDate: string): Promise<string[]> {
@@ -902,7 +1160,7 @@ function isDailySnapshotCandidate(prediction: EodPredictionRecord, runDate: stri
 async function scanEodPredictions(
   db: FirebaseFirestore.Firestore,
   runDate: string,
-  limit: number,
+  limit: PredictionScanLimit,
   manualTickers: string[],
 ): Promise<EodPredictionScanResult> {
   const candidatePredictions: EodPredictionRecord[] = [];
@@ -912,7 +1170,8 @@ async function scanEodPredictions(
   let scannedCandidatePredictions = 0;
   let hasMoreCandidatePredictions = false;
 
-  while (predictionsToProcess.length < limit) {
+  while (limit === null || predictionsToProcess.length < limit) {
+    let stoppedByLimit = false;
     let query = db
       .collection("predictions")
       .where("status", "in", ["CREATED", "OPEN", "SETTLED", "OPENING", "CLOSING", "CLOSED"])
@@ -948,16 +1207,17 @@ async function scanEodPredictions(
 
       if (isActionable || needsDailySnapshot) {
         predictionsToProcess.push(prediction);
-        if (predictionsToProcess.length >= limit) {
+        if (limit !== null && predictionsToProcess.length >= limit) {
+          stoppedByLimit = true;
           break;
         }
       }
     }
 
     lastDoc = snapshot.docs[snapshot.docs.length - 1] ?? null;
-    hasMoreCandidatePredictions = snapshot.size === POSITION_SCAN_PAGE_SIZE;
+    hasMoreCandidatePredictions = stoppedByLimit || snapshot.size === POSITION_SCAN_PAGE_SIZE;
 
-    if (!hasMoreCandidatePredictions) {
+    if (stoppedByLimit || !hasMoreCandidatePredictions) {
       break;
     }
   }
@@ -980,7 +1240,7 @@ export async function runDailyEodMaintenance(
   const loadPrices = input.loadPrices !== false;
   const markPredictions = input.markPredictions !== false;
   const runDate = resolveRunDate(input.runDate);
-  const limit = clampLimit(input.limit);
+  const limit = readPredictionScanLimit(input.limit);
   const nowIso = new Date().toISOString();
   const manualTickers = input.tickers?.length ? uniqueTickers(input.tickers) : [];
 
@@ -1059,6 +1319,9 @@ export async function runDailyEodMaintenance(
     });
 
     const priceLoad: DailyEodMaintenanceResult["priceLoad"] = {
+      provider: null,
+      rawGcsPath: null,
+      rawCacheHit: false,
       requestedTickers: requestedTickers.length,
       cacheHits: 0,
       loaded: 0,
@@ -1083,8 +1346,11 @@ export async function runDailyEodMaintenance(
       priceLoad.cacheHits = cachedPrices.size;
 
       const tickersToFetch = requestedTickers.filter((ticker) => !cachedPrices.has(ticker));
-      const fetched = await fetchTwelveDataEodPrices(tickersToFetch, runDate, nowIso);
+      const fetched = await fetchEodPrices(tickersToFetch, runDate, nowIso);
       const loadedPrices = await withTickerDailyReturns(db, [...cachedPrices.values(), ...fetched.prices]);
+      priceLoad.provider = fetched.provider;
+      priceLoad.rawGcsPath = fetched.rawGcsPath;
+      priceLoad.rawCacheHit = fetched.rawCacheHit;
       priceLoad.loaded = fetched.prices.length;
       priceLoad.failed = fetched.failures.length;
       priceLoad.prices = loadedPrices.map((price) => ({
@@ -1103,6 +1369,9 @@ export async function runDailyEodMaintenance(
         requestedTickers: requestedTickers.length,
         cacheHits: priceLoad.cacheHits,
         tickersFetched: tickersToFetch.length,
+        provider: priceLoad.provider,
+        rawGcsPath: priceLoad.rawGcsPath,
+        rawCacheHit: priceLoad.rawCacheHit,
         loaded: priceLoad.loaded,
         failed: priceLoad.failed,
         prices: priceLoad.prices,

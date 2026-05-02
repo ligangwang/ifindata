@@ -194,7 +194,6 @@ export async function extractCompanyGraphRelationships(input: {
                 "Use source_to_target when sourceName has the relationship to targetName, target_to_source when targetName has the relationship to sourceName, and bidirectional for reciprocal relationships like competitors or partners. " +
                 "Example: if the filing company depends on TSMC as a supplier, return relationshipType=SUPPLIER_OF and direction=target_to_source. " +
                 "Example: if the filing company sells to Walmart as a customer, return relationshipType=CUSTOMER_OF and direction=target_to_source. " +
-                "Do not extract geographies, risks, products, markets, executives, directors, subsidiaries, generic categories, or unnamed groups. " +
                 "Do not infer relationships beyond the evidence text, and keep evidenceText short but verbatim enough to audit the edge.",
             },
           ],

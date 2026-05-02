@@ -398,53 +398,6 @@ function directionAdjustedDailyReturn(direction: unknown, price: EodPrice): numb
   return direction === "UP" ? price.dailyReturn : -price.dailyReturn;
 }
 
-function buildTwelveDataTimeSeriesUrl(config: { apiKey: string; apiUrl: string }, tickers: string[], requestedDate: string): URL {
-  const url = new URL(`${config.apiUrl}/time_series`);
-  url.searchParams.set("symbol", tickers.join(","));
-  url.searchParams.set("interval", "1day");
-  url.searchParams.set("start_date", `${requestedDate} 00:00:00`);
-  url.searchParams.set("end_date", `${requestedDate} 23:59:59`);
-  url.searchParams.set("apikey", config.apiKey);
-  return url;
-}
-
-function normalizeTwelveDataSymbolKey(value: string | undefined): string {
-  return normalizeTicker((value ?? "").split(":").at(-1) ?? "");
-}
-
-function readTwelveDataSymbolPayload(
-  byTicker: TwelveDataBatchResponse,
-  ticker: string,
-): TwelveDataSymbolResponse | undefined {
-  const normalizedTicker = normalizeTicker(ticker);
-  const exact = byTicker[ticker] ?? byTicker[normalizedTicker];
-  if (exact) {
-    return exact;
-  }
-
-  for (const [responseKey, payload] of Object.entries(byTicker)) {
-    if (
-      normalizeTwelveDataSymbolKey(responseKey) === normalizedTicker ||
-      normalizeTwelveDataSymbolKey(payload.meta?.symbol) === normalizedTicker
-    ) {
-      return payload;
-    }
-  }
-
-  return undefined;
-}
-
-function toTwelveDataBatchResponse(
-  tickerChunk: string[],
-  payload: TwelveDataBatchResponse | TwelveDataSymbolResponse,
-): TwelveDataBatchResponse {
-  if (tickerChunk.length === 1 && ("values" in payload || "status" in payload || "meta" in payload)) {
-    return { [tickerChunk[0]]: payload as TwelveDataSymbolResponse };
-  }
-
-  return payload as TwelveDataBatchResponse;
-}
-
 async function fetchTwelveDataEodPrices(
   tickers: string[],
   requestedDate: string,
@@ -457,10 +410,15 @@ async function fetchTwelveDataEodPrices(
   const config = getTwelveDataConfig();
   const prices: EodPrice[] = [];
   const failures: Array<{ ticker: string; reason: string }> = [];
-  const omittedBatchTickers: string[] = [];
 
   for (const tickerChunk of chunk(tickers, TWELVE_DATA_CHUNK_SIZE)) {
-    const url = buildTwelveDataTimeSeriesUrl(config, tickerChunk, requestedDate);
+    const url = new URL(`${config.apiUrl}/time_series`);
+    url.searchParams.set("symbol", tickerChunk.join(","));
+    url.searchParams.set("interval", "1day");
+    url.searchParams.set("start_date", `${requestedDate} 00:00:00`);
+    url.searchParams.set("end_date", `${requestedDate} 23:59:59`);
+    url.searchParams.set("apikey", config.apiKey);
+
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) {
       tickerChunk.forEach((ticker) => failures.push({ ticker, reason: `provider_http_${response.status}` }));
@@ -468,38 +426,18 @@ async function fetchTwelveDataEodPrices(
     }
 
     const payload = (await response.json()) as TwelveDataBatchResponse | TwelveDataSymbolResponse;
-    const byTicker = toTwelveDataBatchResponse(tickerChunk, payload);
+    const byTicker = tickerChunk.length === 1 && "values" in payload
+      ? { [tickerChunk[0]]: payload as TwelveDataSymbolResponse }
+      : payload as TwelveDataBatchResponse;
 
     tickerChunk.forEach((ticker) => {
-      const parsed = parseTwelveDataPrice(ticker, requestedDate, loadedAt, readTwelveDataSymbolPayload(byTicker, ticker));
+      const parsed = parseTwelveDataPrice(ticker, requestedDate, loadedAt, byTicker[ticker]);
       if ("reason" in parsed) {
-        if (parsed.reason === "missing_symbol_response" && tickerChunk.length > 1) {
-          omittedBatchTickers.push(ticker);
-        } else {
-          failures.push(parsed);
-        }
+        failures.push(parsed);
       } else {
         prices.push(parsed);
       }
     });
-  }
-
-  for (const ticker of omittedBatchTickers) {
-    const url = buildTwelveDataTimeSeriesUrl(config, [ticker], requestedDate);
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) {
-      failures.push({ ticker, reason: `provider_http_${response.status}` });
-      continue;
-    }
-
-    const payload = (await response.json()) as TwelveDataBatchResponse | TwelveDataSymbolResponse;
-    const byTicker = toTwelveDataBatchResponse([ticker], payload);
-    const parsed = parseTwelveDataPrice(ticker, requestedDate, loadedAt, readTwelveDataSymbolPayload(byTicker, ticker));
-    if ("reason" in parsed) {
-      failures.push(parsed);
-    } else {
-      prices.push(parsed);
-    }
   }
 
   return { prices, failures };

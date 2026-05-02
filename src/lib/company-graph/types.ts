@@ -11,6 +11,7 @@ export const COMPANY_GRAPH_RELATIONSHIP_TYPES = [
 
 export const COMPANY_GRAPH_TARGET_TYPES = [
   "company",
+  "category",
 ] as const;
 
 export const COMPANY_GRAPH_EDGE_DIRECTIONS = [

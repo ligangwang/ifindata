@@ -9,7 +9,7 @@ import { collapseCompanyGraphEntityEdges } from "@/lib/company-graph/entities";
 import { FieldPath } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
-const MAX_EDGES = 40;
+const MAX_EDGES = 50;
 
 type CompanyGraphRunDocument = {
   companyName?: unknown;

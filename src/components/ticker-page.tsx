@@ -602,9 +602,11 @@ function KnowledgeGraph({
           <div className="mt-5 rounded-xl border border-white/10 bg-slate-900/70 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Graph type</p>
             <p className="mt-2 text-sm text-slate-200">
-              {companyGraph?.available && !locked
-                ? "SEC latest 10-K relationships with filing evidence."
-                : "Sign in to explore more relationships."}
+              {locked
+                ? "Sign in to explore more relationships."
+                : companyGraph?.available
+                  ? "SEC latest 10-K relationships with filing evidence."
+                  : "No SEC relationship graph is available yet."}
             </p>
           </div>
           {selectedNode.evidenceText ? (

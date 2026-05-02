@@ -90,15 +90,25 @@ async function persistEdges(db: FirebaseFirestore.Firestore, edges: CompanyGraph
 }
 
 function limitCategoryEdges(edges: CompanyGraphEdge[]): CompanyGraphEdge[] {
-  let categoryCount = 0;
+  const categoryEdgesById = new Set(edges
+    .filter((edge) => edge.targetType === "category")
+    .sort((left, right) => {
+      const confidenceDelta = right.confidence - left.confidence;
+      if (confidenceDelta !== 0) {
+        return confidenceDelta;
+      }
+
+      return left.targetName.localeCompare(right.targetName);
+    })
+    .slice(0, MAX_CATEGORY_EDGES)
+    .map((edge) => edge.id));
 
   return edges.filter((edge) => {
     if (edge.targetType !== "category") {
       return true;
     }
 
-    categoryCount += 1;
-    return categoryCount <= MAX_CATEGORY_EDGES;
+    return categoryEdgesById.has(edge.id);
   });
 }
 

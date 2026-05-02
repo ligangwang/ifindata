@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { FieldPath } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
   buildCompanyGraphExtractionText,
@@ -98,6 +99,10 @@ function runDocId(ticker: string): string {
   return `${ticker}_latest_10k`;
 }
 
+function edgeDocIdPrefix(ticker: string, accessionNumber: string): string {
+  return `${ticker}_${accessionNumber.replace(/-/g, "")}_`;
+}
+
 function readCachedResult(data: Record<string, unknown> | undefined): CompanyGraphExtractionResult | null {
   const result = data?.result;
   if (!result || typeof result !== "object") {
@@ -179,6 +184,39 @@ async function persistEdges(db: FirebaseFirestore.Firestore, edges: CompanyGraph
   }
 
   return written;
+}
+
+async function deleteStaleEdgesForFiling(
+  db: FirebaseFirestore.Firestore,
+  input: {
+    sourceTicker: string;
+    accessionNumber: string;
+    currentEdgeIds: Set<string>;
+  },
+): Promise<number> {
+  const edgePrefix = edgeDocIdPrefix(input.sourceTicker, input.accessionNumber);
+  const snapshot = await db
+    .collection("company_graph_edges")
+    .where(FieldPath.documentId(), ">=", edgePrefix)
+    .where(FieldPath.documentId(), "<", `${edgePrefix}\uf8ff`)
+    .orderBy(FieldPath.documentId())
+    .get();
+  const staleDocs = snapshot.docs.filter((doc) => !input.currentEdgeIds.has(doc.id));
+  let deleted = 0;
+
+  for (let index = 0; index < staleDocs.length; index += EDGE_BATCH_SIZE) {
+    const batch = db.batch();
+    const chunk = staleDocs.slice(index, index + EDGE_BATCH_SIZE);
+
+    for (const doc of chunk) {
+      batch.delete(doc.ref);
+    }
+
+    await batch.commit();
+    deleted += chunk.length;
+  }
+
+  return deleted;
 }
 
 function limitCategoryEdges(edges: CompanyGraphEdge[]): CompanyGraphEdge[] {
@@ -390,6 +428,11 @@ export async function runLatest10KCompanyGraphExtraction(
     }, { merge: true });
   }
 
+  await deleteStaleEdgesForFiling(db, {
+    sourceTicker: ticker,
+    accessionNumber: filing.accessionNumber,
+    currentEdgeIds: new Set(edges.map((edge) => edge.id)),
+  });
   await persistEdges(db, edges);
   await runRef.set({
     ticker,

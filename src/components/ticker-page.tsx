@@ -108,16 +108,6 @@ function directionLabel(direction: CompanyGraphEdge["direction"] | undefined): s
   return direction ? direction.replace(/_/g, " ") : "direction unknown";
 }
 
-function arrowLabel(direction: CompanyGraphEdge["direction"] | undefined, displayTicker: string, targetName: string): string {
-  if (direction === "target_to_source") {
-    return `${targetName} -> ${displayTicker}`;
-  }
-  if (direction === "bidirectional") {
-    return `${displayTicker} <-> ${targetName}`;
-  }
-  return `${displayTicker} -> ${targetName}`;
-}
-
 function graphKindForEdge(edge: CompanyGraphEdge): GraphNode["kind"] {
   if (edge.relationshipType === "COMPETES_WITH") {
     return "peer";
@@ -280,7 +270,7 @@ function relationNodes(displayTicker: string, predictions: Prediction[], graphEd
   ];
 }
 
-function relationEdges(nodes: GraphNode[], displayTicker: string): ElementDefinition[] {
+function relationEdges(nodes: GraphNode[]): ElementDefinition[] {
   return nodes
     .filter((node) => node.id !== "company")
     .map((node) => {
@@ -294,9 +284,7 @@ function relationEdges(nodes: GraphNode[], displayTicker: string): ElementDefini
           source: isTargetToSource ? node.id : "company",
           target: isTargetToSource ? "company" : node.id,
           label: relationshipText,
-          tooltip: node.relationshipType
-            ? `${relationshipText} - ${arrowLabel(node.direction, displayTicker, node.label)} - ${Math.round((node.confidence ?? 0) * 100)}% confidence`
-            : relationshipText,
+          tooltip: relationshipText,
           lineColor: node.relationshipType ? tone.line : "#155e75",
         },
         classes: [
@@ -358,7 +346,7 @@ function graphElements(nodes: GraphNode[], locked: boolean): ElementDefinition[]
         classes: node.kind,
       };
     }),
-    ...relationEdges(nodes, nodes.find((node) => node.id === "company")?.label ?? "Company"),
+    ...relationEdges(nodes),
   ];
 }
 

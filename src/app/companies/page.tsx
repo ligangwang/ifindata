@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CompanySearchCard } from "@/components/company-search-card";
+import { listLatestCompanyGraphRuns } from "@/lib/company-graph/latest-runs";
 import { featuredCompanies } from "@/lib/featured-companies";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Company graph | YouAnalyst",
@@ -20,7 +23,10 @@ export const metadata: Metadata = {
   },
 };
 
-export default function CompaniesPage() {
+export default async function CompaniesPage() {
+  const latestGraphRuns = await listLatestCompanyGraphRuns(4);
+  const graphCompanies = latestGraphRuns.length > 0 ? latestGraphRuns : featuredCompanies;
+
   return (
     <main className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-5xl flex-col px-4 pt-24 pb-8 sm:pt-28 lg:pt-32">
       <section className="w-full">
@@ -32,7 +38,7 @@ export default function CompaniesPage() {
         <CompanySearchCard />
 
         <div className="mt-5 flex flex-wrap justify-center gap-2">
-          {featuredCompanies.map((company) => (
+          {graphCompanies.map((company) => (
             <Link
               key={company.symbol}
               href={`/ticker/${company.symbol}`}

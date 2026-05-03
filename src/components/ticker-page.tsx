@@ -596,6 +596,11 @@ function KnowledgeGraph({
                   ? "SEC latest 10-K relationships with filing evidence."
                   : "No SEC relationship graph is available yet."}
             </p>
+            {!locked ? (
+              <p className="mt-3 text-xs leading-5 text-slate-400">
+                Graph relationships are extracted from public filings and may be incomplete. Please review the evidence and do your own due diligence.
+              </p>
+            ) : null}
           </div>
           {selectedNode.evidenceText ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-slate-900/70 p-4">

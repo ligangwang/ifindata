@@ -1,3 +1,4 @@
+import { FieldPath } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 
 const SEC_BASE_URL = "https://www.sec.gov";
@@ -401,7 +402,6 @@ function changeDocId(quarter: string, managerCik: string, cusip: string): string
 async function loadPreviousHoldings(
   managerCik: string,
   quarter: string,
-  cusips: string[],
 ): Promise<Map<string, InstitutionalHolding>> {
   const priorQuarter = previousQuarter(quarter);
   if (!priorQuarter) {
@@ -410,18 +410,17 @@ async function loadPreviousHoldings(
 
   const db = getAdminFirestore();
   const previous = new Map<string, InstitutionalHolding>();
-  const uniqueCusips = [...new Set(cusips)];
+  const docPrefix = `${priorQuarter}_${managerCik}_`;
+  const snapshot = await db
+    .collection("institutional_holdings")
+    .where(FieldPath.documentId(), ">=", docPrefix)
+    .where(FieldPath.documentId(), "<", `${docPrefix}\uf8ff`)
+    .orderBy(FieldPath.documentId())
+    .get();
 
-  for (let index = 0; index < uniqueCusips.length; index += HOLDING_BATCH_SIZE) {
-    const refs = uniqueCusips.slice(index, index + HOLDING_BATCH_SIZE)
-      .map((cusip) => db.collection("institutional_holdings").doc(holdingDocId(priorQuarter, managerCik, cusip)));
-    const snapshots = await db.getAll(...refs);
-
-    for (const snapshot of snapshots) {
-      if (snapshot.exists) {
-        previous.set(snapshot.id.split("_").at(-1) ?? snapshot.id, snapshot.data() as InstitutionalHolding);
-      }
-    }
+  for (const doc of snapshot.docs) {
+    const holding = doc.data() as InstitutionalHolding;
+    previous.set(holding.cusip, holding);
   }
 
   return previous;
@@ -430,9 +429,12 @@ async function loadPreviousHoldings(
 function buildHoldingChanges(
   holdings: InstitutionalHolding[],
   previousHoldings: Map<string, InstitutionalHolding>,
+  filing: Latest13FFiling,
+  quarter: string,
   updatedAt: string,
 ): InstitutionalHoldingChange[] {
-  return holdings.map((holding) => {
+  const currentHoldings = new Map(holdings.map((holding) => [holding.cusip, holding]));
+  const changes: InstitutionalHoldingChange[] = holdings.map((holding) => {
     const previous = previousHoldings.get(holding.cusip);
     const previousShares = previous?.shares ?? 0;
     const previousValueUsd = previous?.valueUsd ?? 0;
@@ -468,6 +470,35 @@ function buildHoldingChanges(
       updatedAt,
     };
   });
+
+  for (const previous of previousHoldings.values()) {
+    if (currentHoldings.has(previous.cusip)) {
+      continue;
+    }
+
+    changes.push({
+      quarter,
+      managerCik: filing.managerCik,
+      managerName: filing.managerName,
+      cusip: previous.cusip,
+      ticker: previous.ticker,
+      nameOfIssuer: previous.nameOfIssuer,
+      currentShares: 0,
+      previousShares: previous.shares,
+      shareChange: -previous.shares,
+      percentChange: previous.shares > 0 ? -1 : null,
+      currentValueUsd: 0,
+      previousValueUsd: previous.valueUsd,
+      valueChangeUsd: -previous.valueUsd,
+      status: "SOLD_OUT",
+      accessionNumber: filing.accessionNumber,
+      filingDate: filing.filingDate,
+      reportDate: filing.reportDate,
+      updatedAt,
+    });
+  }
+
+  return changes;
 }
 
 async function persistManager13F(input: {
@@ -564,8 +595,8 @@ async function syncManager13F(managerCik: string, dryRun: boolean, updatedAt: st
         updatedAt,
       };
     });
-    const previousHoldings = await loadPreviousHoldings(filing.managerCik, quarter, holdings.map((holding) => holding.cusip));
-    const changes = buildHoldingChanges(holdings, previousHoldings, updatedAt);
+    const previousHoldings = await loadPreviousHoldings(filing.managerCik, quarter);
+    const changes = buildHoldingChanges(holdings, previousHoldings, filing, quarter, updatedAt);
     const written = await persistManager13F({
       filing,
       infoTableUrl: infoTable.url,

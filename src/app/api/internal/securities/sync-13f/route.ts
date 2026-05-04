@@ -1,5 +1,5 @@
 import { isInternalRequest } from "@/lib/firebase/auth";
-import { syncLatest13FHoldings } from "@/lib/securities/thirteen-f";
+import { InvalidManagerCikError, syncLatest13FHoldings } from "@/lib/securities/thirteen-f";
 import { NextRequest, NextResponse } from "next/server";
 
 type Sync13FRequest = {
@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to sync 13F holdings";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const status = error instanceof InvalidManagerCikError ? 400 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

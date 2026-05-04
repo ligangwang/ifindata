@@ -7,6 +7,13 @@ const SEC_DATA_BASE_URL = "https://data.sec.gov";
 const HOLDING_BATCH_SIZE = 450;
 const MAX_MANAGER_CIKS = 25;
 
+export class InvalidManagerCikError extends Error {
+  constructor(value: string) {
+    super(`Invalid manager CIK "${value}". Manager CIKs must contain 1 to 10 digits.`);
+    this.name = "InvalidManagerCikError";
+  }
+}
+
 type SecSubmissionsResponse = {
   name?: unknown;
   cik?: unknown;
@@ -171,7 +178,13 @@ async function fetchSecText(url: string): Promise<string> {
 }
 
 function padCik(cik: string | number): string {
-  return String(cik).replace(/\D/g, "").padStart(10, "0");
+  const value = String(cik).trim();
+  const digits = value.replace(/\D/g, "");
+  if (!digits || digits.length > 10) {
+    throw new InvalidManagerCikError(value);
+  }
+
+  return digits.padStart(10, "0");
 }
 
 function unpadCik(cik: string): string {
@@ -184,7 +197,7 @@ function normalizeManagerCiks(values: string[]): string[] {
 
   for (const value of values) {
     const cik = padCik(value);
-    if (!/^\d{10}$/.test(cik) || seen.has(cik)) {
+    if (seen.has(cik)) {
       continue;
     }
 

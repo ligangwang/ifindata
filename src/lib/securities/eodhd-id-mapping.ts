@@ -3,7 +3,7 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 const DEFAULT_EXCHANGE = "US";
 const DEFAULT_PAGE_LIMIT = 1000;
 const MAX_PAGE_LIMIT = 1000;
-const MAX_SYNC_PAGES = 200;
+const MAX_SYNC_PAGES = 5;
 const MAPPING_SOURCE = "eodhd-id-mapping";
 const MAPPING_BATCH_SIZE = 450;
 

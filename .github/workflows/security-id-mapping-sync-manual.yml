@@ -27,9 +27,14 @@ on:
         default: "0"
         type: string
       max_pages:
-        description: Max pages to sync in this run
+        description: Total max pages to sync across batched requests
         required: true
         default: "200"
+        type: string
+      pages_per_request:
+        description: Pages per Cloud Run request
+        required: true
+        default: "5"
         type: string
       dry_run:
         description: Fetch and parse without Firestore writes
@@ -103,6 +108,7 @@ jobs:
           PAGE_LIMIT: ${{ inputs.page_limit }}
           PAGE_OFFSET: ${{ inputs.page_offset }}
           MAX_PAGES: ${{ inputs.max_pages }}
+          PAGES_PER_REQUEST: ${{ inputs.pages_per_request }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
@@ -111,37 +117,81 @@ jobs:
             exit 1
           fi
 
-          body="$(jq -n \
-            --arg exchange "$EXCHANGE" \
-            --argjson pageLimit "$PAGE_LIMIT" \
-            --argjson pageOffset "$PAGE_OFFSET" \
-            --argjson maxPages "$MAX_PAGES" \
-            --argjson dryRun "$DRY_RUN" \
-            '{
-              exchange: $exchange,
-              pageLimit: $pageLimit,
-              pageOffset: $pageOffset,
-              maxPages: $maxPages,
-              dryRun: $dryRun
-            }')"
+          offset="$PAGE_OFFSET"
+          remaining="$MAX_PAGES"
+          pages_per_request="$PAGES_PER_REQUEST"
+          total_pages=0
+          total_fetched=0
+          total_mapped=0
+          total_written=0
+          total_skipped=0
 
-          echo "Calling ${CLOUD_RUN_URL}/api/internal/securities/sync-id-mappings"
-          echo "Request body: $body"
+          while [[ "$remaining" -gt 0 ]]; do
+            batch_pages="$pages_per_request"
+            if [[ "$batch_pages" -gt "$remaining" ]]; then
+              batch_pages="$remaining"
+            fi
 
-          response_file="$(mktemp)"
-          status="$(curl --silent --show-error \
-            --output "$response_file" \
-            --write-out '%{http_code}' \
-            --request POST \
-            --header "Authorization: Bearer ${INTERNAL_API_TOKEN}" \
-            --header "Content-Type: application/json" \
-            --data "$body" \
-            "${CLOUD_RUN_URL}/api/internal/securities/sync-id-mappings" || true)"
+            body="$(jq -n \
+              --arg exchange "$EXCHANGE" \
+              --argjson pageLimit "$PAGE_LIMIT" \
+              --argjson pageOffset "$offset" \
+              --argjson maxPages "$batch_pages" \
+              --argjson dryRun "$DRY_RUN" \
+              '{
+                exchange: $exchange,
+                pageLimit: $pageLimit,
+                pageOffset: $pageOffset,
+                maxPages: $maxPages,
+                dryRun: $dryRun
+              }')"
 
-          cat "$response_file"
-          echo
+            echo "Calling ${CLOUD_RUN_URL}/api/internal/securities/sync-id-mappings"
+            echo "Request body: $body"
 
-          if [[ "$status" -lt 200 || "$status" -ge 300 ]]; then
-            echo "Security ID mapping sync failed with HTTP $status" >&2
-            exit 1
-          fi
+            response_file="$(mktemp)"
+            status="$(curl --silent --show-error \
+              --output "$response_file" \
+              --write-out '%{http_code}' \
+              --request POST \
+              --header "Authorization: Bearer ${INTERNAL_API_TOKEN}" \
+              --header "Content-Type: application/json" \
+              --data "$body" \
+              "${CLOUD_RUN_URL}/api/internal/securities/sync-id-mappings" || true)"
+
+            cat "$response_file"
+            echo
+
+            if [[ "$status" -lt 200 || "$status" -ge 300 ]]; then
+              echo "Security ID mapping sync failed with HTTP $status" >&2
+              exit 1
+            fi
+
+            pages="$(jq -r '.pages // 0' "$response_file")"
+            fetched="$(jq -r '.fetched // 0' "$response_file")"
+            mapped="$(jq -r '.mapped // 0' "$response_file")"
+            written="$(jq -r '.written // 0' "$response_file")"
+            skipped="$(jq -r '.skipped // 0' "$response_file")"
+            has_more="$(jq -r '.hasMore // false' "$response_file")"
+            next_offset="$(jq -r '.nextOffset // empty' "$response_file")"
+
+            total_pages=$((total_pages + pages))
+            total_fetched=$((total_fetched + fetched))
+            total_mapped=$((total_mapped + mapped))
+            total_written=$((total_written + written))
+            total_skipped=$((total_skipped + skipped))
+
+            if [[ "$pages" -le 0 || "$has_more" != "true" || -z "$next_offset" ]]; then
+              break
+            fi
+
+            offset="$next_offset"
+            remaining=$((remaining - pages))
+          done
+
+          echo "Completed security ID mapping sync batches."
+          echo "Pages: $total_pages"
+          echo "Fetched: $total_fetched"
+          echo "Mapped: $total_mapped"
+          echo "Written: $total_written"
+          echo "Skipped: $total_skipped"

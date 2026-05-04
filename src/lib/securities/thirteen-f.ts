@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { FieldPath } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 
@@ -59,6 +60,7 @@ type Latest13FFiling = {
 };
 
 export type InstitutionalHolding = Parsed13FHolding & {
+  positionKey: string;
   quarter: string;
   managerCik: string;
   managerName: string;
@@ -78,6 +80,7 @@ export type InstitutionalHoldingChange = {
   quarter: string;
   managerCik: string;
   managerName: string;
+  positionKey: string;
   cusip: string;
   ticker: string | null;
   nameOfIssuer: string;
@@ -391,12 +394,31 @@ async function loadCusipMappings(cusips: string[]): Promise<Map<string, Security
   return mappings;
 }
 
-function holdingDocId(quarter: string, managerCik: string, cusip: string): string {
-  return `${quarter}_${managerCik}_${cusip}`;
+function normalizedKeyPart(value: string | null): string {
+  return value?.trim().toUpperCase().replace(/\s+/g, " ") ?? "";
 }
 
-function changeDocId(quarter: string, managerCik: string, cusip: string): string {
-  return `${quarter}_${managerCik}_${cusip}`;
+function holdingPositionKey(holding: Pick<Parsed13FHolding, "cusip" | "titleOfClass" | "shareType" | "putCall" | "investmentDiscretion">): string {
+  const digest = createHash("sha256")
+    .update([
+      holding.cusip,
+      normalizedKeyPart(holding.titleOfClass),
+      normalizedKeyPart(holding.shareType),
+      normalizedKeyPart(holding.putCall),
+      normalizedKeyPart(holding.investmentDiscretion),
+    ].join("|"))
+    .digest("hex")
+    .slice(0, 16);
+
+  return `${holding.cusip}_${digest}`;
+}
+
+function holdingDocId(quarter: string, managerCik: string, positionKey: string): string {
+  return `${quarter}_${managerCik}_${positionKey}`;
+}
+
+function changeDocId(quarter: string, managerCik: string, positionKey: string): string {
+  return `${quarter}_${managerCik}_${positionKey}`;
 }
 
 async function loadPreviousHoldings(
@@ -420,7 +442,7 @@ async function loadPreviousHoldings(
 
   for (const doc of snapshot.docs) {
     const holding = doc.data() as InstitutionalHolding;
-    previous.set(holding.cusip, holding);
+    previous.set(holding.positionKey ?? holdingPositionKey(holding), holding);
   }
 
   return previous;
@@ -433,9 +455,9 @@ function buildHoldingChanges(
   quarter: string,
   updatedAt: string,
 ): InstitutionalHoldingChange[] {
-  const currentHoldings = new Map(holdings.map((holding) => [holding.cusip, holding]));
+  const currentHoldings = new Map(holdings.map((holding) => [holding.positionKey, holding]));
   const changes: InstitutionalHoldingChange[] = holdings.map((holding) => {
-    const previous = previousHoldings.get(holding.cusip);
+    const previous = previousHoldings.get(holding.positionKey);
     const previousShares = previous?.shares ?? 0;
     const previousValueUsd = previous?.valueUsd ?? 0;
     const shareChange = holding.shares - previousShares;
@@ -453,6 +475,7 @@ function buildHoldingChanges(
       quarter: holding.quarter,
       managerCik: holding.managerCik,
       managerName: holding.managerName,
+      positionKey: holding.positionKey,
       cusip: holding.cusip,
       ticker: holding.ticker,
       nameOfIssuer: holding.nameOfIssuer,
@@ -472,7 +495,8 @@ function buildHoldingChanges(
   });
 
   for (const previous of previousHoldings.values()) {
-    if (currentHoldings.has(previous.cusip)) {
+    const positionKey = previous.positionKey ?? holdingPositionKey(previous);
+    if (currentHoldings.has(positionKey)) {
       continue;
     }
 
@@ -480,6 +504,7 @@ function buildHoldingChanges(
       quarter,
       managerCik: filing.managerCik,
       managerName: filing.managerName,
+      positionKey,
       cusip: previous.cusip,
       ticker: previous.ticker,
       nameOfIssuer: previous.nameOfIssuer,
@@ -545,7 +570,7 @@ async function persistManager13F(input: {
     const chunk = input.holdings.slice(index, index + HOLDING_BATCH_SIZE);
 
     for (const holding of chunk) {
-      batch.set(db.collection("institutional_holdings").doc(holdingDocId(holding.quarter, holding.managerCik, holding.cusip)), holding, { merge: true });
+      batch.set(db.collection("institutional_holdings").doc(holdingDocId(holding.quarter, holding.managerCik, holding.positionKey)), holding, { merge: true });
     }
 
     await batch.commit();
@@ -557,7 +582,7 @@ async function persistManager13F(input: {
     const chunk = input.changes.slice(index, index + HOLDING_BATCH_SIZE);
 
     for (const change of chunk) {
-      batch.set(db.collection("institutional_holding_changes").doc(changeDocId(change.quarter, change.managerCik, change.cusip)), change, { merge: true });
+      batch.set(db.collection("institutional_holding_changes").doc(changeDocId(change.quarter, change.managerCik, change.positionKey)), change, { merge: true });
     }
 
     await batch.commit();
@@ -580,6 +605,7 @@ async function syncManager13F(managerCik: string, dryRun: boolean, updatedAt: st
 
       return {
         ...holding,
+        positionKey: holdingPositionKey(holding),
         quarter,
         managerCik: filing.managerCik,
         managerName: filing.managerName,

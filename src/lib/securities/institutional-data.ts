@@ -118,6 +118,10 @@ function latestChangeByPosition(changes: InstitutionalHoldingChange[]): Map<stri
   return byPosition;
 }
 
+function isChangeNewerThanHolding(change: InstitutionalHoldingChange, holding: InstitutionalHolding): boolean {
+  return `${change.reportDate}_${change.updatedAt}` > `${holding.reportDate}_${holding.updatedAt}`;
+}
+
 export async function getInstitutionalTickerSummary(
   rawTicker: string,
   limit = DEFAULT_TICKER_SCAN_LIMIT,
@@ -158,6 +162,7 @@ export async function getInstitutionalTickerSummary(
       const aggregateShares = managerHoldings.reduce((total, item) => total + item.shares, 0);
       const aggregateValueUsd = managerHoldings.reduce((total, item) => total + item.valueUsd, 0);
       const change = changeByManager.get(holding.managerCik) ?? null;
+      const isSoldOut = change?.status === "SOLD_OUT" && isChangeNewerThanHolding(change, holding);
 
       return {
         managerCik: holding.managerCik,
@@ -168,9 +173,9 @@ export async function getInstitutionalTickerSummary(
         reportDate: holding.reportDate,
         filingDate: holding.filingDate,
         accessionNumber: holding.accessionNumber,
-        shares: aggregateShares,
-        valueUsd: aggregateValueUsd,
-        positionCount: managerHoldings.length,
+        shares: isSoldOut ? 0 : aggregateShares,
+        valueUsd: isSoldOut ? 0 : aggregateValueUsd,
+        positionCount: isSoldOut ? 0 : managerHoldings.length,
         changeStatus: change?.status ?? null,
         shareChange: change?.shareChange ?? null,
         valueChangeUsd: change?.valueChangeUsd ?? null,

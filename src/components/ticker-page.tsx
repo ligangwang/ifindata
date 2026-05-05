@@ -1,13 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { Core, ElementDefinition, StylesheetJsonBlock } from "cytoscape";
+import { useEffect, useState } from "react";
 import { formatTickerSymbol, PredictionAuthorSummary, PredictionReturnSummary } from "@/components/prediction-ui";
-import { useAuth } from "@/components/providers/auth-provider";
-import type { CompanyGraphEdge, CompanyGraphRelationshipType, CompanyGraphTargetType } from "@/lib/company-graph/types";
 import { type PredictionStatus } from "@/lib/predictions/types";
-import { xPostIntentUrl } from "@/lib/x-share";
 
 type Prediction = {
   id: string;
@@ -41,621 +37,187 @@ type TickerResponse = {
   ticker: string;
 };
 
-type CompanyGraphResponse = {
-  available: boolean;
+type InstitutionalTickerPosition = {
+  managerCik: string;
+  managerName: string;
   ticker: string;
-  companyName: string | null;
-  filing: {
-    accessionNumber: string | null;
-    filingDate: string | null;
-    reportDate: string | null;
-    filingUrl: string | null;
-  } | null;
-  runId?: string | null;
-  edges: CompanyGraphEdge[];
+  nameOfIssuer: string;
+  quarter: string;
+  reportDate: string;
+  filingDate: string;
+  accessionNumber: string;
+  shares: number;
+  valueUsd: number;
+  positionCount: number;
+  changeStatus: "NEW" | "INCREASED" | "REDUCED" | "SOLD_OUT" | "UNCHANGED" | null;
+  shareChange: number | null;
+  valueChangeUsd: number | null;
+  percentChange: number | null;
+  updatedAt: string;
 };
 
-type GraphNode = {
-  id: string;
-  label: string;
-  sublabel: string;
-  kind: "company" | "theme" | "peer" | "chain" | "calls" | "record";
-  width: number;
-  height: number;
-  relationshipType?: CompanyGraphRelationshipType;
-  direction?: CompanyGraphEdge["direction"];
-  targetType?: CompanyGraphTargetType;
-  evidenceText?: string;
-  confidence?: number;
-  filingDate?: string;
-  positionIndex?: number;
-  positionTotal?: number;
+type InstitutionalTickerSummary = {
+  ticker: string;
+  totalManagers: number;
+  totalValueUsd: number;
+  totalShares: number;
+  latestReportDate: string | null;
+  positions: InstitutionalTickerPosition[];
 };
 
-function relationLabel(type: CompanyGraphRelationshipType): string {
-  return type.replace(/_/g, " ");
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    currency: "USD",
+    maximumFractionDigits: 0,
+    style: "currency",
+  }).format(value);
 }
 
-function relationshipTone(type: CompanyGraphRelationshipType | undefined): {
-  line: string;
-  nodeBg: string;
-  nodeBorder: string;
-} {
-  if (type === "COMPETES_WITH") {
-    return {
-      line: "#818cf8",
-      nodeBg: "#312e81",
-      nodeBorder: "#a5b4fc",
-    };
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+}
+
+function formatPercent(value: number | null): string {
+  if (value === null) {
+    return "new";
   }
 
-  if (type === "PARTNER_OF" || type === "DISTRIBUTES_FOR") {
-    return {
-      line: "#22d3ee",
-      nodeBg: "#083344",
-      nodeBorder: "#67e8f9",
-    };
+  return `${value > 0 ? "+" : ""}${new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+    style: "percent",
+  }).format(value)}`;
+}
+
+function changeTone(status: InstitutionalTickerPosition["changeStatus"]): string {
+  if (status === "INCREASED" || status === "NEW") {
+    return "border-emerald-400/30 bg-emerald-400/10 text-emerald-100";
   }
 
-  return {
-    line: "#34d399",
-    nodeBg: "#052e2b",
-    nodeBorder: "#34d399",
-  };
-}
-
-function directionLabel(direction: CompanyGraphEdge["direction"] | undefined): string {
-  return direction ? direction.replace(/_/g, " ") : "direction unknown";
-}
-
-function graphKindForEdge(edge: CompanyGraphEdge): GraphNode["kind"] {
-  if (edge.relationshipType === "COMPETES_WITH") {
-    return "peer";
-  }
-  return "chain";
-}
-
-function summarizeGraphEdges(edges: CompanyGraphEdge[]): string {
-  const counts = edges.reduce<Record<string, number>>((accumulator, edge) => {
-    accumulator[edge.relationshipType] = (accumulator[edge.relationshipType] ?? 0) + 1;
-    return accumulator;
-  }, {});
-  const summary = Object.entries(counts)
-    .sort((left, right) => right[1] - left[1])
-    .slice(0, 3)
-    .map(([type, count]) => `${count} ${relationLabel(type as CompanyGraphRelationshipType)}`)
-    .join(" - ");
-
-  return summary || "Latest 10-K relationships";
-}
-
-function graphShareVersion(companyGraph: CompanyGraphResponse | null): string {
-  const source = companyGraph?.filing?.accessionNumber ?? companyGraph?.runId ?? companyGraph?.ticker ?? "latest";
-  const compact = source.replace(/[^0-9A-Za-z]/g, "");
-  return `graph-${compact || "latest"}`;
-}
-
-function graphShareUrl(ticker: string, companyGraph: CompanyGraphResponse | null): string {
-  const origin = typeof window === "undefined" ? "https://youanalyst.com" : window.location.origin;
-  const url = new URL(`/ticker/${encodeURIComponent(ticker)}`, origin);
-  url.searchParams.set("utm_source", "x");
-  url.searchParams.set("utm_medium", "social");
-  url.searchParams.set("utm_campaign", "company_graph_share");
-  url.searchParams.set("share", graphShareVersion(companyGraph));
-  return url.toString();
-}
-
-function graphShareText(displayTicker: string, companyGraph: CompanyGraphResponse | null): string {
-  const edges = companyGraph?.edges ?? [];
-  const summary = edges.length > 0 ? summarizeGraphEdges(edges).toLowerCase() : "SEC 10-K relationships";
-  const filingDate = companyGraph?.filing?.filingDate;
-  const suffix = filingDate ? ` Latest 10-K filed ${filingDate}.` : "";
-
-  return `Mapping ${displayTicker}'s company knowledge graph on YouAnalyst: ${summary} with SEC filing evidence.${suffix}`;
-}
-
-function graphShareIntentUrl(input: {
-  ticker: string;
-  displayTicker: string;
-  companyGraph: CompanyGraphResponse | null;
-}): string {
-  return xPostIntentUrl({
-    text: graphShareText(input.displayTicker, input.companyGraph),
-    url: graphShareUrl(input.ticker, input.companyGraph),
-  });
-}
-
-function secGraphNodes(displayTicker: string, graphEdges: CompanyGraphEdge[]): GraphNode[] {
-  return [
-    {
-      id: "company",
-      label: displayTicker,
-      sublabel: summarizeGraphEdges(graphEdges),
-      kind: "company",
-      width: 122,
-      height: 78,
-    },
-    ...graphEdges.map((edge, index) => ({
-      id: `sec-${edge.id}`,
-      label: edge.targetName,
-      sublabel: `${relationLabel(edge.relationshipType)} - ${directionLabel(edge.direction)} - ${Math.round(edge.confidence * 100)}% confidence`,
-      kind: graphKindForEdge(edge),
-      width: edge.targetName.length > 18 ? 154 : 132,
-      height: 58,
-      relationshipType: edge.relationshipType,
-      direction: edge.direction,
-      targetType: edge.targetType,
-      evidenceText: edge.evidenceText,
-      confidence: edge.confidence,
-      filingDate: edge.filingDate,
-      positionIndex: index,
-      positionTotal: graphEdges.length,
-    })),
-  ];
-}
-
-function relationNodes(displayTicker: string, predictions: Prediction[], graphEdges: CompanyGraphEdge[]): GraphNode[] {
-  if (graphEdges.length > 0) {
-    return secGraphNodes(displayTicker, graphEdges);
+  if (status === "REDUCED" || status === "SOLD_OUT") {
+    return "border-rose-400/30 bg-rose-400/10 text-rose-100";
   }
 
-  if (predictions.length === 0) {
-    return [
-      {
-        id: "company",
-        label: displayTicker,
-        sublabel: "Company node",
-        kind: "company",
-        width: 112,
-        height: 76,
-      },
-    ];
-  }
-
-  const bullishCount = predictions.filter((prediction) => prediction.direction === "UP").length;
-  const bearishCount = predictions.filter((prediction) => prediction.direction === "DOWN").length;
-  const liveCount = predictions.filter((prediction) => ["CREATED", "OPEN", "CLOSING"].includes(prediction.status)).length;
-  const settledCount = predictions.filter((prediction) => prediction.status === "SETTLED").length;
-  const uniqueAnalystCount = new Set(predictions.map((prediction) => prediction.userId).filter(Boolean)).size;
-
-  return [
-    {
-      id: "theme",
-      label: "Market themes",
-      sublabel: "AI, margins, demand, macro",
-      kind: "theme",
-      width: 136,
-      height: 54,
-    },
-    {
-      id: "peers",
-      label: "Peer set",
-      sublabel: "Competitors and substitutes",
-      kind: "peer",
-      width: 128,
-      height: 52,
-    },
-    {
-      id: "supply",
-      label: "Value chain",
-      sublabel: "Suppliers, customers, channels",
-      kind: "chain",
-      width: 132,
-      height: 52,
-    },
-    {
-      id: "calls",
-      label: "Public calls",
-      sublabel: `${bullishCount} bullish - ${bearishCount} bearish`,
-      kind: "calls",
-      width: 128,
-      height: 52,
-    },
-    {
-      id: "activity",
-      label: "Track record",
-      sublabel: `${liveCount} live - ${settledCount} settled - ${uniqueAnalystCount} analysts`,
-      kind: "record",
-      width: 128,
-      height: 52,
-    },
-    {
-      id: "company",
-      label: displayTicker,
-      sublabel: "Company node",
-      kind: "company",
-      width: 112,
-      height: 76,
-    },
-  ];
+  return "border-white/10 bg-slate-900/80 text-slate-300";
 }
 
-function relationEdges(nodes: GraphNode[]): ElementDefinition[] {
-  return nodes
-    .filter((node) => node.id !== "company")
-    .map((node) => {
-      const isTargetToSource = node.direction === "target_to_source";
-      const isBidirectional = node.direction === "bidirectional";
-      const relationshipText = node.relationshipType ? relationLabel(node.relationshipType) : node.kind === "calls" ? "tracked by" : "related to";
-      const tone = relationshipTone(node.relationshipType);
-      return {
-        data: {
-          id: `company-${node.id}`,
-          source: isTargetToSource ? node.id : "company",
-          target: isTargetToSource ? "company" : node.id,
-          label: relationshipText,
-          tooltip: relationshipText,
-          lineColor: node.relationshipType ? tone.line : "#155e75",
-        },
-        classes: [
-          node.relationshipType ? "relationship" : "context",
-          isBidirectional ? "bidirectional" : "",
-        ].filter(Boolean).join(" "),
-      };
-    });
-}
-
-function graphPosition(id: string, locked: boolean, node?: GraphNode): { x: number; y: number } {
-  if (locked) {
-    if (id === "theme") {
-      return { x: 230, y: 140 };
-    }
-    if (id === "activity") {
-      return { x: 530, y: 260 };
-    }
-    return { x: 380, y: 200 };
-  }
-
-  if (id.startsWith("sec-")) {
-    const index = node?.positionIndex ?? 0;
-    const total = Math.max(6, node?.positionTotal ?? 10);
-    const angle = (index / total) * Math.PI * 2 - Math.PI / 2;
-    const radiusX = total > 24 ? 390 : total > 16 ? 330 : 265;
-    const radiusY = total > 24 ? 230 : total > 16 ? 190 : 150;
-    return {
-      x: 430 + Math.cos(angle) * radiusX,
-      y: 270 + Math.sin(angle) * radiusY,
-    };
-  }
-
-  const positions: Record<string, { x: number; y: number }> = {
-    activity: { x: 150, y: 300 },
-    calls: { x: 150, y: 150 },
-    company: { x: 430, y: 270 },
-    peers: { x: 620, y: 180 },
-    supply: { x: 390, y: 335 },
-    theme: { x: 380, y: 70 },
-  };
-
-  return positions[id] ?? positions.company;
-}
-
-function graphElements(nodes: GraphNode[], locked: boolean): ElementDefinition[] {
-  return [
-    ...nodes.map((node) => {
-      const tone = relationshipTone(node.relationshipType ?? (node.kind === "peer" ? "COMPETES_WITH" : undefined));
-      return {
-        data: {
-          ...node,
-          label: node.label,
-          detail: node.sublabel,
-          nodeBg: tone.nodeBg,
-          nodeBorder: tone.nodeBorder,
-        },
-        position: graphPosition(node.id, locked, node),
-        classes: node.kind,
-      };
-    }),
-    ...relationEdges(nodes),
-  ];
-}
-
-function KnowledgeGraph({
+function InstitutionalHoldingsSection({
   displayTicker,
-  predictions,
-  companyGraph,
-  locked,
+  summary,
+  error,
 }: {
   displayTicker: string;
-  predictions: Prediction[];
-  companyGraph: CompanyGraphResponse | null;
-  locked: boolean;
+  summary: InstitutionalTickerSummary | null;
+  error: string | null;
 }) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const cytoscapeRef = useRef<Core | null>(null);
-  const nodes = useMemo(() => {
-    const allNodes = relationNodes(displayTicker, predictions, locked ? [] : companyGraph?.edges ?? []);
-    return locked
-      ? allNodes.filter((node) => node.id === "company")
-      : allNodes;
-  }, [companyGraph?.edges, displayTicker, locked, predictions]);
-  const [selectedNodeId, setSelectedNodeId] = useState("company");
-  const selectedNodeIdRef = useRef("company");
-  const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? nodes.find((node) => node.id === "company") ?? nodes[0];
-
-  useEffect(() => {
-    selectedNodeIdRef.current = selectedNodeId;
-  }, [selectedNodeId]);
-
-  useEffect(() => {
-    if (!nodes.some((node) => node.id === selectedNodeId)) {
-      setSelectedNodeId("company");
-    }
-  }, [nodes, selectedNodeId]);
-
-  useEffect(() => {
-    if (!containerRef.current) {
-      return;
-    }
-
-    let cancelled = false;
-    let cy: Core | null = null;
-
-    const stylesheet: StylesheetJsonBlock[] = [
-      {
-        selector: "node",
-        style: {
-          "background-color": "#0f172a",
-          "border-color": "#334155",
-          "border-width": 2,
-          color: "#e0f2fe",
-          "font-family": "Inter, sans-serif",
-          "font-size": 12,
-          "font-weight": 700,
-          height: "data(height)",
-          label: "data(label)",
-          "min-zoomed-font-size": 8,
-          shape: "round-rectangle",
-          "text-halign": "center",
-          "text-max-width": "112px",
-          "text-outline-color": "#020617",
-          "text-outline-width": "3px",
-          "text-valign": "center",
-          "text-wrap": "wrap",
-          width: "data(width)",
-        },
-      },
-      {
-        selector: "node.company",
-        style: {
-          "background-color": "#064e3b",
-          "border-color": "#5eead4",
-          color: "#ecfeff",
-        },
-      },
-      {
-        selector: "node.theme, node.record",
-        style: {
-          "background-color": "#083344",
-          "border-color": "#22d3ee",
-        },
-      },
-      {
-        selector: "node.calls",
-        style: {
-          "background-color": "#052e2b",
-          "border-color": "#34d399",
-        },
-      },
-      {
-        selector: "node.chain, node.peer",
-        style: {
-          "background-color": "data(nodeBg)",
-          "border-color": "data(nodeBorder)",
-        },
-      },
-      {
-        selector: "edge",
-        style: {
-          "curve-style": "bezier",
-          "line-color": "data(lineColor)",
-          "line-opacity": 0.72,
-          "target-arrow-color": "data(lineColor)",
-          "source-arrow-color": "data(lineColor)",
-          width: 2,
-        },
-      },
-      {
-        selector: "edge.relationship",
-        style: {
-          "target-arrow-shape": "triangle",
-        },
-      },
-      {
-        selector: "edge.bidirectional",
-        style: {
-          "source-arrow-shape": "triangle",
-        },
-      },
-      {
-        selector: "edge.edge-hover",
-        style: {
-          color: "#e0f2fe",
-          "font-size": 11,
-          "font-weight": 700,
-          label: "data(tooltip)",
-          "line-opacity": 1,
-          "text-background-color": "#020617",
-          "text-background-opacity": 0.86,
-          "text-background-padding": "4px",
-          "text-border-color": "#164e63",
-          "text-border-opacity": 0.85,
-          "text-border-width": 1,
-          "text-rotation": "autorotate",
-          "text-wrap": "wrap",
-          width: 3,
-        },
-      },
-      {
-        selector: "node:selected",
-        style: {
-          "border-color": "#a7f3d0",
-          "border-width": 4,
-        },
-      },
-    ];
-
-    void import("cytoscape").then((module) => {
-      if (cancelled || !containerRef.current) {
-        return;
-      }
-
-      const cytoscape = module.default;
-      cy = cytoscape({
-        autoungrabify: locked,
-        boxSelectionEnabled: false,
-        container: containerRef.current,
-        elements: graphElements(nodes, locked),
-        layout: {
-          name: "preset",
-          animate: false,
-          fit: true,
-          padding: 55,
-        },
-        maxZoom: 2.2,
-        minZoom: 0.65,
-        style: stylesheet,
-        wheelSensitivity: 0.18,
-      });
-
-      cytoscapeRef.current = cy;
-      const initialSelectedNodeId = nodes.some((node) => node.id === selectedNodeIdRef.current)
-        ? selectedNodeIdRef.current
-        : "company";
-      cy.getElementById(initialSelectedNodeId).select();
-      cy.on("tap", "node", (event) => {
-        const id = event.target.id();
-        setSelectedNodeId(id);
-        cy?.nodes().unselect();
-        event.target.select();
-      });
-      cy.on("tap", "edge", (event) => {
-        const targetNode = event.target.target().id() === "company" ? event.target.source() : event.target.target();
-        const id = targetNode.id();
-        setSelectedNodeId(id);
-        cy?.nodes().unselect();
-        targetNode.select();
-      });
-      cy.on("mouseover", "edge", (event) => {
-        event.target.addClass("edge-hover");
-      });
-      cy.on("mouseout", "edge", (event) => {
-        event.target.removeClass("edge-hover");
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      cytoscapeRef.current = null;
-      cy?.destroy();
-    };
-  }, [locked, nodes]);
-
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70">
-      <div className="grid min-h-[560px] gap-0 lg:grid-cols-[1fr_300px]">
-        <div className="relative h-[560px] min-h-[420px]">
-          <div
-            ref={containerRef}
-            className="absolute inset-0 h-full w-full"
-            aria-label={`${displayTicker} company knowledge graph`}
-          />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,145,178,0.18),transparent_48%)]" />
-          <div className="pointer-events-none absolute left-4 top-4 rounded-xl border border-white/10 bg-slate-950/80 p-3 text-xs text-slate-300 shadow-xl">
-            <p className="mb-2 font-semibold uppercase tracking-wide text-slate-500">Color key</p>
-            <div className="grid gap-1.5">
-              <span className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-sm border border-cyan-200 bg-emerald-900" />
-                Filing company
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-sm border border-emerald-300 bg-emerald-950" />
-                Supply chain
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-sm border border-cyan-200 bg-cyan-950" />
-                Partner/channel
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-sm border border-indigo-300 bg-indigo-950" />
-                Competitor
-              </span>
-            </div>
-          </div>
+    <section className="mt-4 rounded-2xl border border-white/15 bg-slate-950/55 p-5">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Institutional holdings</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Latest 13F positions and changes reported by tracked institutions for {displayTicker}.
+          </p>
         </div>
-        <aside className="border-t border-white/10 bg-slate-950/80 p-5 lg:border-l lg:border-t-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Selected node</p>
-          <h3 className="mt-3 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">{selectedNode.label}</h3>
-          <p className="mt-3 text-sm leading-6 text-slate-300">{selectedNode.sublabel}</p>
-          <div className="mt-5 rounded-xl border border-white/10 bg-slate-900/70 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Graph type</p>
-            <p className="mt-2 text-sm text-slate-200">
-              {locked
-                ? "Sign in to explore more relationships."
-                : companyGraph?.available
-                  ? "SEC latest 10-K relationships with filing evidence."
-                  : "No SEC relationship graph is available yet."}
-            </p>
-            {!locked ? (
-              <p className="mt-3 text-xs leading-5 text-slate-400">
-                Graph relationships are extracted from public filings and may be incomplete. Please review the evidence and do your own due diligence.
-              </p>
-            ) : null}
-          </div>
-          {selectedNode.evidenceText ? (
-            <div className="mt-4 rounded-xl border border-white/10 bg-slate-900/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Evidence</p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">{selectedNode.evidenceText}</p>
-              {selectedNode.filingDate ? (
-                <p className="mt-3 text-xs text-slate-500">10-K filed {selectedNode.filingDate}</p>
-              ) : null}
-            </div>
-          ) : null}
-        </aside>
+        {summary?.latestReportDate ? (
+          <p className="text-sm font-semibold text-slate-300">Latest report {summary.latestReportDate}</p>
+        ) : null}
       </div>
-      {locked ? (
-        <div className="border-t border-white/10 bg-slate-950/75 p-5">
-          <div className="mx-auto flex max-w-3xl flex-col gap-3 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
-            <div>
-              <h3 className="font-[var(--font-sora)] text-base font-semibold text-cyan-100">Company graph preview</h3>
-              <p className="mt-1 text-sm leading-6 text-slate-300">
-                Sign in to explore more relationships around this company.
-              </p>
-            </div>
-            <Link
-              href="/auth"
-              className="shrink-0 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
-            >
-              Sign in to explore more
-            </Link>
+
+      {error ? <p className="mb-3 text-sm text-amber-200">{error}</p> : null}
+
+      {summary ? (
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-white/10 bg-slate-900/60 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Managers</p>
+            <p className="mt-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">{summary.totalManagers}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-slate-900/60 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reported value</p>
+            <p className="mt-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">{formatCurrency(summary.totalValueUsd)}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-slate-900/60 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reported shares</p>
+            <p className="mt-2 font-[var(--font-sora)] text-2xl font-semibold text-cyan-100">{formatNumber(summary.totalShares)}</p>
           </div>
         </div>
       ) : null}
-    </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[840px] text-left text-sm">
+          <thead className="border-b border-white/10 text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="py-3 pr-3">Institution</th>
+              <th className="py-3 pr-3 text-right">Value</th>
+              <th className="py-3 pr-3 text-right">Shares</th>
+              <th className="py-3 pr-3">Change</th>
+              <th className="py-3 pr-3 text-right">Value change</th>
+              <th className="py-3">Report</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/10">
+            {summary?.positions.map((position) => (
+              <tr key={`${position.managerCik}_${position.accessionNumber}`} className="text-slate-200">
+                <td className="py-3 pr-3">
+                  <Link href={`/institutions/${position.managerCik}`} className="font-semibold text-cyan-100 hover:text-cyan-300">
+                    {position.managerName}
+                  </Link>
+                  <p className="mt-1 text-xs text-slate-500">CIK {position.managerCik}</p>
+                </td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatCurrency(position.valueUsd)}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatNumber(position.shares)}</td>
+                <td className="py-3 pr-3">
+                  <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${changeTone(position.changeStatus)}`}>
+                    {position.changeStatus ?? "CURRENT"} {position.changeStatus ? formatPercent(position.percentChange) : ""}
+                  </span>
+                </td>
+                <td className="py-3 pr-3 text-right tabular-nums">
+                  {position.valueChangeUsd === null ? "Unknown" : formatCurrency(position.valueChangeUsd)}
+                </td>
+                <td className="py-3 text-slate-400">
+                  {position.quarter}
+                  <p className="text-xs text-slate-500">{position.reportDate}</p>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {summary && summary.positions.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
+          No tracked institutional 13F positions are available for {displayTicker} yet.
+        </p>
+      ) : null}
+
+      {!summary && !error ? (
+        <p className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
+          Loading institutional holdings...
+        </p>
+      ) : null}
+
+      <p className="mt-4 text-xs leading-5 text-slate-500">
+        13F filings are delayed, may omit some positions, and are not investment advice. Review original filings and do your own due diligence.
+      </p>
+    </section>
   );
 }
 
 export function TickerPage({ ticker }: { ticker: string }) {
-  const { user, loading: authLoading, getIdToken } = useAuth();
   const [payload, setPayload] = useState<TickerResponse | null>(null);
-  const [companyGraph, setCompanyGraph] = useState<CompanyGraphResponse | null>(null);
+  const [holdings, setHoldings] = useState<InstitutionalTickerSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [graphError, setGraphError] = useState<string | null>(null);
-  const [adminStatus, setAdminStatus] = useState<{ userId: string; isAdmin: boolean } | null>(null);
-  const [extractingGraph, setExtractingGraph] = useState(false);
-  const [graphActionMessage, setGraphActionMessage] = useState<string | null>(null);
+  const [holdingsError, setHoldingsError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const displayTicker = formatTickerSymbol(payload?.ticker ?? ticker);
-  const graphLocked = authLoading || !user;
-  const canExtractGraph = Boolean(user && adminStatus?.userId === user.uid && adminStatus.isAdmin);
 
   useEffect(() => {
     let cancelled = false;
 
     setPayload(null);
-    setCompanyGraph(null);
+    setHoldings(null);
     setError(null);
-    setGraphError(null);
+    setHoldingsError(null);
     setLoadingMore(false);
 
     void fetch(`/api/ticker/${ticker}?limit=25`)
@@ -677,22 +239,22 @@ export function TickerPage({ ticker }: { ticker: string }) {
         }
       });
 
-    void fetch(`/api/company-graph/${ticker}`)
+    void fetch(`/api/institutional-holdings/${encodeURIComponent(ticker)}`)
       .then(async (response) => {
         if (!response.ok) {
-          throw new Error("Unable to load company graph.");
+          throw new Error("Unable to load institutional holdings.");
         }
 
-        return (await response.json()) as CompanyGraphResponse;
+        return (await response.json()) as InstitutionalTickerSummary;
       })
-      .then((nextGraph) => {
+      .then((nextHoldings) => {
         if (!cancelled) {
-          setCompanyGraph(nextGraph);
+          setHoldings(nextHoldings);
         }
       })
       .catch((nextError) => {
         if (!cancelled) {
-          setGraphError(nextError instanceof Error ? nextError.message : "Unable to load company graph.");
+          setHoldingsError(nextError instanceof Error ? nextError.message : "Unable to load institutional holdings.");
         }
       });
 
@@ -700,93 +262,6 @@ export function TickerPage({ ticker }: { ticker: string }) {
       cancelled = true;
     };
   }, [ticker]);
-
-  useEffect(() => {
-    if (authLoading || !user) {
-      setAdminStatus(null);
-      return;
-    }
-
-    let cancelled = false;
-    const userId = user.uid;
-
-    async function loadAdminStatus() {
-      try {
-        const token = await getIdToken(true);
-        if (!token) {
-          if (!cancelled) {
-            setAdminStatus({ userId, isAdmin: false });
-          }
-          return;
-        }
-
-        const response = await fetch("/api/admin/me", {
-          headers: {
-            authorization: `Bearer ${token}`,
-          },
-        });
-        const payload = (await response.json().catch(() => ({}))) as { isAdmin?: boolean };
-
-        if (!cancelled) {
-          setAdminStatus({ userId, isAdmin: response.ok && payload.isAdmin === true });
-        }
-      } catch {
-        if (!cancelled) {
-          setAdminStatus({ userId, isAdmin: false });
-        }
-      }
-    }
-
-    void loadAdminStatus();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, getIdToken, user]);
-
-  async function refreshCompanyGraph() {
-    if (extractingGraph) {
-      return;
-    }
-
-    setExtractingGraph(true);
-    setGraphActionMessage(null);
-    setGraphError(null);
-
-    try {
-      const token = await getIdToken(true);
-      if (!token) {
-        throw new Error("Sign in with an admin account to generate SEC graph data.");
-      }
-
-      const response = await fetch("/api/admin/company-graph/extract", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ticker: payload?.ticker ?? ticker,
-          force: false,
-        }),
-      });
-      const body = (await response.json().catch(() => ({}))) as { error?: string; edges?: CompanyGraphEdge[]; cached?: boolean };
-
-      if (!response.ok) {
-        throw new Error(body.error ?? "Unable to generate SEC graph.");
-      }
-
-      const graphResponse = await fetch(`/api/company-graph/${encodeURIComponent(payload?.ticker ?? ticker)}`);
-      if (graphResponse.ok) {
-        setCompanyGraph((await graphResponse.json()) as CompanyGraphResponse);
-      }
-      setGraphActionMessage(body.cached ? "SEC graph is already current." : `SEC graph generated with ${body.edges?.length ?? 0} edges.`);
-    } catch (nextError) {
-      setGraphError(nextError instanceof Error ? nextError.message : "Unable to generate SEC graph.");
-    } finally {
-      setExtractingGraph(false);
-    }
-  }
 
   async function loadMorePredictions() {
     if (!payload?.nextCursor || loadingMore) {
@@ -837,7 +312,7 @@ export function TickerPage({ ticker }: { ticker: string }) {
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Company</p>
             <h1 className="mt-2 font-[var(--font-sora)] text-4xl font-semibold text-cyan-100">{displayTicker}</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-              Public calls, watchlists, and relationship context for {displayTicker}.
+              Public calls, watchlists, and institutional 13F context for {displayTicker}.
             </p>
           </div>
           <Link
@@ -849,52 +324,11 @@ export function TickerPage({ ticker }: { ticker: string }) {
         </div>
       </section>
 
-      <section className="mt-4 rounded-2xl border border-white/15 bg-slate-950/55 p-5">
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex flex-col gap-1">
-            <h2 className="font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Knowledge graph</h2>
-            <p className="text-sm text-slate-400">
-              {companyGraph?.available && !graphLocked
-                ? `Latest 10-K relationships around ${displayTicker}.`
-                : `Map company relationships, market themes, and YouAnalyst activity around ${displayTicker}.`}
-            </p>
-          </div>
-          {canExtractGraph ? (
-            <div className="flex flex-col gap-2 sm:flex-row">
-              {companyGraph?.available ? (
-                <a
-                  href={graphShareIntentUrl({
-                    ticker: payload.ticker,
-                    displayTicker,
-                    companyGraph,
-                  })}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full rounded-lg bg-cyan-500 px-4 py-2 text-center text-sm font-semibold text-slate-950 hover:bg-cyan-400 sm:w-auto"
-                >
-                  Share graph on X
-                </a>
-              ) : null}
-              <button
-                type="button"
-                onClick={refreshCompanyGraph}
-                disabled={extractingGraph}
-                className="w-full rounded-lg border border-cyan-400/40 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-              >
-                {extractingGraph ? "Generating..." : companyGraph?.available ? "Check latest 10-K" : "Generate SEC graph"}
-              </button>
-            </div>
-          ) : null}
-        </div>
-        {graphActionMessage ? <p className="mb-3 text-sm text-emerald-200">{graphActionMessage}</p> : null}
-        {graphError ? <p className="mb-3 text-sm text-amber-200">{graphError}</p> : null}
-        <KnowledgeGraph
-          displayTicker={displayTicker}
-          predictions={payload.items}
-          companyGraph={companyGraph}
-          locked={graphLocked}
-        />
-      </section>
+      <InstitutionalHoldingsSection
+        displayTicker={displayTicker}
+        summary={holdings}
+        error={holdingsError}
+      />
 
       <section className="mt-4 rounded-2xl border border-white/15 bg-slate-950/55 p-5">
         <h2 className="mb-3 font-[var(--font-sora)] text-xl font-semibold text-cyan-100">Predictions</h2>

@@ -9,8 +9,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { symbol } = await params;
   const ticker = normalizeTicker(symbol);
-  const title = `${ticker} company graph | YouAnalyst`;
-  const description = `Explore ${ticker} company context, public calls, watchlists, and relationship signals on YouAnalyst.`;
+  const title = `${ticker} institutional holdings | YouAnalyst`;
+  const description = `Explore ${ticker} public calls, watchlists, and institutional 13F holding changes on YouAnalyst.`;
 
   return {
     title,

@@ -129,8 +129,20 @@ export async function getInstitutionalTickerSummary(
   const ticker = normalizeTicker(rawTicker);
   const db = getAdminFirestore();
   const [holdingsSnapshot, changesSnapshot] = await Promise.all([
-    db.collection("institutional_holdings").where("ticker", "==", ticker).limit(limit).get(),
-    db.collection("institutional_holding_changes").where("ticker", "==", ticker).limit(limit).get(),
+    db
+      .collection("institutional_holdings")
+      .where("ticker", "==", ticker)
+      .orderBy("reportDate", "desc")
+      .orderBy("updatedAt", "desc")
+      .limit(limit)
+      .get(),
+    db
+      .collection("institutional_holding_changes")
+      .where("ticker", "==", ticker)
+      .orderBy("reportDate", "desc")
+      .orderBy("updatedAt", "desc")
+      .limit(limit)
+      .get(),
   ]);
   const latestByManager = new Map<string, InstitutionalHolding>();
 

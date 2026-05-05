@@ -348,9 +348,8 @@ async function fetchLatest13FFiling(managerCik: string): Promise<Latest13FFiling
 
 function isLikelyInformationTableFile(item: SecDirectoryItem): boolean {
   const name = readString(item.name)?.toLowerCase() ?? "";
-  const type = readString(item.type)?.toLowerCase() ?? "";
 
-  return name.endsWith(".xml") && type === "xml";
+  return name.endsWith(".xml");
 }
 
 function informationTableFileRank(item: SecDirectoryItem): number {
@@ -360,6 +359,9 @@ function informationTableFileRank(item: SecDirectoryItem): number {
   }
   if (name.includes("form13f")) {
     return 1;
+  }
+  if (name === "primary_doc.xml" || name.includes("primary")) {
+    return 3;
   }
   return 2;
 }
